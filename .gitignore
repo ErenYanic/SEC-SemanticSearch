@@ -25,6 +25,7 @@ edgar-identity.txt
 *.json
 *.parquet
 *.feather
+data/
 
 # Operating system files
 .DS_Store
