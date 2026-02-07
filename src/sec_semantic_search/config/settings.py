@@ -3,7 +3,15 @@
 from pathlib import Path
 from typing import Optional
 
+from dotenv import load_dotenv
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# Load .env into os.environ BEFORE nested BaseSettings classes are
+# instantiated as default values in the Settings class body.  Without
+# this, EdgarSettings() (which has required fields and no defaults)
+# fails because it only searches os.environ — it has no env_file of
+# its own.
+load_dotenv()
 
 
 class EdgarSettings(BaseSettings):
