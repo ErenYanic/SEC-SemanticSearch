@@ -26,7 +26,7 @@ class EdgarSettings(BaseSettings):
 class EmbeddingSettings(BaseSettings):
     """Embedding model configuration."""
 
-    model_name: str = "all-MiniLM-L6-v2"
+    model_name: str = "google/embeddinggemma-300m"
     device: str = "auto"  # "cuda", "cpu", or "auto"
     batch_size: int = 32
 
