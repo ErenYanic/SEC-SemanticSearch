@@ -4,8 +4,8 @@
 SUPPORTED_FORMS = ("10-K", "10-Q")
 
 # Embedding model parameters
-EMBEDDING_DIMENSION = 384  # Dimension of all-MiniLM-L6-v2
-EMBEDDING_MODEL_NAME = "all-MiniLM-L6-v2"
+EMBEDDING_DIMENSION = 768  # Dimension of google/embeddinggemma-300m
+EMBEDDING_MODEL_NAME = "google/embeddinggemma-300m"
 
 # Chunking parameters
 DEFAULT_CHUNK_TOKEN_LIMIT = 500
