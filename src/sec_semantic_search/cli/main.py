@@ -1,5 +1,6 @@
 """Typer application root for the sec-search CLI."""
 
+import logging
 from importlib.metadata import version
 
 import typer
@@ -8,6 +9,7 @@ from rich.console import Console
 from sec_semantic_search.cli.ingest import ingest_app
 from sec_semantic_search.cli.manage import manage_app
 from sec_semantic_search.cli.search import search
+from sec_semantic_search.core.logging import configure_logging, suppress_third_party_loggers
 
 # Shared console instance for consistent output across all CLI modules.
 console = Console()
@@ -26,6 +28,13 @@ def _version_callback(value: bool) -> None:
         raise typer.Exit()
 
 
+def _verbose_callback(value: bool) -> None:
+    """Enable DEBUG-level logging when --verbose is passed."""
+    if value:
+        configure_logging(level=logging.DEBUG)
+        suppress_third_party_loggers()
+
+
 @app.callback()
 def main(
     _version: bool = typer.Option(
@@ -34,6 +43,14 @@ def main(
         "-v",
         help="Show version and exit.",
         callback=_version_callback,
+        is_eager=True,
+    ),
+    _verbose: bool = typer.Option(
+        False,
+        "--verbose",
+        "-V",
+        help="Enable detailed debug output.",
+        callback=_verbose_callback,
         is_eager=True,
     ),
 ) -> None:
