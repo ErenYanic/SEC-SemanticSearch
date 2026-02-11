@@ -4,6 +4,13 @@ from typing import Annotated
 
 import typer
 from rich.console import Console
+from rich.progress import (
+    BarColumn,
+    Progress,
+    SpinnerColumn,
+    TextColumn,
+    TimeElapsedColumn,
+)
 
 from sec_semantic_search.config import SUPPORTED_FORMS
 from sec_semantic_search.core import (
@@ -19,6 +26,36 @@ from sec_semantic_search.pipeline.fetch import FilingFetcher
 console = Console()
 
 ingest_app = typer.Typer(no_args_is_help=True)
+
+# Step labels used in the progress display for ingestion.
+_STEPS = ["Fetching", "Parsing", "Chunking", "Embedding", "Storing"]
+
+
+def _print_error(
+    label: str,
+    message: str,
+    *,
+    details: str | None = None,
+    hint: str | None = None,
+) -> None:
+    """Print a consistently formatted error with optional details and hint."""
+    console.print(f"[red]{label}:[/red] {message}")
+    if details:
+        console.print(f"  [dim]{details}[/dim]")
+    if hint:
+        console.print(f"  [dim italic]Hint: {hint}[/dim italic]")
+
+
+def _make_progress() -> Progress:
+    """Create a Rich Progress instance for ingestion steps."""
+    return Progress(
+        SpinnerColumn(),
+        TextColumn("[bold]{task.description}"),
+        BarColumn(bar_width=30),
+        TextColumn("{task.completed}/{task.total} steps"),
+        TimeElapsedColumn(),
+        console=console,
+    )
 
 
 @ingest_app.command("add")
@@ -47,46 +84,80 @@ def add(
     try:
         registry.check_filing_limit()
     except FilingLimitExceededError as e:
-        console.print(f"[red]Filing limit reached:[/red] {e.message}")
+        _print_error(
+            "Filing limit reached",
+            e.message,
+            hint="Remove filings with 'sec-search manage remove' or raise the limit via DB_MAX_FILINGS.",
+        )
         raise typer.Exit(code=1) from None
 
-    # 2. Fetch the latest filing (cheap network call).
-    with console.status(f"Fetching latest {form} for {ticker}..."):
+    with _make_progress() as progress:
+        task = progress.add_task(f"Fetching {ticker} {form}...", total=len(_STEPS))
+
+        # 2. Fetch the latest filing (cheap network call).
         try:
             fetcher = FilingFetcher()
             filing_id, html_content = fetcher.fetch_latest(ticker, form)
         except FetchError as e:
-            console.print(f"[red]Fetch failed:[/red] {e.message}")
-            if e.details:
-                console.print(f"  [dim]{e.details}[/dim]")
+            progress.stop()
+            _print_error(
+                "Fetch failed",
+                e.message,
+                details=e.details,
+                hint="Check the ticker symbol is valid and you have an internet connection.",
+            )
             raise typer.Exit(code=1) from None
 
-    # 3. Check for duplicates before expensive processing.
-    if registry.is_duplicate(filing_id.accession_number):
-        console.print(
-            f"[yellow]Already ingested:[/yellow] {ticker} {form} "
-            f"({filing_id.date_str}, {filing_id.accession_number})"
-        )
-        raise typer.Exit(code=0)
+        progress.advance(task)
 
-    # 4. Run the pipeline (parse → chunk → embed).
-    with console.status("Processing filing (parse, chunk, embed)..."):
+        # 3. Check for duplicates before expensive processing.
+        if registry.is_duplicate(filing_id.accession_number):
+            progress.stop()
+            console.print(
+                f"[yellow]Already ingested:[/yellow] {ticker} {form} "
+                f"({filing_id.date_str}, {filing_id.accession_number})"
+            )
+            raise typer.Exit(code=0)
+
+        # 4. Run the pipeline (parse → chunk → embed).
+        #    The orchestrator callback drives steps 2-4 of the progress bar.
+        def _on_progress(step: str, _current: int, _total: int) -> None:
+            if step != "Complete":
+                progress.update(task, description=f"{step}...")
+                progress.advance(task)
+
         try:
             orchestrator = PipelineOrchestrator(fetcher=fetcher)
-            result = orchestrator.process_filing(filing_id, html_content)
+            result = orchestrator.process_filing(
+                filing_id, html_content, progress_callback=_on_progress
+            )
         except SECSemanticSearchError as e:
-            console.print(f"[red]Processing failed:[/red] {e.message}")
-            if e.details:
-                console.print(f"  [dim]{e.details}[/dim]")
+            progress.stop()
+            _print_error(
+                "Processing failed",
+                e.message,
+                details=e.details,
+                hint="If this is a memory error, try lowering EMBEDDING_BATCH_SIZE in .env.",
+            )
             raise typer.Exit(code=1) from None
 
-    # 5. Store: ChromaDB first, then SQLite.
-    try:
-        chroma.store_filing(result)
-        registry.register_filing(result.filing_id, result.ingest_result.chunk_count)
-    except DatabaseError as e:
-        console.print(f"[red]Storage failed:[/red] {e.message}")
-        raise typer.Exit(code=1) from None
+        # 5. Store: ChromaDB first, then SQLite.
+        progress.update(task, description="Storing...")
+        try:
+            chroma.store_filing(result)
+            registry.register_filing(
+                result.filing_id, result.ingest_result.chunk_count
+            )
+        except DatabaseError as e:
+            progress.stop()
+            _print_error(
+                "Storage failed",
+                e.message,
+                hint="Check disk space and that the data directory is writable.",
+            )
+            raise typer.Exit(code=1) from None
+
+        progress.advance(task)
 
     # 6. Summary.
     stats = result.ingest_result
@@ -127,62 +198,104 @@ def batch(
     skipped = 0
     failed = 0
 
-    for ticker in tickers:
-        # Check filing limit before each ingestion.
-        try:
-            registry.check_filing_limit()
-        except FilingLimitExceededError as e:
-            console.print(f"[red]Filing limit reached:[/red] {e.message}")
-            console.print("[dim]Stopping batch ingestion.[/dim]")
-            break
+    with _make_progress() as progress:
+        overall = progress.add_task(
+            f"Batch: 0/{len(tickers)} tickers", total=len(tickers)
+        )
+        step_task = progress.add_task("Waiting...", total=len(_STEPS), visible=False)
 
-        console.print(f"\n[bold]{ticker}[/bold] {form}")
+        for i, ticker in enumerate(tickers):
+            # Check filing limit before each ingestion.
+            try:
+                registry.check_filing_limit()
+            except FilingLimitExceededError as e:
+                progress.stop()
+                _print_error(
+                    "Filing limit reached",
+                    e.message,
+                    hint="Remove filings with 'sec-search manage remove' or raise the limit via DB_MAX_FILINGS.",
+                )
+                break
 
-        # Fetch.
-        with console.status(f"  Fetching latest {form} for {ticker}..."):
+            progress.update(
+                overall, description=f"Batch: {i + 1}/{len(tickers)} — {ticker}"
+            )
+            progress.update(
+                step_task,
+                description=f"Fetching {ticker}...",
+                completed=0,
+                visible=True,
+            )
+
+            # Fetch.
             try:
                 fetcher = FilingFetcher()
                 filing_id, html_content = fetcher.fetch_latest(ticker, form)
             except FetchError as e:
-                console.print(f"  [red]Fetch failed:[/red] {e.message}")
+                progress.console.print(f"  [red]{ticker}: Fetch failed —[/red] {e.message}")
                 failed += 1
+                progress.advance(overall)
                 continue
 
-        # Duplicate check.
-        if registry.is_duplicate(filing_id.accession_number):
-            console.print(
-                f"  [yellow]Already ingested:[/yellow] "
-                f"{filing_id.date_str} ({filing_id.accession_number})"
-            )
-            skipped += 1
-            continue
+            progress.advance(step_task)
 
-        # Process.
-        with console.status("  Processing filing (parse, chunk, embed)..."):
+            # Duplicate check.
+            if registry.is_duplicate(filing_id.accession_number):
+                progress.console.print(
+                    f"  [yellow]{ticker}: Already ingested[/yellow] "
+                    f"({filing_id.date_str})"
+                )
+                skipped += 1
+                progress.advance(overall)
+                continue
+
+            # Process — wire orchestrator callback to progress bar.
+            def _on_progress(step: str, _current: int, _total: int) -> None:
+                if step != "Complete":
+                    progress.update(step_task, description=f"{step} {ticker}...")
+                    progress.advance(step_task)
+
             try:
                 orchestrator = PipelineOrchestrator(fetcher=fetcher)
-                result = orchestrator.process_filing(filing_id, html_content)
+                result = orchestrator.process_filing(
+                    filing_id, html_content, progress_callback=_on_progress
+                )
             except SECSemanticSearchError as e:
-                console.print(f"  [red]Processing failed:[/red] {e.message}")
+                progress.console.print(
+                    f"  [red]{ticker}: Processing failed —[/red] {e.message}"
+                )
                 failed += 1
+                progress.advance(overall)
                 continue
 
-        # Store.
-        try:
-            chroma.store_filing(result)
-            registry.register_filing(result.filing_id, result.ingest_result.chunk_count)
-        except DatabaseError as e:
-            console.print(f"  [red]Storage failed:[/red] {e.message}")
-            failed += 1
-            continue
+            # Store.
+            progress.update(step_task, description=f"Storing {ticker}...")
+            try:
+                chroma.store_filing(result)
+                registry.register_filing(
+                    result.filing_id, result.ingest_result.chunk_count
+                )
+            except DatabaseError as e:
+                progress.console.print(
+                    f"  [red]{ticker}: Storage failed —[/red] {e.message}"
+                )
+                failed += 1
+                progress.advance(overall)
+                continue
 
-        stats = result.ingest_result
-        console.print(
-            f"  [green]Ingested:[/green] {filing_id.date_str}  |  "
-            f"Chunks: {stats.chunk_count}  |  "
-            f"Time: {stats.duration_seconds:.1f}s"
-        )
-        succeeded += 1
+            progress.advance(step_task)
+
+            stats = result.ingest_result
+            progress.console.print(
+                f"  [green]{ticker}:[/green] {filing_id.date_str}  |  "
+                f"Chunks: {stats.chunk_count}  |  "
+                f"Time: {stats.duration_seconds:.1f}s"
+            )
+            succeeded += 1
+            progress.advance(overall)
+
+        # Hide the per-filing step bar at the end.
+        progress.update(step_task, visible=False)
 
     # Summary.
     console.print(

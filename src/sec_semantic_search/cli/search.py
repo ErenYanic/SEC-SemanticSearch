@@ -4,7 +4,7 @@ from typing import Annotated, Optional
 
 import typer
 from rich.console import Console
-from rich.panel import Panel
+from rich.table import Table
 from rich.text import Text
 
 from sec_semantic_search.core import SearchError
@@ -12,8 +12,23 @@ from sec_semantic_search.search import SearchEngine
 
 console = Console()
 
-# Maximum characters to display per result.
-_CONTENT_PREVIEW_LIMIT = 500
+# Maximum characters to display per result in the table.
+_CONTENT_PREVIEW_LIMIT = 300
+
+
+def _similarity_text(similarity: float) -> Text:
+    """Return a colour-coded similarity percentage.
+
+    Green for >= 40%, yellow for >= 25%, dim otherwise.
+    These thresholds reflect typical cosine similarity ranges
+    from the embedding model where raw scores are relatively low.
+    """
+    pct = f"{similarity:.1%}"
+    if similarity >= 0.40:
+        return Text(pct, style="bold green")
+    if similarity >= 0.25:
+        return Text(pct, style="yellow")
+    return Text(pct, style="dim")
 
 
 def search(
@@ -45,34 +60,46 @@ def search(
             console.print(f"[red]Search failed:[/red] {e.message}")
             if e.details:
                 console.print(f"  [dim]{e.details}[/dim]")
+            console.print(
+                "  [dim italic]Hint: Ensure filings have been ingested with "
+                "'sec-search ingest add'.[/dim italic]"
+            )
             raise typer.Exit(code=1) from None
 
     if not results:
         console.print("[yellow]No results found.[/yellow]")
+        console.print(
+            "[dim italic]Hint: Try a broader query, or check that filings are ingested "
+            "with 'sec-search manage status'.[/dim italic]"
+        )
         return
 
-    console.print(f"\n[bold]Found {len(results)} result(s)[/bold]\n")
+    console.print(f"\n[bold]Found {len(results)} result(s)[/bold] for: [italic]{query}[/italic]\n")
+
+    table = Table(show_lines=True, expand=True, border_style="dim")
+    table.add_column("#", style="bold", width=3, justify="right")
+    table.add_column("Similarity", width=10, justify="right")
+    table.add_column("Source", style="cyan", width=20, no_wrap=True)
+    table.add_column("Section", style="dim", max_width=30)
+    table.add_column("Content")
 
     for i, result in enumerate(results, 1):
-        # Build the header line with similarity and filing metadata.
-        similarity_pct = f"{result.similarity:.1%}"
-        header = (
-            f"[bold]#{i}[/bold]  "
-            f"[cyan]{similarity_pct}[/cyan] similarity  |  "
-            f"{result.ticker} {result.form_type}"
-        )
+        # Source: ticker, form type, and date in one compact column.
+        source = f"{result.ticker} {result.form_type}"
         if result.filing_date:
-            header += f"  |  {result.filing_date}"
+            source += f"\n{result.filing_date}"
 
         # Truncate long content for display.
         content = result.content
         if len(content) > _CONTENT_PREVIEW_LIMIT:
             content = content[:_CONTENT_PREVIEW_LIMIT] + "..."
 
-        # Build the panel body.
-        body = Text()
-        body.append(result.path, style="dim")
-        body.append("\n\n")
-        body.append(content)
+        table.add_row(
+            str(i),
+            _similarity_text(result.similarity),
+            source,
+            result.path,
+            content,
+        )
 
-        console.print(Panel(body, title=header, title_align="left", expand=True))
+    console.print(table)
