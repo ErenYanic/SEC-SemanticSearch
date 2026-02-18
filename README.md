@@ -272,10 +272,6 @@ SEC-SemanticSearch/
 │   ├── search/                       # SearchEngine facade
 │   ├── cli/                          # Typer CLI (ingest, search, manage)
 │   └── web/                          # Streamlit interface (multi-page)
-│       ├── app.py                    # Entrypoint — page config and navigation
-│       ├── _shared.py                # Cached resource singletons
-│       ├── run.py                    # Launch helper for sec-search-web
-│       └── pages/                    # Dashboard, search, ingest, filings
 ├── tests/
 │   ├── unit/                         # 169 unit tests
 │   └── integration/                  # 42 integration tests
