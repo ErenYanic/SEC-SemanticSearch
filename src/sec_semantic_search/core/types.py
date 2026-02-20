@@ -1,4 +1,5 @@
-"""Core data types for SEC-SemanticSearch.
+"""
+Core data types for SEC-SemanticSearch.
 
 This module defines the domain objects used throughout the pipeline:
     - FilingIdentifier: Unique identifier for an SEC filing
@@ -19,7 +20,8 @@ from typing import Optional
 
 
 class ContentType(Enum):
-    """Content types extracted from SEC filings via doc2dict.
+    """
+    Content types extracted from SEC filings via doc2dict.
 
     Values:
         TEXT: Regular paragraph text
@@ -34,7 +36,8 @@ class ContentType(Enum):
 
 @dataclass(frozen=True)
 class FilingIdentifier:
-    """Unique identifier for an SEC filing.
+    """
+    Unique identifier for an SEC filing.
 
     This immutable identifier is used to track filings throughout the pipeline
     and serves as the primary key in the metadata registry.
@@ -73,7 +76,8 @@ class FilingIdentifier:
 
 @dataclass
 class Segment:
-    """A semantically meaningful unit of content extracted from a filing.
+    """
+    A semantically meaningful unit of content extracted from a filing.
 
     Segments are created by the parser from doc2dict output. Each segment
     represents a coherent piece of content (paragraph, table, footnote)
@@ -102,7 +106,8 @@ class Segment:
 
 @dataclass
 class Chunk:
-    """An embedding-ready text unit derived from a segment.
+    """
+    An embedding-ready text unit derived from a segment.
 
     Chunks are created by splitting long segments at sentence boundaries.
     Each chunk inherits metadata from its source segment and is assigned
@@ -127,7 +132,8 @@ class Chunk:
 
     @property
     def chunk_id(self) -> str:
-        """Generate unique ChromaDB document ID.
+        """
+        Generate unique ChromaDB document ID.
 
         Format: {TICKER}_{FORM_TYPE}_{DATE}_{INDEX}
         Example: AAPL_10-K_2023-11-03_042
@@ -140,7 +146,8 @@ class Chunk:
         )
 
     def to_metadata(self) -> dict:
-        """Convert chunk metadata to ChromaDB-compatible dict.
+        """
+        Convert chunk metadata to ChromaDB-compatible dict.
 
         Returns:
             Dictionary with string values suitable for ChromaDB metadata.
@@ -157,7 +164,8 @@ class Chunk:
 
 @dataclass
 class SearchResult:
-    """A single result from a semantic search query.
+    """
+    A single result from a semantic search query.
 
     Search results are returned by the search engine, ranked by similarity.
     Each result contains the matched chunk content along with its metadata
@@ -193,7 +201,8 @@ class SearchResult:
         distance: float,
         chunk_id: Optional[str] = None,
     ) -> "SearchResult":
-        """Create SearchResult from ChromaDB query output.
+        """
+        Create SearchResult from ChromaDB query output.
 
         ChromaDB returns cosine distance; this method converts it to
         similarity (1 - distance).
@@ -222,7 +231,8 @@ class SearchResult:
 
 @dataclass
 class IngestResult:
-    """Result of a filing ingestion operation.
+    """
+    Result of a filing ingestion operation.
 
     Returned by the pipeline orchestrator after successfully ingesting
     a filing, providing statistics for CLI output and logging.

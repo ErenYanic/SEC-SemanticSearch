@@ -1,4 +1,5 @@
-"""Core module — types, exceptions, and logging.
+"""
+Core module — types, exceptions, and logging.
 
 This module provides the foundational components used throughout the package:
     - Data types (FilingIdentifier, Segment, Chunk, SearchResult, IngestResult)

@@ -1,4 +1,5 @@
-"""Embedding generation using sentence-transformers.
+"""
+Embedding generation using sentence-transformers.
 
 This module generates vector embeddings for text chunks using a
 sentence-transformer model. It supports GPU acceleration and batch
@@ -28,7 +29,8 @@ logger = get_logger(__name__)
 
 
 class EmbeddingGenerator:
-    """Generates vector embeddings using sentence-transformers.
+    """
+    Generates vector embeddings using sentence-transformers.
 
     This class wraps the sentence-transformers library to provide
     GPU-accelerated embedding generation. The model is loaded lazily
@@ -51,7 +53,8 @@ class EmbeddingGenerator:
         device: str | None = None,
         batch_size: int | None = None,
     ) -> None:
-        """Initialise the embedding generator.
+        """
+        Initialise the embedding generator.
 
         Args:
             model_name: Model name. If None, uses settings.
@@ -81,7 +84,8 @@ class EmbeddingGenerator:
 
     @property
     def device(self) -> str:
-        """Get the actual device being used.
+        """
+        Get the actual device being used.
 
         Returns:
             Device string ('cuda' or 'cpu').
@@ -92,7 +96,8 @@ class EmbeddingGenerator:
 
     @property
     def model(self) -> "SentenceTransformer":
-        """Get or load the sentence-transformer model.
+        """
+        Get or load the sentence-transformer model.
 
         The model is loaded lazily on first access to avoid
         unnecessary initialisation if embeddings aren't needed.
@@ -108,7 +113,8 @@ class EmbeddingGenerator:
         return self._model
 
     def _load_model(self) -> "SentenceTransformer":
-        """Load the sentence-transformer model.
+        """
+        Load the sentence-transformer model.
 
         Returns:
             Loaded model on configured device.
@@ -145,7 +151,8 @@ class EmbeddingGenerator:
         texts: list[str],
         show_progress: bool = True,
     ) -> np.ndarray:
-        """Generate embeddings for a list of texts.
+        """
+        Generate embeddings for a list of texts.
 
         Args:
             texts: List of text strings to embed.
@@ -196,7 +203,8 @@ class EmbeddingGenerator:
         chunks: list[Chunk],
         show_progress: bool = True,
     ) -> np.ndarray:
-        """Generate embeddings for a list of chunks.
+        """
+        Generate embeddings for a list of chunks.
 
         This is the main method for embedding chunks during ingestion.
         It extracts text content from chunks and generates embeddings.
@@ -241,7 +249,8 @@ class EmbeddingGenerator:
         return embeddings
 
     def embed_query(self, query: str) -> np.ndarray:
-        """Generate embedding for a search query.
+        """
+        Generate embedding for a search query.
 
         This method is optimised for single query embedding during search.
         It returns a 1D array suitable for ChromaDB query.
@@ -273,7 +282,8 @@ class EmbeddingGenerator:
         return embeddings[0]
 
     def embed_query_for_chromadb(self, query: str) -> list[list[float]]:
-        """Generate embedding in ChromaDB query format.
+        """
+        Generate embedding in ChromaDB query format.
 
         ChromaDB expects query_embeddings as list[list[float]].
         This method provides the correct format.

@@ -1,4 +1,5 @@
-"""Pipeline module — fetch, parse, chunk, embed, and orchestrate.
+"""
+Pipeline module — fetch, parse, chunk, embed, and orchestrate.
 
 This module provides the complete ingestion pipeline for SEC filings:
     - FilingFetcher: Fetch filings from SEC EDGAR

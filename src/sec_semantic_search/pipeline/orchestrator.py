@@ -1,4 +1,5 @@
-"""Pipeline orchestrator for SEC filing ingestion.
+"""
+Pipeline orchestrator for SEC filing ingestion.
 
 This module coordinates the full ingestion pipeline:
     Fetch → Parse → Chunk → Embed
@@ -49,7 +50,8 @@ ProgressCallback = Callable[[str, int, int], None]
 
 @dataclass
 class ProcessedFiling:
-    """Result of processing a single filing through the pipeline.
+    """
+    Result of processing a single filing through the pipeline.
 
     This contains all the data needed for storage in the database.
 
@@ -69,7 +71,8 @@ class ProcessedFiling:
 
 
 class PipelineOrchestrator:
-    """Coordinates the SEC filing ingestion pipeline.
+    """
+    Coordinates the SEC filing ingestion pipeline.
 
     This class ties together the fetcher, parser, chunker, and embedding
     generator to provide a unified interface for processing filings.
@@ -98,7 +101,8 @@ class PipelineOrchestrator:
         chunker: TextChunker | None = None,
         embedder: EmbeddingGenerator | None = None,
     ) -> None:
-        """Initialise the orchestrator with pipeline components.
+        """
+        Initialise the orchestrator with pipeline components.
 
         Components are created with defaults if not provided, allowing
         dependency injection for testing.
@@ -122,7 +126,8 @@ class PipelineOrchestrator:
         html_content: str,
         progress_callback: ProgressCallback | None = None,
     ) -> ProcessedFiling:
-        """Process a single filing through the pipeline.
+        """
+        Process a single filing through the pipeline.
 
         This method runs the full pipeline on HTML content that has
         already been fetched. Use this when you have the HTML content
@@ -204,7 +209,8 @@ class PipelineOrchestrator:
         form_type: str = "10-K",
         progress_callback: ProgressCallback | None = None,
     ) -> ProcessedFiling:
-        """Fetch and process the latest filing for a company.
+        """
+        Fetch and process the latest filing for a company.
 
         This is a convenience method that combines fetching and processing
         for the most recent filing of the specified type.
@@ -241,7 +247,8 @@ class PipelineOrchestrator:
         year: int | list[int] | range | None = None,
         progress_callback: ProgressCallback | None = None,
     ) -> ProcessedFiling:
-        """Fetch and process a specific filing by index.
+        """
+        Fetch and process a specific filing by index.
 
         Args:
             ticker: Stock ticker symbol
@@ -279,7 +286,8 @@ class PipelineOrchestrator:
         start_date: str | None = None,
         end_date: str | None = None,
     ) -> Iterator[ProcessedFiling]:
-        """Fetch and process multiple filings for a company.
+        """
+        Fetch and process multiple filings for a company.
 
         This method yields ProcessedFiling objects one at a time,
         allowing incremental processing and storage.
@@ -333,7 +341,8 @@ class PipelineOrchestrator:
         start_date: str | None = None,
         end_date: str | None = None,
     ) -> Iterator[ProcessedFiling]:
-        """Fetch and process filings for multiple companies.
+        """
+        Fetch and process filings for multiple companies.
 
         This method yields ProcessedFiling objects for each successfully
         processed filing across all specified tickers.

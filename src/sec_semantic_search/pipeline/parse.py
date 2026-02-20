@@ -1,4 +1,5 @@
-"""SEC filing HTML parser using doc2dict.
+"""
+SEC filing HTML parser using doc2dict.
 
 This module parses SEC filing HTML into semantically meaningful segments.
 It uses doc2dict for initial HTML parsing and then recursively extracts
@@ -27,7 +28,8 @@ logger = get_logger(__name__)
 
 
 class FilingParser:
-    """Parses SEC filing HTML into structured segments.
+    """
+    Parses SEC filing HTML into structured segments.
 
     This class wraps doc2dict to parse filing HTML and extract semantically
     meaningful segments. Each segment includes its hierarchical path in the
@@ -52,7 +54,8 @@ class FilingParser:
         html_content: str,
         filing_id: FilingIdentifier,
     ) -> list[Segment]:
-        """Parse filing HTML into segments.
+        """
+        Parse filing HTML into segments.
 
         Args:
             html_content: Raw HTML content from SEC EDGAR.
@@ -133,7 +136,8 @@ class FilingParser:
         filing_id: FilingIdentifier,
         segments: list[Segment],
     ) -> None:
-        """Recursively extract segments from parsed dictionary.
+        """
+        Recursively extract segments from parsed dictionary.
 
         This method traverses the doc2dict output tree, building hierarchical
         paths and extracting content from text, textsmall, and table fields.
@@ -198,7 +202,8 @@ class FilingParser:
                 )
 
     def _format_table(self, table: Any) -> str:
-        """Convert table data to readable text representation.
+        """
+        Convert table data to readable text representation.
 
         Tables are formatted as pipe-delimited rows, making them both
         human-readable and suitable for embedding.

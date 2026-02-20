@@ -1,4 +1,5 @@
-"""Custom exception hierarchy for SEC-SemanticSearch.
+"""
+Custom exception hierarchy for SEC-SemanticSearch.
 
 All exceptions inherit from SECSemanticSearchError, allowing callers to catch
 all project-specific errors with a single except clause when desired.
@@ -19,7 +20,8 @@ from typing import Optional
 
 
 class SECSemanticSearchError(Exception):
-    """Base exception for all SEC-SemanticSearch errors.
+    """
+    Base exception for all SEC-SemanticSearch errors.
 
     Args:
         message: Human-readable error description.
@@ -38,7 +40,8 @@ class SECSemanticSearchError(Exception):
 
 
 class ConfigurationError(SECSemanticSearchError):
-    """Raised when configuration is invalid or missing.
+    """
+    Raised when configuration is invalid or missing.
 
     Examples:
         - Missing required environment variables (EDGAR_IDENTITY_NAME)
@@ -50,7 +53,8 @@ class ConfigurationError(SECSemanticSearchError):
 
 
 class FetchError(SECSemanticSearchError):
-    """Raised when fetching SEC filings fails.
+    """
+    Raised when fetching SEC filings fails.
 
     Examples:
         - Network connectivity issues
@@ -63,7 +67,8 @@ class FetchError(SECSemanticSearchError):
 
 
 class ParseError(SECSemanticSearchError):
-    """Raised when parsing filing HTML fails.
+    """
+    Raised when parsing filing HTML fails.
 
     Examples:
         - Malformed HTML content
@@ -75,7 +80,8 @@ class ParseError(SECSemanticSearchError):
 
 
 class ChunkingError(SECSemanticSearchError):
-    """Raised when text chunking fails.
+    """
+    Raised when text chunking fails.
 
     Examples:
         - Empty content after parsing
@@ -86,7 +92,8 @@ class ChunkingError(SECSemanticSearchError):
 
 
 class EmbeddingError(SECSemanticSearchError):
-    """Raised when embedding generation fails.
+    """
+    Raised when embedding generation fails.
 
     Examples:
         - Model loading failures
@@ -98,7 +105,8 @@ class EmbeddingError(SECSemanticSearchError):
 
 
 class DatabaseError(SECSemanticSearchError):
-    """Raised when database operations fail.
+    """
+    Raised when database operations fail.
 
     Examples:
         - ChromaDB connection failures
@@ -110,7 +118,8 @@ class DatabaseError(SECSemanticSearchError):
 
 
 class FilingLimitExceededError(DatabaseError):
-    """Raised when the maximum filing limit is reached.
+    """
+    Raised when the maximum filing limit is reached.
 
     This is a soft limit for portfolio project scope, configurable via
     DB_MAX_FILINGS environment variable.
@@ -132,7 +141,8 @@ class FilingLimitExceededError(DatabaseError):
 
 
 class SearchError(SECSemanticSearchError):
-    """Raised when search operations fail.
+    """
+    Raised when search operations fail.
 
     Examples:
         - Empty query string
