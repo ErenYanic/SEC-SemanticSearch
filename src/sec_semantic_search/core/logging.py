@@ -1,4 +1,5 @@
-"""Logging configuration for SEC-SemanticSearch.
+"""
+Logging configuration for SEC-SemanticSearch.
 
 This module provides a consistent logging setup across all package modules.
 It uses Rich for beautiful console output when running interactively.
@@ -34,7 +35,8 @@ _logging_configured = False
 
 
 def _get_log_level() -> int:
-    """Get log level from environment variable.
+    """
+    Get log level from environment variable.
 
     Returns:
         Logging level constant (e.g., logging.INFO)
@@ -47,7 +49,8 @@ def configure_logging(
     level: Optional[int] = None,
     use_rich: bool = True,
 ) -> None:
-    """Configure the package-level logger.
+    """
+    Configure the package-level logger.
 
     This function sets up the root logger for the sec_semantic_search package.
     It should be called once at application startup (e.g., in CLI main).
@@ -103,7 +106,8 @@ def configure_logging(
 
 
 def get_logger(name: str) -> logging.Logger:
-    """Get a logger for the specified module.
+    """
+    Get a logger for the specified module.
 
     This function returns a child logger of the package-level logger.
     If logging hasn't been configured yet, it will be configured with
@@ -133,7 +137,8 @@ def get_logger(name: str) -> logging.Logger:
 
 
 def suppress_third_party_loggers() -> None:
-    """Suppress verbose logging from third-party libraries.
+    """
+    Suppress verbose logging from third-party libraries.
 
     Some libraries (sentence-transformers, chromadb, httpx) are quite
     verbose at INFO level. This function sets them to WARNING.

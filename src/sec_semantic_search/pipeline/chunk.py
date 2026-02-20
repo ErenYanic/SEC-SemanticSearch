@@ -1,4 +1,5 @@
-"""Text chunking for SEC filings.
+"""
+Text chunking for SEC filings.
 
 This module splits long segments into smaller chunks suitable for embedding.
 It uses sentence-boundary splitting to ensure chunks don't cut mid-sentence.
@@ -19,7 +20,8 @@ logger = get_logger(__name__)
 
 
 class TextChunker:
-    """Splits segments into embedding-ready chunks.
+    """
+    Splits segments into embedding-ready chunks.
 
     This class implements sentence-boundary aware chunking to ensure
     that text is split at natural boundaries rather than mid-sentence.
@@ -48,7 +50,8 @@ class TextChunker:
         token_limit: int | None = None,
         tolerance: int | None = None,
     ) -> None:
-        """Initialise the chunker with configurable limits.
+        """
+        Initialise the chunker with configurable limits.
 
         Args:
             token_limit: Max tokens per chunk. If None, uses settings.
@@ -65,7 +68,8 @@ class TextChunker:
         )
 
     def _count_tokens(self, text: str) -> int:
-        """Approximate token count using whitespace splitting.
+        """
+        Approximate token count using whitespace splitting.
 
         This is a simple heuristic that works well for English text.
         More accurate tokenisation would require the actual model's
@@ -80,7 +84,8 @@ class TextChunker:
         return len(text.split())
 
     def _chunk_text(self, text: str) -> list[str]:
-        """Split text into chunks respecting sentence boundaries.
+        """
+        Split text into chunks respecting sentence boundaries.
 
         Args:
             text: Text content to split.
@@ -124,7 +129,8 @@ class TextChunker:
         return chunks
 
     def chunk_segment(self, segment: Segment, start_index: int = 0) -> list[Chunk]:
-        """Split a single segment into chunks.
+        """
+        Split a single segment into chunks.
 
         Args:
             segment: Segment to chunk.
@@ -147,7 +153,8 @@ class TextChunker:
         ]
 
     def chunk_segments(self, segments: list[Segment]) -> list[Chunk]:
-        """Chunk all segments from a filing.
+        """
+        Chunk all segments from a filing.
 
         This is the main entry point for chunking. It processes all
         segments and assigns sequential chunk indices across the

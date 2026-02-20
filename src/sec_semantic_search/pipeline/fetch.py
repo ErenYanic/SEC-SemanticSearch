@@ -1,4 +1,5 @@
-"""SEC filing fetcher using edgartools.
+"""
+SEC filing fetcher using edgartools.
 
 This module wraps the edgartools library to fetch SEC filings (10-K, 10-Q)
 from the EDGAR database. It provides flexible selection methods including:
@@ -46,7 +47,8 @@ logger = get_logger(__name__)
 
 @dataclass
 class FilingInfo:
-    """Summary information about an available filing (without content).
+    """
+    Summary information about an available filing (without content).
 
     This lightweight class is used by list_available() to preview
     filings before downloading their full HTML content.
@@ -76,7 +78,8 @@ class FilingInfo:
 
 
 class FilingFetcher:
-    """Fetches SEC filings from EDGAR using edgartools.
+    """
+    Fetches SEC filings from EDGAR using edgartools.
 
     This class provides flexible methods for fetching SEC filings with
     various selection criteria. It handles identity configuration
@@ -112,7 +115,8 @@ class FilingFetcher:
         self._configure_identity()
 
     def _configure_identity(self) -> None:
-        """Configure SEC EDGAR identity from settings.
+        """
+        Configure SEC EDGAR identity from settings.
 
         SEC EDGAR requires identification for API access. This sets
         the identity using credentials from environment variables.
@@ -132,7 +136,8 @@ class FilingFetcher:
             ) from e
 
     def _validate_form_type(self, form_type: str) -> str:
-        """Validate and normalise form type.
+        """
+        Validate and normalise form type.
 
         Args:
             form_type: SEC form type (e.g., "10-K", "10-Q")
@@ -152,7 +157,8 @@ class FilingFetcher:
         return normalised
 
     def _parse_filing_date(self, date_value: str | date) -> date:
-        """Parse filing date from edgartools.
+        """
+        Parse filing date from edgartools.
 
         edgartools may return dates as strings or date objects depending
         on the version. This method handles both cases.
@@ -172,7 +178,8 @@ class FilingFetcher:
         start_date: str | date | None,
         end_date: str | date | None,
     ) -> str | None:
-        """Format date range for edgartools filing_date parameter.
+        """
+        Format date range for edgartools filing_date parameter.
 
         edgartools accepts date ranges in format: "YYYY-MM-DD:YYYY-MM-DD"
         For open-ended ranges: "YYYY-MM-DD:" or ":YYYY-MM-DD"
@@ -205,7 +212,8 @@ class FilingFetcher:
         return f"{start_str}:{end_str}"
 
     def _get_company(self, ticker: str) -> Company:
-        """Get Company object for ticker with error handling.
+        """
+        Get Company object for ticker with error handling.
 
         Args:
             ticker: Stock ticker symbol
@@ -232,7 +240,8 @@ class FilingFetcher:
         start_date: str | date | None = None,
         end_date: str | date | None = None,
     ):
-        """Get filings from company with optional filters.
+        """
+        Get filings from company with optional filters.
 
         Args:
             company: edgartools Company object
@@ -296,7 +305,8 @@ class FilingFetcher:
         ticker: str,
         form_type: str,
     ) -> tuple[FilingIdentifier, str]:
-        """Fetch HTML content for a single filing.
+        """
+        Fetch HTML content for a single filing.
 
         Args:
             filing: edgartools Filing object
@@ -349,7 +359,8 @@ class FilingFetcher:
         start_date: str | date | None = None,
         end_date: str | date | None = None,
     ) -> list[FilingInfo]:
-        """List available filings without downloading content.
+        """
+        List available filings without downloading content.
 
         Use this method to preview what filings are available before
         downloading. This is useful for showing users what will be
@@ -415,7 +426,8 @@ class FilingFetcher:
         ticker: str,
         form_type: str = "10-K",
     ) -> tuple[FilingIdentifier, str]:
-        """Fetch the most recent filing for a company.
+        """
+        Fetch the most recent filing for a company.
 
         This is a convenience method equivalent to fetch_one(ticker, form, index=0).
 
@@ -445,7 +457,8 @@ class FilingFetcher:
         start_date: str | date | None = None,
         end_date: str | date | None = None,
     ) -> tuple[FilingIdentifier, str]:
-        """Fetch a single filing by index position.
+        """
+        Fetch a single filing by index position.
 
         Index 0 is the most recent filing, index 1 is the second most
         recent, and so on. Filters are applied before indexing.
@@ -517,7 +530,8 @@ class FilingFetcher:
         start_date: str | date | None = None,
         end_date: str | date | None = None,
     ) -> Iterator[tuple[FilingIdentifier, str]]:
-        """Fetch multiple filings with flexible filtering.
+        """
+        Fetch multiple filings with flexible filtering.
 
         This is the main method for batch fetching. It returns a generator
         that yields filings one at a time, allowing incremental processing.
@@ -618,7 +632,8 @@ class FilingFetcher:
         form_type: str,
         accession_number: str,
     ) -> tuple[FilingIdentifier, str]:
-        """Fetch a specific filing by its accession number.
+        """
+        Fetch a specific filing by its accession number.
 
         Use this method when you know the exact accession number of the
         filing you want. This is useful for re-fetching a specific filing
@@ -687,7 +702,8 @@ class FilingFetcher:
         start_date: str | date | None = None,
         end_date: str | date | None = None,
     ) -> dict[str, list[FilingInfo]]:
-        """List available filings for multiple companies.
+        """
+        List available filings for multiple companies.
 
         Args:
             tickers: List of stock ticker symbols
@@ -755,7 +771,8 @@ class FilingFetcher:
         start_date: str | date | None = None,
         end_date: str | date | None = None,
     ) -> Iterator[tuple[FilingIdentifier, str]]:
-        """Fetch filings for multiple companies.
+        """
+        Fetch filings for multiple companies.
 
         This method iterates through multiple tickers and yields filings
         one at a time. Useful for batch ingestion operations.
