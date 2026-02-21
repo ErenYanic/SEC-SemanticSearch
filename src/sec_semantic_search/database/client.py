@@ -1,4 +1,5 @@
-"""ChromaDB client wrapper for vector storage operations.
+"""
+ChromaDB client wrapper for vector storage operations.
 
 This module manages a single ChromaDB collection (``sec_filings``) that stores
 chunk embeddings with metadata for similarity search. It handles storage,
@@ -25,7 +26,8 @@ logger = get_logger(__name__)
 
 
 class ChromaDBClient:
-    """Wrapper around ChromaDB for SEC filing vector storage.
+    """
+    Wrapper around ChromaDB for SEC filing vector storage.
 
     This class manages a single collection (``sec_filings``) that stores
     all filing chunks with their embeddings and metadata. It uses cosine
@@ -41,7 +43,8 @@ class ChromaDBClient:
     """
 
     def __init__(self, chroma_path: Optional[str] = None) -> None:
-        """Initialise the ChromaDB client and collection.
+        """
+        Initialise the ChromaDB client and collection.
 
         Creates a persistent client and gets or creates the unified
         ``sec_filings`` collection with cosine similarity.
@@ -78,7 +81,8 @@ class ChromaDBClient:
     # ------------------------------------------------------------------
 
     def store_filing(self, processed_filing: ProcessedFiling) -> None:
-        """Store all chunks and embeddings from a processed filing.
+        """
+        Store all chunks and embeddings from a processed filing.
 
         Adds the chunks, their embeddings, text content, and metadata to
         the ChromaDB collection in a single batch operation.
@@ -120,7 +124,8 @@ class ChromaDBClient:
             ) from e
 
     def delete_filing(self, accession_number: str) -> int:
-        """Delete all chunks belonging to a filing.
+        """
+        Delete all chunks belonging to a filing.
 
         Retrieves chunk IDs matching the accession number via metadata
         filter, then deletes them by ID.
@@ -174,7 +179,8 @@ class ChromaDBClient:
         ticker: Optional[str] = None,
         form_type: Optional[str] = None,
     ) -> list[SearchResult]:
-        """Query the collection for similar chunks.
+        """
+        Query the collection for similar chunks.
 
         Args:
             query_embeddings: Query embedding in ChromaDB format
@@ -223,7 +229,8 @@ class ChromaDBClient:
             ) from e
 
     def collection_count(self) -> int:
-        """Return the total number of chunks in the collection.
+        """
+        Return the total number of chunks in the collection.
 
         Returns:
             Number of documents in the ChromaDB collection.
@@ -239,7 +246,8 @@ class ChromaDBClient:
         ticker: Optional[str] = None,
         form_type: Optional[str] = None,
     ) -> Optional[dict]:
-        """Build a ChromaDB where filter from optional parameters.
+        """
+        Build a ChromaDB where filter from optional parameters.
 
         ChromaDB uses ``{"field": "value"}`` for single conditions and
         ``{"$and": [...]}`` for multiple conditions.
