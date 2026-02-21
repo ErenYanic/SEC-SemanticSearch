@@ -1,4 +1,5 @@
-"""SQLite metadata registry for tracking ingested SEC filings.
+"""
+SQLite metadata registry for tracking ingested SEC filings.
 
 This module provides a lightweight relational layer for operations that
 ChromaDB does not handle well: duplicate detection, listing with filters,
@@ -31,7 +32,8 @@ logger = get_logger(__name__)
 
 @dataclass
 class FilingRecord:
-    """A single row from the filings table.
+    """
+    A single row from the filings table.
 
     Provides typed access to filing metadata rather than raw tuples or dicts.
     Used by the CLI ``manage list`` and ``manage status`` commands.
@@ -56,7 +58,8 @@ class FilingRecord:
 
 
 class MetadataRegistry:
-    """SQLite registry for tracking ingested SEC filings.
+    """
+    SQLite registry for tracking ingested SEC filings.
 
     This class manages a single ``filings`` table that records which filings
     have been ingested, their chunk counts, and ingestion timestamps. It
@@ -75,7 +78,8 @@ class MetadataRegistry:
     """
 
     def __init__(self, db_path: Optional[str] = None) -> None:
-        """Initialise the metadata registry.
+        """
+        Initialise the metadata registry.
 
         Args:
             db_path: Path to SQLite database file. If None, uses
@@ -127,7 +131,8 @@ class MetadataRegistry:
     # ------------------------------------------------------------------
 
     def check_filing_limit(self) -> None:
-        """Raise FilingLimitExceededError if the filing limit is reached.
+        """
+        Raise FilingLimitExceededError if the filing limit is reached.
 
         This should be called before ingesting a new filing to prevent
         exceeding the configured maximum.
@@ -141,7 +146,8 @@ class MetadataRegistry:
             raise FilingLimitExceededError(current, self._max_filings)
 
     def is_duplicate(self, accession_number: str) -> bool:
-        """Check whether a filing has already been ingested.
+        """
+        Check whether a filing has already been ingested.
 
         Args:
             accession_number: SEC accession number to check.
@@ -172,7 +178,8 @@ class MetadataRegistry:
         filing_id: FilingIdentifier,
         chunk_count: int,
     ) -> None:
-        """Register a newly ingested filing in the metadata registry.
+        """
+        Register a newly ingested filing in the metadata registry.
 
         Args:
             filing_id: Identifier of the ingested filing.
@@ -220,7 +227,8 @@ class MetadataRegistry:
             ) from e
 
     def remove_filing(self, accession_number: str) -> bool:
-        """Remove a filing from the metadata registry.
+        """
+        Remove a filing from the registry by accession number.
 
         Args:
             accession_number: SEC accession number of the filing to remove.
@@ -256,7 +264,8 @@ class MetadataRegistry:
     # ------------------------------------------------------------------
 
     def get_filing(self, accession_number: str) -> Optional[FilingRecord]:
-        """Retrieve a single filing record by accession number.
+        """
+        Retrieve a single filing record by accession number.
 
         Args:
             accession_number: SEC accession number.
@@ -285,7 +294,8 @@ class MetadataRegistry:
         ticker: Optional[str] = None,
         form_type: Optional[str] = None,
     ) -> list[FilingRecord]:
-        """List ingested filings with optional filters.
+        """
+        List ingested filings with optional filters.
 
         Args:
             ticker: Filter by ticker symbol (case-insensitive).
@@ -324,7 +334,8 @@ class MetadataRegistry:
         ticker: Optional[str] = None,
         form_type: Optional[str] = None,
     ) -> int:
-        """Count ingested filings with optional filters.
+        """
+        Count ingested filings with optional filters.
 
         Args:
             ticker: Filter by ticker symbol.

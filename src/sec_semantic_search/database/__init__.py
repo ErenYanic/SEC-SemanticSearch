@@ -1,4 +1,5 @@
-"""Database module — ChromaDB vector storage and SQLite metadata registry.
+"""
+Database module — ChromaDB vector storage and SQLite metadata registry.
 
 This module provides the storage layer for ingested SEC filings:
     - ChromaDBClient: Vector storage for chunk embeddings and similarity search
