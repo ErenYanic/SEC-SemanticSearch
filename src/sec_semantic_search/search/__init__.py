@@ -1,4 +1,5 @@
-"""Search module — semantic search over ingested SEC filings.
+"""
+Search module — semantic search over ingested SEC filings.
 
 This module provides the high-level search interface:
     - SearchEngine: Facade coordinating query embedding and similarity search

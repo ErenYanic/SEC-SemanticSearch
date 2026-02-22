@@ -62,7 +62,7 @@ class TestConstants:
         assert DEFAULT_MIN_SIMILARITY == 0.0
 
     def test_default_max_filings(self):
-        assert DEFAULT_MAX_FILINGS == 20
+        assert DEFAULT_MAX_FILINGS == 100
 
 
 # -----------------------------------------------------------------------
@@ -92,7 +92,7 @@ class TestSettingsDefaults:
         s = DatabaseSettings()
         assert s.chroma_path == "./data/chroma_db"
         assert s.metadata_db_path == "./data/metadata.sqlite"
-        assert s.max_filings == 20
+        assert s.max_filings == 100
 
     def test_search_defaults(self):
         s = SearchSettings()
