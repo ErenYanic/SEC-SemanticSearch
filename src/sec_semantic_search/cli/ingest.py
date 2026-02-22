@@ -83,7 +83,7 @@ def _fetch_filings(
     ticker: str,
     form_type: str,
     *,
-    count: int = 1,
+    count: int | None = 1,
     year: int | None = None,
     start_date: str | None = None,
     end_date: str | None = None,
@@ -93,14 +93,15 @@ def _fetch_filings(
 
     Yields ``(FilingIdentifier, html_content)`` tuples.  For *count=1* with
     no filters the fast-path ``fetch_latest()`` is used; for *count=1* with
-    filters ``fetch_one()`` is used; for *count > 1* the ``fetch()``
-    generator is used.
+    filters ``fetch_one()`` is used; for *count > 1* or *count=None* the
+    ``fetch()`` generator is used (``None`` means all available within
+    filters, capped by ``max_filings``).
     """
     has_filters = year is not None or start_date is not None or end_date is not None
 
     if count == 1 and not has_filters:
         yield fetcher.fetch_latest(ticker, form_type)
-    elif count == 1:
+    elif count == 1 and has_filters:
         yield fetcher.fetch_one(
             ticker, form_type,
             year=year, start_date=start_date, end_date=end_date,
@@ -146,7 +147,7 @@ def _ingest_one_form(
     ticker: str,
     form_type: str,
     *,
-    count: int = 1,
+    count: int | None = 1,
     year: int | None = None,
     start_date: str | None = None,
     end_date: str | None = None,
@@ -162,12 +163,13 @@ def _ingest_one_form(
 
     Runs the full pipeline per filing: fetch → duplicate check → process →
     store.  When *count* is 1 (default) the behaviour is identical to the
-    previous single-filing flow.
+    previous single-filing flow.  When *count* is ``None`` all available
+    filings matching the filters are fetched (capped by ``max_filings``).
 
     Args:
         ticker: Uppercased stock ticker symbol.
         form_type: Single validated form type (e.g. "10-K").
-        count: Number of filings to ingest.
+        count: Number of filings to ingest, or ``None`` for all matching.
         year: Optional filing-year filter.
         start_date: Optional start-date filter (YYYY-MM-DD).
         end_date: Optional end-date filter (YYYY-MM-DD).
@@ -181,7 +183,7 @@ def _ingest_one_form(
     Returns:
         Tuple of (succeeded, skipped, failed) counts.
     """
-    multi = count > 1
+    multi = count is None or count > 1
 
     # --- Fetch ---------------------------------------------------------------
     progress.update(
@@ -601,8 +603,16 @@ def add(
             raise typer.Exit(code=1)
         return
 
-    # --- Per-form mode: -n or default (1 per form type) ----------------------
-    effective_per_form = number if number is not None else 1
+    # --- Per-form mode: -n or default -----------------------------------------
+    # When filters narrow the results and no explicit count is given, fetch all
+    # matching filings (capped by max_filings) rather than just the latest one.
+    has_filters = year is not None or start_date is not None or end_date is not None
+    if number is not None:
+        effective_per_form: int | None = number
+    elif has_filters:
+        effective_per_form = None  # all matching within filters
+    else:
+        effective_per_form = 1  # default: latest only
 
     succeeded = 0
     skipped = 0
@@ -638,10 +648,13 @@ def add(
                     form_label=form_label,
                 )
             else:
-                # Multiple filings: dual bars (outer=filings, inner=steps).
+                # Multiple filings (or all matching): dual bars.
+                # When count is None the total is unknown until fetch;
+                # _ingest_one_form updates it after materialisation.
+                estimated = effective_per_form or 0
                 filing_task = progress.add_task(
-                    f"{ticker} {form_type}{form_label}: 0/{effective_per_form} filings",
-                    total=effective_per_form,
+                    f"{ticker} {form_type}{form_label}: filings",
+                    total=estimated or None,
                 )
                 step_task = progress.add_task(
                     f"Fetching {ticker} {form_type}{form_label}...",
@@ -662,7 +675,7 @@ def add(
         failed += f
 
     # Show a combined summary when multiple form types or filings requested.
-    if len(form_types) > 1 or effective_per_form > 1:
+    if len(form_types) > 1 or effective_per_form != 1:
         console.print(
             f"\n[bold]Summary:[/bold] "
             f"[green]{succeeded} ingested[/green], "
@@ -773,8 +786,14 @@ def batch(
         )
         return
 
-    # --- Per-form mode: -n or default (1 per form type) ----------------------
-    effective_per_form = number if number is not None else 1
+    # --- Per-form mode: -n or default -----------------------------------------
+    has_filters = year is not None or start_date is not None or end_date is not None
+    if number is not None:
+        effective_per_form: int | None = number
+    elif has_filters:
+        effective_per_form = None  # all matching within filters
+    else:
+        effective_per_form = 1  # default: latest only
 
     # Build a flat work list of (ticker, form_type) pairs.
     work_items = [(t, f) for t in tickers for f in form_types]
