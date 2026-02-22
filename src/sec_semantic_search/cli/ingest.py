@@ -62,7 +62,8 @@ def _make_progress() -> Progress:
 
 
 def _validate_date(value: str | None, param_name: str) -> str | None:
-    """Validate a date string in YYYY-MM-DD format.
+    """
+    Validate a date string in YYYY-MM-DD format.
 
     Returns the value unchanged if valid, or raises ``typer.BadParameter``.
     """
@@ -87,7 +88,8 @@ def _fetch_filings(
     start_date: str | None = None,
     end_date: str | None = None,
 ) -> Iterator[tuple[FilingIdentifier, str]]:
-    """Fetch filing(s) using the appropriate FilingFetcher method.
+    """
+    Fetch filing(s) using the appropriate FilingFetcher method.
 
     Yields ``(FilingIdentifier, html_content)`` tuples.  For *count=1* with
     no filters the fast-path ``fetch_latest()`` is used; for *count=1* with
@@ -120,7 +122,8 @@ def _list_across_forms(
     start_date: str | None = None,
     end_date: str | None = None,
 ) -> list[FilingInfo]:
-    """List available filings across multiple form types, sorted by date.
+    """
+    List available filings across multiple form types, sorted by date.
 
     Calls ``list_available()`` per form type, merges all results, sorts by
     ``filing_date`` descending, and returns the top *count* entries.
@@ -154,7 +157,8 @@ def _ingest_one_form(
     filing_task_id: int | None = None,
     form_label: str = "",
 ) -> tuple[int, int, int]:
-    """Ingest filing(s) for one ticker and one form type.
+    """
+    Ingest filing(s) for one ticker and one form type.
 
     Runs the full pipeline per filing: fetch → duplicate check → process →
     store.  When *count* is 1 (default) the behaviour is identical to the
@@ -353,7 +357,8 @@ def _ingest_across_forms(
     registry: MetadataRegistry,
     chroma: ChromaDBClient,
 ) -> tuple[int, int, int]:
-    """Ingest the *count* most recent filings across all *form_types*.
+    """
+    Ingest the *count* most recent filings across all *form_types*.
 
     Uses ``list_available()`` to preview filings across form types, merges
     them by date, selects the newest *count*, then fetches, processes, and
@@ -540,7 +545,23 @@ def add(
         typer.Option("--end-date", help="End date filter (YYYY-MM-DD)."),
     ] = None,
 ) -> None:
-    """Fetch and ingest SEC filing(s) for a company."""
+    """
+    Fetch and ingest SEC filing(s) for a company.
+
+    Examples:
+
+        sec-search ingest add AAPL
+
+        sec-search ingest add AAPL -f 10-K
+
+        sec-search ingest add AAPL -t 3
+
+        sec-search ingest add AAPL -n 2 -f 10-K
+
+        sec-search ingest add AAPL -y 2023
+
+        sec-search ingest add AAPL --start-date 2022-01-01 --end-date 2023-12-31
+    """
     ticker = ticker.upper()
 
     if total is not None and number is not None:
@@ -695,7 +716,19 @@ def batch(
         typer.Option("--end-date", help="End date filter (YYYY-MM-DD)."),
     ] = None,
 ) -> None:
-    """Fetch and ingest filings for multiple companies."""
+    """
+    Fetch and ingest filings for multiple companies.
+
+    Examples:
+
+        sec-search ingest batch AAPL MSFT GOOGL
+
+        sec-search ingest batch AAPL MSFT -f 10-K
+
+        sec-search ingest batch AAPL MSFT -t 3
+
+        sec-search ingest batch AAPL MSFT GOOGL -n 2 -y 2023
+    """
     tickers = [t.upper() for t in tickers]
 
     if total is not None and number is not None:

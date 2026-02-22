@@ -1,4 +1,5 @@
-"""Search engine for semantic search over SEC filings.
+"""
+Search engine for semantic search over SEC filings.
 
 This module provides the high-level search interface that coordinates
 query embedding and ChromaDB similarity search. It serves as the
@@ -22,7 +23,8 @@ logger = get_logger(__name__)
 
 
 class SearchEngine:
-    """Facade for semantic search over ingested SEC filings.
+    """
+    Facade for semantic search over ingested SEC filings.
 
     This class coordinates query embedding and vector similarity search,
     providing a single ``search()`` method that accepts a plain text query
@@ -46,7 +48,8 @@ class SearchEngine:
         embedder: Optional[EmbeddingGenerator] = None,
         chroma_client: Optional[ChromaDBClient] = None,
     ) -> None:
-        """Initialise the search engine.
+        """
+        Initialise the search engine.
 
         Args:
             embedder: Pre-built embedding generator. If None, a new
@@ -75,7 +78,8 @@ class SearchEngine:
         form_type: Optional[str] = None,
         min_similarity: Optional[float] = None,
     ) -> list[SearchResult]:
-        """Search ingested filings for chunks relevant to the query.
+        """
+        Search ingested filings for chunks relevant to the query.
 
         The query is embedded using the same model used during ingestion,
         then matched against stored chunks via cosine similarity. Results

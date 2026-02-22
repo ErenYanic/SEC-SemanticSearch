@@ -13,11 +13,12 @@ from sec_semantic_search.search import SearchEngine
 console = Console()
 
 # Maximum characters to display per result in the table.
-_CONTENT_PREVIEW_LIMIT = 300
+_CONTENT_PREVIEW_LIMIT = 700
 
 
 def _similarity_text(similarity: float) -> Text:
-    """Return a colour-coded similarity percentage.
+    """
+    Return a colour-coded similarity percentage.
 
     Green for >= 40%, yellow for >= 25%, dim otherwise.
     These thresholds reflect typical cosine similarity ranges
@@ -46,7 +47,17 @@ def search(
         typer.Option("--form", "-f", help="Filter by form type (10-K or 10-Q)."),
     ] = None,
 ) -> None:
-    """Search ingested SEC filings with a natural language query."""
+    """
+    Search ingested SEC filings with a natural language query.
+
+    Examples:
+
+        sec-search search "risk factors related to supply chain"
+
+        sec-search search "revenue recognition" -t 10 -k AAPL
+
+        sec-search search "liquidity" -f 10-Q
+    """
     with console.status("Searching..."):
         try:
             engine = SearchEngine()
