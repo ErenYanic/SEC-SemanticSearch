@@ -172,6 +172,9 @@ target/
 # Jupyter Notebook
 .ipynb_checkpoints
 
+# Scratch / investigation notebooks (not part of the project deliverable)
+notebooks/*_investigation.ipynb
+
 # IPython
 profile_default/
 ipython_config.py

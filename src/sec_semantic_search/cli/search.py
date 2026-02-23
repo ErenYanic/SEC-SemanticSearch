@@ -13,7 +13,8 @@ from sec_semantic_search.search import SearchEngine
 console = Console()
 
 # Maximum characters to display per result in the table.
-_CONTENT_PREVIEW_LIMIT = 700
+_CONTENT_PREVIEW_LIMIT = 1000
+_SECTION_PATH_LIMIT = 350
 
 
 def _similarity_text(similarity: float) -> Text:
@@ -105,11 +106,16 @@ def search(
         if len(content) > _CONTENT_PREVIEW_LIMIT:
             content = content[:_CONTENT_PREVIEW_LIMIT] + "..."
 
+        # Truncate long section paths for display.
+        section = result.path
+        if len(section) > _SECTION_PATH_LIMIT:
+            section = section[:_SECTION_PATH_LIMIT] + "..."
+
         table.add_row(
             str(i),
             _similarity_text(result.similarity),
             source,
-            result.path,
+            section,
             content,
         )
 
