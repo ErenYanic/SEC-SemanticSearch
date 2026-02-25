@@ -14,7 +14,7 @@ console = Console()
 
 # Maximum characters to display per result in the table.
 _CONTENT_PREVIEW_LIMIT = 1000
-_SECTION_PATH_LIMIT = 350
+_SECTION_PATH_LIMIT = 500
 
 
 def _similarity_text(similarity: float) -> Text:
