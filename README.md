@@ -60,9 +60,10 @@ cp .env.example .env
 | `EMBEDDING_DEVICE` | `auto` | `cuda`, `cpu`, or `auto` |
 | `EMBEDDING_BATCH_SIZE` | `32` | Reduce for low-VRAM GPUs (e.g. `8`) |
 | `CHUNKING_TOKEN_LIMIT` | `500` | Maximum tokens per chunk |
+| `CHUNKING_TOLERANCE` | `50` | Tolerance band for chunk boundaries (±tokens) |
 | `DB_CHROMA_PATH` | `./data/chroma_db` | ChromaDB storage path |
 | `DB_METADATA_DB_PATH` | `./data/metadata.sqlite` | SQLite metadata path |
-| `DB_MAX_FILINGS` | `20` | Maximum filings to store |
+| `DB_MAX_FILINGS` | `100` | Maximum filings to store |
 | `SEARCH_TOP_K` | `5` | Default number of search results |
 | `SEARCH_MIN_SIMILARITY` | `0.0` | Minimum similarity threshold |
 
@@ -79,14 +80,29 @@ The CLI is accessed via the `sec-search` command (or `python -m sec_semantic_sea
 #### Ingest filings
 
 ```bash
-# Ingest the latest 10-K filing for Apple
+# Ingest the latest 10-K and 10-Q for Apple
 sec-search ingest add AAPL
 
-# Ingest a 10-Q filing instead
+# Ingest only 10-Q filings
 sec-search ingest add AAPL --form 10-Q
+
+# Ingest the 3 newest filings across all form types
+sec-search ingest add AAPL --total 3
+
+# Ingest the 2 most recent 10-K filings
+sec-search ingest add AAPL --number 2 --form 10-K
+
+# Ingest filings from a specific year
+sec-search ingest add AAPL --year 2023
+
+# Ingest filings within a date range
+sec-search ingest add AAPL --start-date 2022-01-01 --end-date 2023-12-31
 
 # Batch ingest multiple companies
 sec-search ingest batch AAPL MSFT GOOGL
+
+# Batch ingest with the 3 newest per ticker across forms
+sec-search ingest batch AAPL MSFT --total 3
 ```
 
 #### Search filings
@@ -111,14 +127,23 @@ sec-search manage status
 # List all ingested filings
 sec-search manage list
 
-# List filings filtered by ticker
-sec-search manage list --ticker AAPL
+# List filings filtered by ticker and/or form type
+sec-search manage list --ticker AAPL --form 10-K
 
-# Remove a filing by accession number
+# Remove a single filing by accession number
 sec-search manage remove 0000320193-24-000123
 
+# Bulk remove all filings for a ticker
+sec-search manage remove --ticker AAPL
+
+# Bulk remove by ticker and form type
+sec-search manage remove --ticker AAPL --form 10-K
+
 # Skip confirmation prompt
-sec-search manage remove 0000320193-24-000123 --yes
+sec-search manage remove --ticker AAPL --yes
+
+# Delete all filings from the database
+sec-search manage clear
 ```
 
 #### Other options
@@ -305,7 +330,7 @@ python -m pytest tests/integration/
 | Component | Library | Purpose |
 |-----------|---------|---------|
 | Filing retrieval | [edgartools](https://github.com/dgunning/edgartools) | SEC EDGAR API wrapper |
-| HTML parsing | [doc2dict](https://github.com/peterbe/doc2dict) | Structured document extraction |
+| HTML parsing | [doc2dict](https://github.com/john-friedman/doc2dict) | Structured document extraction |
 | Embeddings | [sentence-transformers](https://sbert.net/) | `google/embeddinggemma-300m` (768-dim) |
 | Vector database | [ChromaDB](https://www.trychroma.com/) | Persistent local storage, cosine similarity |
 | Web interface | [Streamlit](https://streamlit.io/) | Multi-page UI with cached GPU resources |
