@@ -298,8 +298,8 @@ SEC-SemanticSearch/
 │   ├── cli/                          # Typer CLI (ingest, search, manage)
 │   └── web/                          # Streamlit interface (multi-page)
 ├── tests/
-│   ├── unit/                         # 169 unit tests
-│   └── integration/                  # 42 integration tests
+│   ├── unit/                         # 189 unit tests
+│   └── integration/                  # 56 integration tests
 ├── notebooks/
 │   └── sec_semantic_search.ipynb     # Original working prototype
 └── data/                             # Runtime data (gitignored)
@@ -323,7 +323,7 @@ python -m pytest tests/unit/
 python -m pytest tests/integration/
 ```
 
-211 tests (169 unit + 42 integration), all passing in ~8 seconds.
+245 tests (189 unit + 56 integration), all passing in ~5 seconds.
 
 ## Technology Stack
 
