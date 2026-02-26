@@ -20,6 +20,7 @@ from sec_semantic_search.core.types import (
     FilingIdentifier,
     Segment,
 )
+from sec_semantic_search.database.metadata import FilingRecord
 
 
 # ---------------------------------------------------------------------------
@@ -170,3 +171,34 @@ def sample_html() -> str:
     </body>
     </html>
     """
+
+
+# ---------------------------------------------------------------------------
+# Filing record factory
+# ---------------------------------------------------------------------------
+
+
+def make_filing_record(
+    *,
+    id: int = 1,
+    ticker: str = "AAPL",
+    form_type: str = "10-K",
+    filing_date: str = "2024-11-01",
+    accession_number: str = "0000320193-24-000001",
+    chunk_count: int = 100,
+    ingested_at: str = "2024-11-15T10:00:00",
+) -> FilingRecord:
+    """Factory for creating FilingRecord instances with sensible defaults.
+
+    Not a fixture — accepts parameters so tests can create records with
+    different values.
+    """
+    return FilingRecord(
+        id=id,
+        ticker=ticker,
+        form_type=form_type,
+        filing_date=filing_date,
+        accession_number=accession_number,
+        chunk_count=chunk_count,
+        ingested_at=ingested_at,
+    )

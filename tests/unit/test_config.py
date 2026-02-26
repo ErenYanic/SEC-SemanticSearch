@@ -6,17 +6,21 @@ guards. We also verify the singleton pattern, default values, and that
 constants used by other modules have the expected values.
 """
 
+import pytest
+
 import sec_semantic_search.config.settings as settings_module
 from sec_semantic_search.config.constants import (
     COLLECTION_NAME,
     DEFAULT_CHUNK_TOKEN_LIMIT,
     DEFAULT_CHUNK_TOLERANCE,
+    DEFAULT_FORM_TYPES,
     DEFAULT_MAX_FILINGS,
     DEFAULT_MIN_SIMILARITY,
     DEFAULT_SEARCH_TOP_K,
     EMBEDDING_DIMENSION,
     EMBEDDING_MODEL_NAME,
     SUPPORTED_FORMS,
+    parse_form_types,
 )
 from sec_semantic_search.config.settings import (
     ChunkingSettings,
@@ -63,6 +67,55 @@ class TestConstants:
 
     def test_default_max_filings(self):
         assert DEFAULT_MAX_FILINGS == 100
+
+    def test_default_form_types_value(self):
+        """DEFAULT_FORM_TYPES must list both supported forms."""
+        assert DEFAULT_FORM_TYPES == "10-K,10-Q"
+
+    def test_default_form_types_roundtrip(self):
+        """DEFAULT_FORM_TYPES must be compatible with parse_form_types()."""
+        assert parse_form_types(DEFAULT_FORM_TYPES) == ("10-K", "10-Q")
+
+
+# -----------------------------------------------------------------------
+# parse_form_types()
+# -----------------------------------------------------------------------
+
+
+class TestParseFormTypes:
+    """parse_form_types() validates, normalises, deduplicates, and sorts."""
+
+    def test_single_valid_form(self):
+        assert parse_form_types("10-K") == ("10-K",)
+
+    def test_both_forms(self):
+        assert parse_form_types("10-K,10-Q") == ("10-K", "10-Q")
+
+    def test_order_independence(self):
+        """Input order should not affect the output."""
+        assert parse_form_types("10-Q,10-K") == ("10-K", "10-Q")
+
+    def test_case_insensitivity(self):
+        assert parse_form_types("10-k") == ("10-K",)
+
+    def test_whitespace_handling(self):
+        assert parse_form_types("10-K , 10-Q") == ("10-K", "10-Q")
+
+    def test_deduplication(self):
+        assert parse_form_types("10-K,10-K") == ("10-K",)
+
+    def test_empty_string_raises(self):
+        with pytest.raises(ValueError, match="Empty form type"):
+            parse_form_types("")
+
+    def test_invalid_form_raises(self):
+        with pytest.raises(ValueError, match="Unsupported"):
+            parse_form_types("8-K")
+
+    def test_mixed_valid_invalid_raises(self):
+        """Even one invalid form in a comma-separated list should fail."""
+        with pytest.raises(ValueError, match="Unsupported"):
+            parse_form_types("10-K,8-K")
 
 
 # -----------------------------------------------------------------------
@@ -114,7 +167,14 @@ class TestSettingsDefaults:
 class TestRootSettings:
     """The root Settings class composes all nested settings."""
 
-    def test_has_all_sections(self):
+    def test_has_all_sections(self, monkeypatch):
+        """Root Settings composes all nested settings sections.
+
+        monkeypatch sets EDGAR credentials so the test does not depend
+        on a real .env file.
+        """
+        monkeypatch.setenv("EDGAR_IDENTITY_NAME", "Test User")
+        monkeypatch.setenv("EDGAR_IDENTITY_EMAIL", "test@example.com")
         s = Settings()
         assert hasattr(s, "edgar")
         assert hasattr(s, "embedding")
