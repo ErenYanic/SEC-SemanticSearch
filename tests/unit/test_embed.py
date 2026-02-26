@@ -1,4 +1,5 @@
-"""Tests for the EmbeddingGenerator pipeline component.
+"""
+Tests for the EmbeddingGenerator pipeline component.
 
 Loading the real 300M-parameter model takes ~10s and requires CUDA.
 We mock SentenceTransformer to test the generator's own logic:

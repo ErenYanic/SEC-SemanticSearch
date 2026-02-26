@@ -1,4 +1,5 @@
-"""Tests for the custom exception hierarchy.
+"""
+Tests for the custom exception hierarchy.
 
 The exception classes carry structured data (message + details) and
 custom formatting. We verify:

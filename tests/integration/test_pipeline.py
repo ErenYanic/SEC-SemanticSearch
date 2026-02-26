@@ -1,4 +1,5 @@
-"""Integration tests for the ingestion pipeline and database layer.
+"""
+Integration tests for the ingestion pipeline and database layer.
 
 These tests verify that modules compose correctly:
     - Parser output feeds into the chunker
@@ -141,7 +142,8 @@ class TestMetadataRegistry:
             registry.register_filing(sample_filing_id, chunk_count=5)
 
     def test_filing_limit(self, tmp_db_path, sample_filing_id):
-        """check_filing_limit() should raise when limit is reached.
+        """
+        check_filing_limit() should raise when limit is reached.
 
         We create a registry and manually set _max_filings=1, then
         register one filing to trigger the limit.

@@ -1,4 +1,5 @@
-"""Tests for configuration management and constants.
+"""
+Tests for configuration management and constants.
 
 The settings module was the site of two Pydantic v2 bugs (extra="ignore"
 and load_dotenv before nested defaults). These tests serve as regression

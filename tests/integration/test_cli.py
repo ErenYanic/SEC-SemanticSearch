@@ -1,4 +1,5 @@
-"""Integration tests for the CLI commands via Typer's CliRunner.
+"""
+Integration tests for the CLI commands via Typer's CliRunner.
 
 CliRunner invokes commands programmatically without spawning subprocesses.
 We mock heavy dependencies (fetcher, databases, embedder) to keep tests
@@ -30,9 +31,11 @@ class TestRootApp:
     """The root app should show help and version."""
 
     def test_no_args_shows_help(self):
-        """Typer's no_args_is_help=True exits with code 0 when run
+        """
+        Typer's no_args_is_help=True exits with code 0 when run
         normally, but CliRunner returns exit code 0 or 2 depending on
-        Click version. We just verify help text is shown."""
+        Click version. We just verify help text is shown.
+        """
         result = runner.invoke(app, [])
         assert "Usage" in result.output or "sec-search" in result.output
 

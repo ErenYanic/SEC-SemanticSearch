@@ -1,4 +1,5 @@
-"""Tests for web interface helper functions.
+"""
+Tests for web interface helper functions.
 
 Pure functions extracted from Streamlit page modules can be tested
 without a running Streamlit server. Currently covers the similarity

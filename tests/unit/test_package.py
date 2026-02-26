@@ -1,4 +1,5 @@
-"""Tests for the package-level __init__.py.
+"""
+Tests for the package-level __init__.py.
 
 Verifies version discovery, re-exported types, and __all__ contents.
 The package __init__ deliberately avoids importing heavy modules

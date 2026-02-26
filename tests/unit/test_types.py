@@ -1,4 +1,5 @@
-"""Tests for core domain data classes.
+"""
+Tests for core domain data classes.
 
 These types are the foundation of the entire pipeline — every module
 depends on them. We verify normalisation, immutability, computed
@@ -39,7 +40,8 @@ class TestContentType:
         assert ContentType.TABLE.value == "table"
 
     def test_from_string(self):
-        """ContentType("text") should produce ContentType.TEXT.
+        """
+        ContentType("text") should produce ContentType.TEXT.
 
         This is how SearchResult.from_chromadb_result reconstructs
         the enum from stored metadata strings.

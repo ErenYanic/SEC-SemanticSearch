@@ -1,4 +1,5 @@
-"""Tests for the FilingParser pipeline component.
+"""
+Tests for the FilingParser pipeline component.
 
 FilingParser wraps doc2dict to parse SEC filing HTML into Segment
 objects. These tests verify segment extraction, hierarchical path

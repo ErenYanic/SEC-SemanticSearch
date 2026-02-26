@@ -1,4 +1,5 @@
-"""Tests for the PipelineOrchestrator.
+"""
+Tests for the PipelineOrchestrator.
 
 The orchestrator coordinates parser → chunker → embedder. We inject
 mock components via its dependency injection constructor to test the
