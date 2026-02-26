@@ -158,3 +158,90 @@ class TestGetCompanyError:
         ):
             with pytest.raises(FetchError, match="Invalid ticker"):
                 fetcher._get_company("INVALIDTICKER")
+
+
+# -----------------------------------------------------------------------
+# fetch() generator — fault tolerance and count=None
+# -----------------------------------------------------------------------
+
+
+def _make_mock_filing(accession_no, filing_date, *, html_content="<html></html>",
+                      html_side_effect=None):
+    """Create a mock filing object with the given properties."""
+    filing = MagicMock()
+    filing.accession_no = accession_no
+    filing.filing_date = filing_date
+    if html_side_effect is not None:
+        filing.html.side_effect = html_side_effect
+    else:
+        filing.html.return_value = html_content
+    return filing
+
+
+def _make_mock_filings(filing_list):
+    """Wrap a list of mock filings to behave like edgartools Filings."""
+    mock_filings = MagicMock()
+    mock_filings.__len__ = lambda self: len(filing_list)
+    mock_filings.__iter__ = lambda self: iter(filing_list)
+    mock_filings.__bool__ = lambda self: bool(filing_list)
+    return mock_filings
+
+
+class TestFetchGeneratorFaultTolerance:
+    """fetch() should skip filings that raise FetchError and continue."""
+
+    def test_skips_failed_filing_continues(self, fetcher):
+        """If one filing fails, the others should still be yielded."""
+        filings = [
+            _make_mock_filing("ACC-001", date(2024, 1, 1),
+                              html_content="<html>1</html>"),
+            _make_mock_filing("ACC-002", date(2024, 2, 1),
+                              html_side_effect=Exception("Network error")),
+            _make_mock_filing("ACC-003", date(2024, 3, 1),
+                              html_content="<html>3</html>"),
+        ]
+        mock_company = MagicMock()
+        mock_company.get_filings.return_value = _make_mock_filings(filings)
+
+        with patch.object(fetcher, "_get_company", return_value=mock_company):
+            results = list(fetcher.fetch("AAPL", "10-K", count=3))
+
+        assert len(results) == 2
+        assert results[0][0].accession_number == "ACC-001"
+        assert results[1][0].accession_number == "ACC-003"
+
+    def test_all_filings_fail_yields_nothing(self, fetcher):
+        """If every filing fails, the generator should yield nothing."""
+        filings = [
+            _make_mock_filing("ACC-001", date(2024, 1, 1),
+                              html_side_effect=Exception("Fail 1")),
+            _make_mock_filing("ACC-002", date(2024, 2, 1),
+                              html_side_effect=Exception("Fail 2")),
+        ]
+        mock_company = MagicMock()
+        mock_company.get_filings.return_value = _make_mock_filings(filings)
+
+        with patch.object(fetcher, "_get_company", return_value=mock_company):
+            results = list(fetcher.fetch("AAPL", "10-K", count=2))
+
+        assert results == []
+
+
+class TestFetchCountNone:
+    """When count is None, fetch() should default to max_filings."""
+
+    def test_count_none_defaults_to_max_filings(self, fetcher):
+        """With 10 available filings and max_filings=5, only 5 should be yielded."""
+        fetcher.max_filings = 5
+        filings = [
+            _make_mock_filing(f"ACC-{i:03d}", date(2024, 1, i + 1),
+                              html_content=f"<html>{i}</html>")
+            for i in range(10)
+        ]
+        mock_company = MagicMock()
+        mock_company.get_filings.return_value = _make_mock_filings(filings)
+
+        with patch.object(fetcher, "_get_company", return_value=mock_company):
+            results = list(fetcher.fetch("AAPL", "10-K", count=None))
+
+        assert len(results) == 5
