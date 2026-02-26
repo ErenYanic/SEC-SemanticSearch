@@ -1,4 +1,5 @@
-"""Shared pytest fixtures for SEC-SemanticSearch tests.
+"""
+Shared pytest fixtures for SEC-SemanticSearch tests.
 
 This module provides reusable test data and temporary resources used
 across both unit and integration tests:
@@ -30,7 +31,8 @@ from sec_semantic_search.database.metadata import FilingRecord
 
 @pytest.fixture
 def sample_filing_id() -> FilingIdentifier:
-    """A realistic, reusable filing identifier.
+    """
+    A realistic, reusable filing identifier.
 
     Uses AAPL 10-K to match the project's existing verification data,
     but with a synthetic accession number to avoid collision with real
@@ -46,7 +48,8 @@ def sample_filing_id() -> FilingIdentifier:
 
 @pytest.fixture
 def sample_segments(sample_filing_id: FilingIdentifier) -> list[Segment]:
-    """A small list covering all three ContentType variants.
+    """
+    A small list covering all three ContentType variants.
 
     Three segments are enough to exercise chunking, database storage,
     and search without being slow. Each has realistic but short content
@@ -80,7 +83,8 @@ def sample_segments(sample_filing_id: FilingIdentifier) -> list[Segment]:
 
 @pytest.fixture
 def sample_chunks(sample_filing_id: FilingIdentifier) -> list[Chunk]:
-    """Pre-built chunks with sequential indices.
+    """
+    Pre-built chunks with sequential indices.
 
     These mirror what TextChunker would produce from sample_segments —
     useful for database and search tests that don't need to run the
@@ -122,7 +126,8 @@ def sample_chunks(sample_filing_id: FilingIdentifier) -> list[Chunk]:
 
 @pytest.fixture
 def tmp_db_path(tmp_path) -> str:
-    """Isolated SQLite database path inside pytest's tmp directory.
+    """
+    Isolated SQLite database path inside pytest's tmp directory.
 
     Each test receives a unique temporary directory, so databases never
     collide or persist between runs.
@@ -132,7 +137,8 @@ def tmp_db_path(tmp_path) -> str:
 
 @pytest.fixture
 def tmp_chroma_path(tmp_path) -> str:
-    """Isolated ChromaDB storage directory.
+    """
+    Isolated ChromaDB storage directory.
 
     ChromaDB's PersistentClient writes to this directory; pytest
     cleans it up automatically after the test session.
@@ -147,7 +153,8 @@ def tmp_chroma_path(tmp_path) -> str:
 
 @pytest.fixture
 def sample_html() -> str:
-    """Minimal HTML that doc2dict can parse into segments.
+    """
+    Minimal HTML that doc2dict can parse into segments.
 
     This is intentionally small — just enough structure to produce
     a few segments with titles, text, and a table. Real SEC filings
@@ -188,7 +195,8 @@ def make_filing_record(
     chunk_count: int = 100,
     ingested_at: str = "2024-11-15T10:00:00",
 ) -> FilingRecord:
-    """Factory for creating FilingRecord instances with sensible defaults.
+    """
+    Factory for creating FilingRecord instances with sensible defaults.
 
     Not a fixture — accepts parameters so tests can create records with
     different values.

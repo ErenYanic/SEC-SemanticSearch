@@ -1,4 +1,5 @@
-"""Tests for the FilingFetcher pipeline component.
+"""
+Tests for the FilingFetcher pipeline component.
 
 FilingFetcher wraps edgartools to fetch SEC filings over the network.
 We mock edgartools' Company and set_identity so tests run without

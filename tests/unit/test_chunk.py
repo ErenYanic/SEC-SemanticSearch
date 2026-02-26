@@ -1,4 +1,5 @@
-"""Tests for the TextChunker pipeline component.
+"""
+Tests for the TextChunker pipeline component.
 
 TextChunker is a pure algorithmic class — it splits Segments into
 Chunks at sentence boundaries. These tests verify the splitting logic,
@@ -19,7 +20,8 @@ from sec_semantic_search.pipeline.chunk import TextChunker
 
 @pytest.fixture
 def chunker() -> TextChunker:
-    """A chunker with small, predictable limits.
+    """
+    A chunker with small, predictable limits.
 
     token_limit=20 and tolerance=5 make it easy to construct test
     inputs that are just above or below the boundary without needing
@@ -174,7 +176,8 @@ class TestEdgeCases:
         assert chunks[0].content == "Disclaimer."
 
     def test_no_sentence_boundaries(self, chunker, sample_filing_id):
-        """Text without sentence terminators should still be chunked.
+        """
+        Text without sentence terminators should still be chunked.
 
         The chunker accumulates until limit+tolerance is exceeded,
         then starts a new chunk even without clean boundaries.

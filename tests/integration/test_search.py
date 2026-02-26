@@ -1,4 +1,5 @@
-"""Integration tests for the SearchEngine facade.
+"""
+Integration tests for the SearchEngine facade.
 
 SearchEngine coordinates EmbeddingGenerator and ChromaDBClient. We use
 a real ChromaDB instance (with tmp_chroma_path for isolation) but mock
@@ -32,7 +33,8 @@ from sec_semantic_search.search.engine import SearchEngine
 
 @pytest.fixture
 def mock_embedder():
-    """A mock EmbeddingGenerator that returns deterministic embeddings.
+    """
+    A mock EmbeddingGenerator that returns deterministic embeddings.
 
     embed_query_for_chromadb() returns a fixed vector wrapped in the
     list-of-lists format ChromaDB expects. This avoids loading the
@@ -47,7 +49,8 @@ def mock_embedder():
 
 @pytest.fixture
 def populated_chroma(tmp_chroma_path, sample_chunks, sample_filing_id):
-    """A ChromaDB client pre-populated with sample chunks.
+    """
+    A ChromaDB client pre-populated with sample chunks.
 
     Returns the client so tests can pass it to SearchEngine.
     """

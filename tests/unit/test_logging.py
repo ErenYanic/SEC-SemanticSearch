@@ -1,4 +1,5 @@
-"""Tests for the logging configuration module.
+"""
+Tests for the logging configuration module.
 
 The logging module has non-trivial state: a global _logging_configured
 flag, automatic namespace prefixing, and third-party logger suppression.
@@ -21,7 +22,8 @@ from sec_semantic_search.core.logging import (
 
 @pytest.fixture(autouse=True)
 def reset_logging_state():
-    """Reset the module's global _logging_configured flag between tests.
+    """
+    Reset the module's global _logging_configured flag between tests.
 
     Without this, configure_logging() would short-circuit after the
     first test that calls it, making subsequent tests unreliable.
