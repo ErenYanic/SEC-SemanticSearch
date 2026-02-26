@@ -33,10 +33,10 @@ from sec_semantic_search.web.pages.search import render as search_render  # noqa
 
 pages = st.navigation(
     [
-        st.Page(dashboard_render, title="Dashboard", icon=":material/dashboard:"),
-        st.Page(search_render, title="Search", icon=":material/search:"),
-        st.Page(ingest_render, title="Ingest", icon=":material/download:"),
-        st.Page(filings_render, title="Filings", icon=":material/folder:"),
+        st.Page(dashboard_render, title="Dashboard", icon=":material/dashboard:", url_path="dashboard"),
+        st.Page(search_render, title="Search", icon=":material/search:", url_path="search"),
+        st.Page(ingest_render, title="Ingest", icon=":material/download:", url_path="ingest"),
+        st.Page(filings_render, title="Filings", icon=":material/folder:", url_path="filings"),
     ]
 )
 pages.run()
