@@ -12,7 +12,8 @@ from sec_semantic_search.web._shared import get_registry, get_search_engine
 
 
 def _render_sidebar() -> tuple[str | None, str | None, int]:
-    """Render the sidebar with ticker and form type filter controls.
+    """
+    Render the sidebar with ticker and form type filter controls.
 
     Returns:
         Tuple of (selected_ticker, selected_form_type, top_k).
@@ -55,7 +56,8 @@ def _render_sidebar() -> tuple[str | None, str | None, int]:
 
 
 def _similarity_colour(similarity: float) -> str:
-    """Return a Streamlit colour name for the similarity score.
+    """
+    Return a Streamlit colour name for the similarity score.
 
     Thresholds match the CLI (calibrated to embeddinggemma-300m):
     green >= 40 %, orange >= 25 %, red below.
