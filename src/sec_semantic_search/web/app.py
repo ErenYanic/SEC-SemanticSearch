@@ -1,4 +1,5 @@
-"""Streamlit web interface for SEC-SemanticSearch.
+"""
+Streamlit web interface for SEC-SemanticSearch.
 
 Multi-page application with search, ingest, and filing management pages.
 

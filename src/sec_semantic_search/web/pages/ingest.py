@@ -33,7 +33,8 @@ def _process_and_store(
     status,
     label: str = "",
 ) -> dict | None:
-    """Process a single pre-fetched filing and store it.
+    """
+    Process a single pre-fetched filing and store it.
 
     Returns a result dict on success, or ``None`` on failure (errors are
     displayed inline).
@@ -92,7 +93,8 @@ def _ingest_one_form(
     status,
     form_label: str = "",
 ) -> list[dict]:
-    """Run the full pipeline for one ticker and one form type.
+    """
+    Run the full pipeline for one ticker and one form type.
 
     Returns a list of dicts (one per successfully ingested filing), each
     containing ``filing_id``, ``form_type``, and ``stats``.  Errors and
@@ -205,7 +207,8 @@ def _ingest_across_forms(
     chroma,
     status,
 ) -> list[dict]:
-    """Ingest the *count* most recent filings across all *form_types*.
+    """
+    Ingest the *count* most recent filings across all *form_types*.
 
     Uses ``list_available()`` to preview filings from each form type,
     merges by date, selects the newest *count*, then fetches, processes,

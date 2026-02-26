@@ -1,4 +1,5 @@
-"""Launch helper for the Streamlit web interface.
+"""
+Launch helper for the Streamlit web interface.
 
 This module provides the ``main()`` entry point used by the
 ``sec-search-web`` console script defined in ``pyproject.toml``.

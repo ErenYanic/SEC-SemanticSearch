@@ -1,4 +1,5 @@
-"""Shared cached resources for the Streamlit web interface.
+"""
+Shared cached resources for the Streamlit web interface.
 
 All page modules import from here rather than creating their own
 instances.  ``@st.cache_resource`` ensures each object is created once
@@ -13,7 +14,8 @@ from sec_semantic_search.search import SearchEngine
 
 @st.cache_resource
 def get_search_engine() -> SearchEngine:
-    """Create a SearchEngine singleton.
+    """
+    Create a SearchEngine singleton.
 
     The embedding model (loaded lazily on first query) stays in GPU
     memory across reruns.
