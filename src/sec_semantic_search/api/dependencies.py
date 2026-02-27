@@ -53,3 +53,11 @@ def get_embedder(request: Request) -> EmbeddingGenerator:
     """Provide the EmbeddingGenerator singleton."""
     embedder: EmbeddingGenerator = request.app.state.embedder
     return embedder
+
+
+def get_task_manager(request: Request):  # noqa: ANN201
+    """Provide the TaskManager singleton."""
+    from sec_semantic_search.api.tasks import TaskManager
+
+    manager: TaskManager = request.app.state.task_manager
+    return manager
