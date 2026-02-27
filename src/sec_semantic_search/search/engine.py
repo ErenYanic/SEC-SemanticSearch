@@ -77,6 +77,7 @@ class SearchEngine:
         ticker: Optional[str] = None,
         form_type: Optional[str] = None,
         min_similarity: Optional[float] = None,
+        accession_number: Optional[str] = None,
     ) -> list[SearchResult]:
         """
         Search ingested filings for chunks relevant to the query.
@@ -94,6 +95,8 @@ class SearchEngine:
                        (e.g. "10-K", "10-Q").
             min_similarity: Minimum similarity threshold (0.0–1.0).
                             Defaults to ``SEARCH_MIN_SIMILARITY`` from settings.
+            accession_number: Optional filter — restrict search to a single
+                filing by accession number (web-only feature).
 
         Returns:
             List of ``SearchResult`` objects ordered by similarity
@@ -130,6 +133,7 @@ class SearchEngine:
                 n_results=effective_top_k,
                 ticker=ticker,
                 form_type=form_type,
+                accession_number=accession_number,
             )
         except SearchError:
             raise
