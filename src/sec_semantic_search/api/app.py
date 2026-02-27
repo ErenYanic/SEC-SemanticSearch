@@ -46,9 +46,16 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         3. EmbeddingGenerator (lazy — model loads on first use)
         4. SearchEngine (wraps embedder + chroma — fast)
         5. FilingFetcher (sets EDGAR identity — fast)
+        6. PipelineOrchestrator (wraps fetcher + embedder — fast)
+        7. TaskManager (wraps registry + chroma + fetcher + orchestrator)
     """
+    from sec_semantic_search.api.tasks import TaskManager
     from sec_semantic_search.database import ChromaDBClient, MetadataRegistry
-    from sec_semantic_search.pipeline import EmbeddingGenerator, FilingFetcher
+    from sec_semantic_search.pipeline import (
+        EmbeddingGenerator,
+        FilingFetcher,
+        PipelineOrchestrator,
+    )
     from sec_semantic_search.search import SearchEngine
 
     logger.info("SEC Semantic Search API starting up (v%s)", __version__)
@@ -60,12 +67,21 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     embedder = EmbeddingGenerator()
     search_engine = SearchEngine(embedder=embedder, chroma_client=chroma)
     fetcher = FilingFetcher()
+    orchestrator = PipelineOrchestrator(fetcher=fetcher, embedder=embedder)
+    task_manager = TaskManager(
+        registry=registry,
+        chroma=chroma,
+        fetcher=fetcher,
+        orchestrator=orchestrator,
+    )
 
     app.state.registry = registry
     app.state.chroma = chroma
     app.state.embedder = embedder
     app.state.search_engine = search_engine
     app.state.fetcher = fetcher
+    app.state.orchestrator = orchestrator
+    app.state.task_manager = task_manager
     app.state.settings = settings
 
     logger.info("All singletons initialised. API ready.")
@@ -113,15 +129,17 @@ def create_app() -> FastAPI:
 
     # -- Routers (uncommented as implemented in W1.2–W1.8) ------------------
     from sec_semantic_search.api.routes.filings import router as filings_router
+    from sec_semantic_search.api.routes.ingest import router as ingest_router
+    from sec_semantic_search.api.routes.search import router as search_router
     from sec_semantic_search.api.routes.status import router as status_router
-    # from sec_semantic_search.api.routes.search import router as search_router
-    # from sec_semantic_search.api.routes.ingest import router as ingest_router
+    from sec_semantic_search.api.websocket import router as ws_router
     # from sec_semantic_search.api.routes.resources import router as resources_router
 
     application.include_router(status_router, prefix="/api/status", tags=["status"])
     application.include_router(filings_router, prefix="/api/filings", tags=["filings"])
-    # application.include_router(search_router, prefix="/api/search", tags=["search"])
-    # application.include_router(ingest_router, prefix="/api/ingest", tags=["ingest"])
+    application.include_router(search_router, prefix="/api/search", tags=["search"])
+    application.include_router(ingest_router, prefix="/api/ingest", tags=["ingest"])
+    application.include_router(ws_router, tags=["websocket"])
     # application.include_router(resources_router, prefix="/api/resources", tags=["resources"])
 
     # -- Health check -------------------------------------------------------
