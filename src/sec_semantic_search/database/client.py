@@ -178,6 +178,7 @@ class ChromaDBClient:
         n_results: int = 5,
         ticker: Optional[str] = None,
         form_type: Optional[str] = None,
+        accession_number: Optional[str] = None,
     ) -> list[SearchResult]:
         """
         Query the collection for similar chunks.
@@ -189,6 +190,8 @@ class ChromaDBClient:
             n_results: Maximum number of results to return.
             ticker: Optional filter by ticker symbol.
             form_type: Optional filter by form type.
+            accession_number: Optional filter to restrict search to a
+                single filing (web-only feature).
 
         Returns:
             List of SearchResult objects, ordered by similarity
@@ -197,7 +200,7 @@ class ChromaDBClient:
         Raises:
             DatabaseError: If the query fails.
         """
-        where_filter = self._build_where_filter(ticker, form_type)
+        where_filter = self._build_where_filter(ticker, form_type, accession_number)
 
         try:
             results = self._collection.query(
@@ -245,6 +248,7 @@ class ChromaDBClient:
     def _build_where_filter(
         ticker: Optional[str] = None,
         form_type: Optional[str] = None,
+        accession_number: Optional[str] = None,
     ) -> Optional[dict]:
         """
         Build a ChromaDB where filter from optional parameters.
@@ -255,6 +259,8 @@ class ChromaDBClient:
         Args:
             ticker: Optional ticker filter.
             form_type: Optional form type filter.
+            accession_number: Optional accession number filter
+                (restricts search to a single filing).
 
         Returns:
             Where filter dict, or None if no filters specified.
@@ -264,6 +270,8 @@ class ChromaDBClient:
             conditions.append({"ticker": ticker.upper()})
         if form_type:
             conditions.append({"form_type": form_type.upper()})
+        if accession_number:
+            conditions.append({"accession_number": accession_number})
 
         if not conditions:
             return None
