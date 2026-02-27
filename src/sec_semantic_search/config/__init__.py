@@ -16,6 +16,7 @@ from sec_semantic_search.config.constants import (
     parse_form_types,
 )
 from sec_semantic_search.config.settings import (
+    ApiSettings,
     ChunkingSettings,
     DatabaseSettings,
     EdgarSettings,
@@ -43,6 +44,7 @@ __all__ = [
     "DEFAULT_SEARCH_TOP_K",
     "DEFAULT_MIN_SIMILARITY",
     # Settings
+    "ApiSettings",
     "Settings",
     "EdgarSettings",
     "EmbeddingSettings",

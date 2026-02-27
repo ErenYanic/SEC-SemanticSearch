@@ -69,6 +69,16 @@ class HuggingFaceSettings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="HUGGING_FACE_")
 
 
+class ApiSettings(BaseSettings):
+    """API server configuration."""
+
+    host: str = "0.0.0.0"
+    port: int = 8000
+    cors_origins: list[str] = ["http://localhost:3000"]
+
+    model_config = SettingsConfigDict(env_prefix="API_")
+
+
 class Settings(BaseSettings):
     """Root settings class combining all sections."""
 
@@ -78,6 +88,7 @@ class Settings(BaseSettings):
     database: DatabaseSettings = DatabaseSettings()
     search: SearchSettings = SearchSettings()
     hugging_face: HuggingFaceSettings = HuggingFaceSettings()
+    api: ApiSettings = ApiSettings()
 
     model_config = SettingsConfigDict(
         env_file=".env",

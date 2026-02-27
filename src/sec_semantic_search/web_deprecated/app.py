@@ -26,10 +26,10 @@ st.set_page_config(
 # Navigation — define pages and run the selected one
 # ---------------------------------------------------------------------------
 
-from sec_semantic_search.web.pages.dashboard import render as dashboard_render  # noqa: E402
-from sec_semantic_search.web.pages.filings import render as filings_render  # noqa: E402
-from sec_semantic_search.web.pages.ingest import render as ingest_render  # noqa: E402
-from sec_semantic_search.web.pages.search import render as search_render  # noqa: E402
+from sec_semantic_search.web_deprecated.pages.dashboard import render as dashboard_render  # noqa: E402
+from sec_semantic_search.web_deprecated.pages.filings import render as filings_render  # noqa: E402
+from sec_semantic_search.web_deprecated.pages.ingest import render as ingest_render  # noqa: E402
+from sec_semantic_search.web_deprecated.pages.search import render as search_render  # noqa: E402
 
 pages = st.navigation(
     [

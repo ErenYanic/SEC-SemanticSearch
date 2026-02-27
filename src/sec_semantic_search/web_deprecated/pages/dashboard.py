@@ -4,7 +4,7 @@ import pandas as pd
 import streamlit as st
 
 from sec_semantic_search.config import get_settings
-from sec_semantic_search.web._shared import get_chroma, get_registry
+from sec_semantic_search.web_deprecated._shared import get_chroma, get_registry
 
 
 def render() -> None:

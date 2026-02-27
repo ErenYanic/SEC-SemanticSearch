@@ -15,7 +15,7 @@ from sec_semantic_search.core import (
 )
 from sec_semantic_search.pipeline import PipelineOrchestrator
 from sec_semantic_search.pipeline.fetch import FilingFetcher, FilingInfo
-from sec_semantic_search.web._shared import get_chroma, get_registry
+from sec_semantic_search.web_deprecated._shared import get_chroma, get_registry
 
 
 # ---------------------------------------------------------------------------
