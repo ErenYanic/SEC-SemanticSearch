@@ -10,7 +10,6 @@ This is a classic **vector similarity search** system — not RAG. There is no l
 - **GPU-accelerated embeddings** — Uses `google/embeddinggemma-300m` (768-dim) via sentence-transformers with CUDA support
 - **Dual-store architecture** — ChromaDB for vector similarity search, SQLite for relational metadata
 - **Rich CLI** — Progress bars, colour-coded output, formatted tables, contextual error hints
-- **Web interface** — Multi-page Streamlit UI with dashboard, search, ingestion, and filing management
 - **Flexible filtering** — Search by ticker, form type, or both
 - **Duplicate detection** — Prevents re-ingesting filings already stored
 - **Configurable** — All settings tuneable via environment variables
@@ -70,8 +69,6 @@ cp .env.example .env
 See [`.env.example`](.env.example) for the full list with descriptions.
 
 ## Usage
-
-The project provides two interfaces: a CLI (`sec-search`) and a web UI (`sec-search-web`).
 
 ### CLI Commands
 
@@ -155,25 +152,6 @@ sec-search --version
 # Enable verbose debug output
 sec-search --verbose ingest add AAPL
 ```
-
-### Web Interface
-
-Launch the Streamlit web interface:
-
-```bash
-# Via console script
-sec-search-web
-
-# Or via Streamlit directly
-streamlit run src/sec_semantic_search/web/app.py
-```
-
-The web UI is a multi-page application with four pages:
-
-- **Dashboard** — Overview of ingested filings with key metrics (filing count with capacity, chunk count, unique tickers), a form type bar chart, and a per-ticker breakdown table
-- **Search** — Semantic search with sidebar filters (ticker, form type, result count), colour-coded similarity scores, and bordered result cards
-- **Ingest** — Fetch and store filings with a form-based input, step-by-step progress display, and success metrics
-- **Filings** — View and manage ingested filings with inline filters and a confirmation dialog for deletion
 
 ### Python API
 
@@ -296,7 +274,7 @@ SEC-SemanticSearch/
 │   ├── database/                     # ChromaDB client, SQLite metadata registry
 │   ├── search/                       # SearchEngine facade
 │   ├── cli/                          # Typer CLI (ingest, search, manage)
-│   └── web/                          # Streamlit interface (multi-page)
+│   └── api/                          # FastAPI REST API
 ├── tests/
 │   ├── unit/                         # 189 unit tests
 │   └── integration/                  # 56 integration tests
@@ -333,7 +311,6 @@ python -m pytest tests/integration/
 | HTML parsing | [doc2dict](https://github.com/john-friedman/doc2dict) | Structured document extraction |
 | Embeddings | [sentence-transformers](https://sbert.net/) | `google/embeddinggemma-300m` (768-dim) |
 | Vector database | [ChromaDB](https://www.trychroma.com/) | Persistent local storage, cosine similarity |
-| Web interface | [Streamlit](https://streamlit.io/) | Multi-page UI with cached GPU resources |
 | CLI | [Typer](https://typer.tiangolo.com/) + [Rich](https://rich.readthedocs.io/) | Modern CLI with formatted output |
 | Configuration | [pydantic-settings](https://docs.pydantic.dev/latest/concepts/pydantic_settings/) | Environment-based config management |
 
