@@ -6,7 +6,7 @@ without a running Streamlit server. Currently covers the similarity
 colour helper used by the search page.
 """
 
-from sec_semantic_search.web.pages.search import _similarity_colour
+from sec_semantic_search.web_deprecated.pages.search import _similarity_colour
 
 
 # -----------------------------------------------------------------------

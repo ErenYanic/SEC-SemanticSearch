@@ -17,7 +17,7 @@ from sec_semantic_search.cli.manage import _delete_filings
 from sec_semantic_search.config.constants import EMBEDDING_DIMENSION
 from sec_semantic_search.core.types import ContentType, IngestResult, Segment
 from sec_semantic_search.pipeline.orchestrator import ProcessedFiling
-from tests.conftest import make_filing_record
+from tests.helpers import make_filing_record
 
 runner = CliRunner()
 

@@ -4,7 +4,7 @@ import streamlit as st
 
 from sec_semantic_search.core import DatabaseError
 from sec_semantic_search.database import FilingRecord
-from sec_semantic_search.web._shared import get_chroma, get_registry
+from sec_semantic_search.web_deprecated._shared import get_chroma, get_registry
 
 
 # ---------------------------------------------------------------------------

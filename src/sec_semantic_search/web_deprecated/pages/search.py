@@ -3,7 +3,7 @@
 import streamlit as st
 
 from sec_semantic_search.core import SearchResult
-from sec_semantic_search.web._shared import get_registry, get_search_engine
+from sec_semantic_search.web_deprecated._shared import get_registry, get_search_engine
 
 
 # ---------------------------------------------------------------------------
