@@ -14,6 +14,7 @@ Usage:
 """
 
 import os
+import threading
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -75,6 +76,12 @@ class EmbeddingGenerator:
         # Model loaded lazily
         self._model: "SentenceTransformer | None" = None
 
+        # Idle timeout — auto-unload model after inactivity.
+        self._idle_timeout_seconds: float = (
+            settings.embedding.idle_timeout_minutes * 60.0
+        )
+        self._idle_timer: threading.Timer | None = None
+
         logger.debug(
             "EmbeddingGenerator configured: model=%s, device=%s, batch_size=%d",
             self.model_name,
@@ -95,6 +102,22 @@ class EmbeddingGenerator:
         return self._device_setting
 
     @property
+    def is_loaded(self) -> bool:
+        """Check whether the model is currently loaded (no side effects)."""
+        return self._model is not None
+
+    @property
+    def approximate_vram_mb(self) -> int | None:
+        """
+        Approximate VRAM usage in megabytes.
+
+        Returns ``None`` if the model is not loaded or is on CPU.
+        """
+        if not self.is_loaded or self.device != "cuda":
+            return None
+        return int(torch.cuda.memory_allocated(0) / (1024 * 1024))
+
+    @property
     def model(self) -> "SentenceTransformer":
         """
         Get or load the sentence-transformer model.
@@ -110,7 +133,60 @@ class EmbeddingGenerator:
         """
         if self._model is None:
             self._model = self._load_model()
+        self._schedule_idle_timer()
         return self._model
+
+    def unload(self) -> None:
+        """
+        Unload the embedding model and free GPU memory.
+
+        Idempotent — safe to call when the model is not loaded.
+        The model will reload automatically on the next access via
+        the ``model`` property.
+        """
+        self._cancel_idle_timer()
+
+        if self._model is None:
+            logger.debug("Model already unloaded — nothing to do.")
+            return
+
+        device = self.device
+        del self._model
+        self._model = None
+
+        if device == "cuda":
+            torch.cuda.empty_cache()
+
+        logger.info("Embedding model unloaded (device was %s).", device)
+
+    # ------------------------------------------------------------------
+    # Idle timer
+    # ------------------------------------------------------------------
+
+    def _schedule_idle_timer(self) -> None:
+        """Reset the idle timer if a timeout is configured."""
+        if self._idle_timeout_seconds <= 0:
+            return
+        self._cancel_idle_timer()
+        self._idle_timer = threading.Timer(
+            self._idle_timeout_seconds, self._on_idle_timeout
+        )
+        self._idle_timer.daemon = True
+        self._idle_timer.start()
+
+    def _cancel_idle_timer(self) -> None:
+        """Cancel any running idle timer."""
+        if self._idle_timer is not None:
+            self._idle_timer.cancel()
+            self._idle_timer = None
+
+    def _on_idle_timeout(self) -> None:
+        """Called when the idle timer fires."""
+        logger.info(
+            "Embedding model idle for %d minute(s) — auto-unloading.",
+            int(self._idle_timeout_seconds / 60),
+        )
+        self.unload()
 
     def _load_model(self) -> "SentenceTransformer":
         """
