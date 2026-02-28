@@ -354,3 +354,11 @@ class GPUStatusResponse(BaseModel):
         None,
         description="Approximate VRAM usage in MB (None if not loaded or CPU)",
     )
+
+
+class GPUUnloadResponse(BaseModel):
+    """Response for ``DELETE /api/resources/gpu``."""
+
+    status: str = Field(
+        ..., description="'unloaded' or 'already_unloaded'"
+    )

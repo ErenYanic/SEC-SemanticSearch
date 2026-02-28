@@ -133,14 +133,14 @@ def create_app() -> FastAPI:
     from sec_semantic_search.api.routes.search import router as search_router
     from sec_semantic_search.api.routes.status import router as status_router
     from sec_semantic_search.api.websocket import router as ws_router
-    # from sec_semantic_search.api.routes.resources import router as resources_router
+    from sec_semantic_search.api.routes.resources import router as resources_router
 
     application.include_router(status_router, prefix="/api/status", tags=["status"])
     application.include_router(filings_router, prefix="/api/filings", tags=["filings"])
     application.include_router(search_router, prefix="/api/search", tags=["search"])
     application.include_router(ingest_router, prefix="/api/ingest", tags=["ingest"])
     application.include_router(ws_router, tags=["websocket"])
-    # application.include_router(resources_router, prefix="/api/resources", tags=["resources"])
+    application.include_router(resources_router, prefix="/api/resources", tags=["resources"])
 
     # -- Health check -------------------------------------------------------
     @application.get("/api/health", tags=["meta"], summary="Health check")

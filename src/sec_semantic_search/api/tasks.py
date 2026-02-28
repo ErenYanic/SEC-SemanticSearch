@@ -240,6 +240,13 @@ class TaskManager:
         logger.info("Cancel requested for task %s", task_id[:8])
         return True
 
+    def has_active_task(self) -> bool:
+        """Return True if any task is pending or running."""
+        return any(
+            t.state in (TaskState.PENDING, TaskState.RUNNING)
+            for t in self._tasks.values()
+        )
+
     # ------------------------------------------------------------------
     # WebSocket message helpers
     # ------------------------------------------------------------------

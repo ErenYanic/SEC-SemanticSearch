@@ -29,6 +29,7 @@ class EmbeddingSettings(BaseSettings):
     model_name: str = "google/embeddinggemma-300m"
     device: str = "auto"  # "cuda", "cpu", or "auto"
     batch_size: int = 32
+    idle_timeout_minutes: int = 0  # 0 = disabled; auto-unload model after idle
 
     model_config = SettingsConfigDict(env_prefix="EMBEDDING_")
 
