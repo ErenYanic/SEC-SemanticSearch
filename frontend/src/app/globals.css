@@ -1,0 +1,46 @@
+@import "tailwindcss";
+
+/*
+ * Tell Tailwind v4 to use the `dark` class on <html> for dark mode,
+ * rather than the OS `prefers-color-scheme` media query.  This lets
+ * our ThemeProvider toggle dark mode via JavaScript.
+ *
+ * Tailwind v4 uses CSS-based configuration (not tailwind.config.js).
+ * The `@custom-variant` directive replaces the old `darkMode: "class"`
+ * config option.
+ */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/*
+ * Skeleton shimmer animation.
+ *
+ * A linear gradient slides from left to right across the skeleton block,
+ * creating the "loading pulse" effect seen on Facebook/YouTube/GitHub.
+ *
+ * The gradient has three stops: transparent → semi-white → transparent.
+ * `background-size: 200% 100%` doubles the gradient width so the bright
+ * band can sweep fully across the element.
+ */
+@keyframes shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+/*
+ * Fade-in for content replacing skeletons.
+ *
+ * 200ms is fast enough to feel instant but slow enough to prevent
+ * the jarring "flash" when the skeleton swaps to real content.
+ */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
