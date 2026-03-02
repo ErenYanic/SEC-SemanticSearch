@@ -36,9 +36,6 @@ dependencies = [
     # Vector database
     "chromadb>=1.0.0",
 
-    # Web interface (Streamlit — legacy, kept for reference)
-    "streamlit>=1.30.0",
-
     # REST API
     "fastapi>=0.115.0",
     "uvicorn[standard]>=0.30.0",
@@ -67,7 +64,6 @@ dev = [
 
 [project.scripts]
 sec-search = "sec_semantic_search.cli.main:app"
-deprecated-sec-search-web = "sec_semantic_search.web_deprecated.run:main"
 sec-search-api = "sec_semantic_search.api.run:main"
 
 [project.urls]

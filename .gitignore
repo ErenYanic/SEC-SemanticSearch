@@ -285,6 +285,15 @@ cython_debug/
 .cursorignore
 .cursorindexingignore
 
+# Node.js / Frontend
+node_modules/
+.next/
+out/
+!frontend/package.json
+!frontend/package-lock.json
+!frontend/tsconfig.json
+!frontend/src/lib/
+
 # Ruff
 .ruff_cache/
 
