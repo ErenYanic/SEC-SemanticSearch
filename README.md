@@ -9,6 +9,7 @@ This is a classic **vector similarity search** system — not RAG. There is no l
 - **Full pipeline** — Fetch, parse, chunk, embed, and store SEC filings in one command
 - **GPU-accelerated embeddings** — Uses `google/embeddinggemma-300m` (768-dim) via sentence-transformers with CUDA support
 - **Dual-store architecture** — ChromaDB for vector similarity search, SQLite for relational metadata
+- **Web application** — FastAPI backend + React/Next.js frontend with real-time ingestion progress
 - **Rich CLI** — Progress bars, colour-coded output, formatted tables, contextual error hints
 - **Flexible filtering** — Search by ticker, form type, or both
 - **Duplicate detection** — Prevents re-ingesting filings already stored
@@ -250,6 +251,55 @@ registry.remove_filing(accession)
 print(f"Removed {deleted} chunks")
 ```
 
+## Web Application
+
+The project includes a full-featured web interface built with FastAPI (backend) and React/Next.js (frontend).
+
+### Running in Development
+
+**1. Start the API server:**
+
+```bash
+# From the project root (with virtual environment active)
+sec-search-api
+# or: uvicorn sec_semantic_search.api.app:app --reload --port 8000
+```
+
+**2. Start the frontend dev server:**
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+The frontend runs on `http://localhost:3000` and proxies API requests to `http://localhost:8000`.
+
+### Web Features
+
+- **Dashboard** — Filing count, chunk count, form type chart, ticker table
+- **Search** — Semantic search with filters (ticker, form type, similarity threshold, top-k)
+- **Ingest** — Multi-ticker ingestion with real-time WebSocket progress tracking
+- **Filings** — Sortable table with pagination, bulk delete, URL-based filters
+- **Dark mode** — System-aware theme toggle with full dark mode support
+- **Accessibility** — Skip-to-content, keyboard navigation, ARIA attributes, focus-visible indicators
+
+### API Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/status/` | Database overview |
+| GET | `/api/filings/` | List filings (with filters) |
+| DELETE | `/api/filings/{accession}` | Delete single filing |
+| POST | `/api/search/` | Semantic search |
+| POST | `/api/ingest/add` | Start single-ticker ingestion |
+| POST | `/api/ingest/batch` | Start multi-ticker ingestion |
+| GET | `/api/ingest/tasks` | List ingestion tasks |
+| WS | `/ws/ingest/{task_id}` | Real-time ingestion progress |
+| GET | `/api/resources/gpu` | GPU/model status |
+
+Full API documentation available at `http://localhost:8000/docs` when the server is running.
+
 ## Pipeline
 
 ```
@@ -274,10 +324,16 @@ SEC-SemanticSearch/
 │   ├── database/                     # ChromaDB client, SQLite metadata registry
 │   ├── search/                       # SearchEngine facade
 │   ├── cli/                          # Typer CLI (ingest, search, manage)
-│   └── api/                          # FastAPI REST API
+│   └── api/                          # FastAPI REST API (routes, schemas, tasks, WebSocket)
+├── frontend/                         # React/Next.js web application
+│   ├── src/app/                      # Pages (Dashboard, Search, Ingest, Filings)
+│   ├── src/components/               # UI components (33 components)
+│   ├── src/hooks/                    # React Query hooks (useStatus, useSearch, useIngest, useFilings)
+│   └── src/lib/                      # API client, types, WebSocket client
 ├── tests/
 │   ├── unit/                         # 189 unit tests
-│   └── integration/                  # 56 integration tests
+│   ├── integration/                  # 56 integration tests
+│   └── api/                          # 137 API tests
 ├── notebooks/
 │   └── sec_semantic_search.ipynb     # Original working prototype
 └── data/                             # Runtime data (gitignored)
@@ -299,9 +355,19 @@ python -m pytest tests/unit/
 
 # Run only integration tests
 python -m pytest tests/integration/
+
+# Run only API tests
+python -m pytest tests/api/
 ```
 
-245 tests (189 unit + 56 integration), all passing in ~5 seconds.
+**Backend:** 382 tests (245 core + 137 API), all passing in ~10 seconds.
+
+**Frontend:** 87 tests (Vitest + React Testing Library):
+
+```bash
+cd frontend
+npm test
+```
 
 ## Technology Stack
 
@@ -311,6 +377,8 @@ python -m pytest tests/integration/
 | HTML parsing | [doc2dict](https://github.com/john-friedman/doc2dict) | Structured document extraction |
 | Embeddings | [sentence-transformers](https://sbert.net/) | `google/embeddinggemma-300m` (768-dim) |
 | Vector database | [ChromaDB](https://www.trychroma.com/) | Persistent local storage, cosine similarity |
+| REST API | [FastAPI](https://fastapi.tiangolo.com/) | Backend API with WebSocket support |
+| Frontend | [Next.js](https://nextjs.org/) + [React](https://react.dev/) 19 | App Router, Tailwind CSS v4, React Query |
 | CLI | [Typer](https://typer.tiangolo.com/) + [Rich](https://rich.readthedocs.io/) | Modern CLI with formatted output |
 | Configuration | [pydantic-settings](https://docs.pydantic.dev/latest/concepts/pydantic_settings/) | Environment-based config management |
 
