@@ -13,7 +13,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Github, LayoutDashboard, Search, Upload, FileText, Sun, Moon, Loader2 } from "lucide-react";
+import { Github, Linkedin, LayoutDashboard, Search, Upload, FileText, Sun, Moon, Loader2 } from "lucide-react";
 import { useTheme } from "./ThemeProvider";
 
 // ---------------------------------------------------------------------------
@@ -60,13 +60,22 @@ export function Navbar({ isTaskActive = false }: NavbarProps) {
         {/* ---- Left: GitHub link + app title ---- */}
         <div className="flex items-center gap-3">
           <a
-            href="https://github.com/ErenYanic/SEC-SemanticSearch"
+            href="https://github.com/ErenYanic"
             target="_blank"
             rel="noopener noreferrer"
             className="text-gray-500 transition-colors hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100"
-            aria-label="GitHub repository"
+            aria-label="GitHub profile"
           >
             <Github className="h-6 w-6" />
+          </a>
+          <a
+            href="https://www.linkedin.com/in/erenyanic/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-gray-500 transition-colors hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100"
+            aria-label="LinkedIn profile"
+          >
+            <Linkedin className="h-6 w-6" />
           </a>
           <Link
             href="/"
