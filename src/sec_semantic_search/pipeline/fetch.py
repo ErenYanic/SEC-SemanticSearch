@@ -586,8 +586,9 @@ class FilingFetcher:
         )
 
         # Limit to requested count
-        filings_list = list(filings)[:count]
-        total_available = len(list(filings))
+        all_filings = list(filings)
+        filings_list = all_filings[:count]
+        total_available = len(all_filings)
 
         if total_available > count:
             logger.info(

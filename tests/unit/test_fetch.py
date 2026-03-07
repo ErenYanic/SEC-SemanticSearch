@@ -8,6 +8,7 @@ methods: form type validation, date parsing, date filter formatting,
 and the FilingInfo dataclass conversion.
 """
 
+import logging
 from datetime import date
 from unittest.mock import MagicMock, patch
 
@@ -226,6 +227,71 @@ class TestFetchGeneratorFaultTolerance:
             results = list(fetcher.fetch("AAPL", "10-K", count=2))
 
         assert results == []
+
+
+class TestFetchLimitingLog:
+    """fetch() should log when limiting results (regression test for F1 bug)."""
+
+    def test_logs_limiting_message_when_count_less_than_available(
+        self, fetcher, caplog
+    ):
+        """With 5 available filings and count=2, the limiting log should fire.
+
+        Regression: previously the generator was consumed twice — once by
+        ``list(filings)[:count]`` and again by ``len(list(filings))`` — so
+        ``total_available`` was always 0 and this log path was dead code.
+        """
+        filings = [
+            _make_mock_filing(
+                f"ACC-{i:03d}",
+                date(2024, 1, i + 1),
+                html_content=f"<html>{i}</html>",
+            )
+            for i in range(5)
+        ]
+        mock_company = MagicMock()
+        mock_company.get_filings.return_value = _make_mock_filings(filings)
+
+        pkg_logger = logging.getLogger("sec_semantic_search")
+        pkg_logger.propagate = True
+        try:
+            with patch.object(fetcher, "_get_company", return_value=mock_company):
+                with caplog.at_level(
+                    logging.INFO, logger="sec_semantic_search"
+                ):
+                    results = list(fetcher.fetch("AAPL", "10-K", count=2))
+        finally:
+            pkg_logger.propagate = False
+
+        assert len(results) == 2
+        assert "Limiting to 2 of 5 available filings" in caplog.text
+
+    def test_no_limiting_log_when_count_equals_available(self, fetcher, caplog):
+        """When count equals available filings, no limiting log should appear."""
+        filings = [
+            _make_mock_filing(
+                f"ACC-{i:03d}",
+                date(2024, 1, i + 1),
+                html_content=f"<html>{i}</html>",
+            )
+            for i in range(3)
+        ]
+        mock_company = MagicMock()
+        mock_company.get_filings.return_value = _make_mock_filings(filings)
+
+        pkg_logger = logging.getLogger("sec_semantic_search")
+        pkg_logger.propagate = True
+        try:
+            with patch.object(fetcher, "_get_company", return_value=mock_company):
+                with caplog.at_level(
+                    logging.INFO, logger="sec_semantic_search"
+                ):
+                    results = list(fetcher.fetch("AAPL", "10-K", count=3))
+        finally:
+            pkg_logger.propagate = False
+
+        assert len(results) == 3
+        assert "Limiting to" not in caplog.text
 
 
 class TestFetchCountNone:
