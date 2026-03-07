@@ -87,7 +87,8 @@ interface IngestState {
   completedAt: Date | null;
 }
 
-const DEFAULT_PROGRESS: TaskProgress = {
+/** Exported for direct unit testing. */
+export const DEFAULT_PROGRESS: TaskProgress = {
   current_ticker: null,
   current_form_type: null,
   step_label: "",
@@ -99,7 +100,8 @@ const DEFAULT_PROGRESS: TaskProgress = {
   filings_failed: 0,
 };
 
-const INITIAL_STATE: IngestState = {
+/** Exported for direct unit testing. */
+export const INITIAL_STATE: IngestState = {
   taskId: null,
   status: "idle",
   progress: DEFAULT_PROGRESS,
@@ -125,7 +127,8 @@ type IngestAction =
   | { type: "RESUME"; taskStatus: TaskStatus }
   | { type: "RESET" };
 
-function reducer(state: IngestState, action: IngestAction): IngestState {
+/** Exported for direct unit testing — not part of the public hook API. */
+export function reducer(state: IngestState, action: IngestAction): IngestState {
   switch (action.type) {
     case "START":
       return {
