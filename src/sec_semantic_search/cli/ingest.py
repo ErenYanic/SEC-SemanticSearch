@@ -151,6 +151,8 @@ def _ingest_one_form(
     year: int | None = None,
     start_date: str | None = None,
     end_date: str | None = None,
+    fetcher: FilingFetcher,
+    orchestrator: PipelineOrchestrator,
     registry: MetadataRegistry,
     chroma: ChromaDBClient,
     progress: Progress,
@@ -191,7 +193,6 @@ def _ingest_one_form(
         description=f"Fetching {ticker} {form_type}{form_label}...",
     )
     try:
-        fetcher = FilingFetcher()
         filings_iter = _fetch_filings(
             fetcher, ticker, form_type,
             count=count, year=year, start_date=start_date, end_date=end_date,
@@ -273,7 +274,6 @@ def _ingest_one_form(
                 progress.advance(step_task_id)
 
         try:
-            orchestrator = PipelineOrchestrator(fetcher=fetcher)
             result = orchestrator.process_filing(
                 filing_id, html_content, progress_callback=_on_progress,
             )
@@ -356,6 +356,8 @@ def _ingest_across_forms(
     year: int | None = None,
     start_date: str | None = None,
     end_date: str | None = None,
+    fetcher: FilingFetcher,
+    orchestrator: PipelineOrchestrator,
     registry: MetadataRegistry,
     chroma: ChromaDBClient,
 ) -> tuple[int, int, int]:
@@ -369,8 +371,6 @@ def _ingest_across_forms(
     Returns:
         Tuple of (succeeded, skipped, failed) counts.
     """
-    fetcher = FilingFetcher()
-
     # --- List available filings across form types ----------------------------
     console.print(
         f"Listing available {ticker} filings across "
@@ -463,7 +463,6 @@ def _ingest_across_forms(
                     progress.advance(step_task)
 
             try:
-                orchestrator = PipelineOrchestrator(fetcher=fetcher)
                 result = orchestrator.process_filing(
                     filing_id, html_content, progress_callback=_on_progress,
                 )
@@ -581,6 +580,8 @@ def add(
 
     registry = MetadataRegistry()
     chroma = ChromaDBClient()
+    fetcher = FilingFetcher()
+    orchestrator = PipelineOrchestrator(fetcher=fetcher)
 
     # --- Cross-form mode: -t (total across form types) -----------------------
     if total is not None:
@@ -588,6 +589,7 @@ def add(
             ticker, form_types,
             count=total, year=year,
             start_date=start_date, end_date=end_date,
+            fetcher=fetcher, orchestrator=orchestrator,
             registry=registry, chroma=chroma,
         )
 
@@ -643,6 +645,7 @@ def add(
                     ticker, form_type,
                     count=1, year=year,
                     start_date=start_date, end_date=end_date,
+                    fetcher=fetcher, orchestrator=orchestrator,
                     registry=registry, chroma=chroma,
                     progress=progress, step_task_id=step_task,
                     form_label=form_label,
@@ -664,6 +667,7 @@ def add(
                     ticker, form_type,
                     count=effective_per_form, year=year,
                     start_date=start_date, end_date=end_date,
+                    fetcher=fetcher, orchestrator=orchestrator,
                     registry=registry, chroma=chroma,
                     progress=progress, step_task_id=step_task,
                     filing_task_id=filing_task,
@@ -759,6 +763,8 @@ def batch(
 
     registry = MetadataRegistry()
     chroma = ChromaDBClient()
+    fetcher = FilingFetcher()
+    orchestrator = PipelineOrchestrator(fetcher=fetcher)
 
     total_succeeded = 0
     total_skipped = 0
@@ -772,6 +778,7 @@ def batch(
                 ticker, form_types,
                 count=total, year=year,
                 start_date=start_date, end_date=end_date,
+                fetcher=fetcher, orchestrator=orchestrator,
                 registry=registry, chroma=chroma,
             )
             total_succeeded += s
@@ -831,7 +838,6 @@ def batch(
 
             # Fetch all filings for this work item.
             try:
-                fetcher = FilingFetcher()
                 filings = list(_fetch_filings(
                     fetcher, ticker, form_type,
                     count=effective_per_form, year=year,
@@ -894,7 +900,6 @@ def batch(
                         progress.advance(step_task)
 
                 try:
-                    orchestrator = PipelineOrchestrator(fetcher=fetcher)
                     result = orchestrator.process_filing(
                         filing_id, html_content, progress_callback=_on_progress,
                     )
