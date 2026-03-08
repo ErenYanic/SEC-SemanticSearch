@@ -101,12 +101,11 @@ class ChromaDBClient:
         ids = [chunk.chunk_id for chunk in chunks]
         documents = [chunk.content for chunk in chunks]
         metadatas = [chunk.to_metadata() for chunk in chunks]
-        embedding_list = embeddings.tolist()
 
         try:
             self._collection.add(
                 ids=ids,
-                embeddings=embedding_list,
+                embeddings=embeddings,
                 documents=documents,
                 metadatas=metadatas,
             )
