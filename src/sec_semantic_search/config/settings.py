@@ -48,7 +48,7 @@ class DatabaseSettings(BaseSettings):
 
     chroma_path: str = "./data/chroma_db"
     metadata_db_path: str = "./data/metadata.sqlite"
-    max_filings: int = 100
+    max_filings: int = 500
 
     model_config = SettingsConfigDict(env_prefix="DB_")
 
