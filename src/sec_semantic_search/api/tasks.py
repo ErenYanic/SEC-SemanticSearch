@@ -303,17 +303,23 @@ class TaskManager:
         Core ingestion logic — mirrors the CLI two-phase ingest.
 
         Steps per filing:
-            1. Fetch (cheap)
+            1. Fetch metadata (cheap — ``list_available``)
             2. Duplicate check
-            3. Process (parse → chunk → embed — expensive GPU)
-            4. Store (ChromaDB first, then SQLite)
+            3. Fetch HTML content (on demand, one filing at a time)
+            4. Process (parse → chunk → embed — expensive GPU)
+            5. Store (ChromaDB first, then SQLite)
+
+        HTML is fetched per-filing just before processing, so only one
+        filing's HTML is in memory at a time (see F2 in OPTIMISATIONS.md).
         """
-        # Build the flat work list of filings to ingest.
+        # Build the flat work list of filings to ingest (metadata only).
         work = self._build_work_list(info)
 
         info.progress.filings_total = len(work)
 
-        for filing_id, html_content in work:
+        for filing_info in work:
+            filing_id = filing_info.to_identifier()
+
             # --- Cancellation check (between filings) --------------------
             if info.cancel_event.is_set():
                 self._rollback(info)
@@ -362,6 +368,32 @@ class TaskManager:
                     "details": exc.details,
                 })
                 return
+
+            # --- Fetch HTML content (on demand) --------------------------
+            info.progress.step_label = "Fetching"
+            info.progress.step_index = 0
+
+            try:
+                _, html_content = self._fetcher.fetch_by_accession(
+                    ticker, form_type, filing_info.accession_number,
+                )
+            except FetchError as exc:
+                info.progress.filings_failed += 1
+                info.progress.filings_done += 1
+                self._push(info, {
+                    "type": "filing_failed",
+                    "ticker": ticker,
+                    "form_type": form_type,
+                    "accession_number": filing_id.accession_number,
+                    "error": exc.message,
+                })
+                logger.warning(
+                    "Task %s: fetch failed for %s — %s",
+                    info.task_id[:8],
+                    filing_id.accession_number,
+                    exc.message,
+                )
+                continue
 
             # --- Process (parse → chunk → embed) -------------------------
             def _progress_cb(
@@ -537,14 +569,15 @@ class TaskManager:
     def _build_work_list(
         self,
         info: TaskInfo,
-    ) -> list[tuple]:
+    ) -> list[FilingInfo]:
         """
-        Build a flat list of ``(FilingIdentifier, html_content)`` tuples.
+        Build a flat list of ``FilingInfo`` metadata objects.
 
-        Mirrors the CLI's fetch-first approach: materialise all filings
-        upfront so ``FetchError`` surfaces early, not mid-loop.
+        Only fetches lightweight metadata (no HTML content). HTML is
+        fetched per-filing in ``_execute()`` just before processing,
+        so only one filing's HTML is in memory at a time.
         """
-        work: list[tuple] = []
+        work: list[FilingInfo] = []
 
         for ticker in info.tickers:
             if info.cancel_event.is_set():
@@ -556,25 +589,13 @@ class TaskManager:
 
             if info.count_mode == "total" and info.count is not None:
                 # Cross-form mode: list available across forms, pick
-                # the newest `count`, then fetch each by accession.
+                # the newest `count`.
                 filings = self._list_across_forms(
                     ticker, tuple(info.form_types), info,
                 )
-                for fi in filings:
-                    try:
-                        fid, html = self._fetcher.fetch_by_accession(
-                            fi.ticker, fi.form_type, fi.accession_number,
-                        )
-                        work.append((fid, html))
-                    except FetchError as exc:
-                        logger.warning(
-                            "Task %s: fetch failed for %s — %s",
-                            info.task_id[:8],
-                            fi.accession_number,
-                            exc.message,
-                        )
+                work.extend(filings)
             else:
-                # Per-form mode.
+                # Per-form mode: list available filings (metadata only).
                 for form_type in info.form_types:
                     if info.cancel_event.is_set():
                         break
@@ -583,15 +604,15 @@ class TaskManager:
                     effective_count = self._effective_count(info)
 
                     try:
-                        fetched = list(self._fetcher.fetch(
+                        available = self._fetcher.list_available(
                             ticker,
                             form_type,
                             count=effective_count,
                             year=info.year,
                             start_date=info.start_date,
                             end_date=info.end_date,
-                        ))
-                        work.extend(fetched)
+                        )
+                        work.extend(available)
                     except FetchError as exc:
                         logger.warning(
                             "Task %s: fetch failed for %s %s — %s",
