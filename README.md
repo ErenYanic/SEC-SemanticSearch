@@ -63,7 +63,7 @@ cp .env.example .env
 | `CHUNKING_TOLERANCE` | `50` | Tolerance band for chunk boundaries (±tokens) |
 | `DB_CHROMA_PATH` | `./data/chroma_db` | ChromaDB storage path |
 | `DB_METADATA_DB_PATH` | `./data/metadata.sqlite` | SQLite metadata path |
-| `DB_MAX_FILINGS` | `100` | Maximum filings to store |
+| `DB_MAX_FILINGS` | `500` | Maximum filings to store |
 | `SEARCH_TOP_K` | `5` | Default number of search results |
 | `SEARCH_MIN_SIMILARITY` | `0.0` | Minimum similarity threshold |
 

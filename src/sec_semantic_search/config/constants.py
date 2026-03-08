@@ -51,7 +51,7 @@ DEFAULT_CHUNK_TOLERANCE = 50
 # Database
 DEFAULT_CHROMADB_PATH = "./data/chroma_db"
 DEFAULT_METADATA_DB_PATH = "./data/metadata.sqlite"
-DEFAULT_MAX_FILINGS = 100
+DEFAULT_MAX_FILINGS = 500
 
 # Collection naming
 COLLECTION_NAME = "sec_filings"
