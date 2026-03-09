@@ -11,21 +11,27 @@ from fastapi.testclient import TestClient
 
 from sec_semantic_search.api.app import app
 from sec_semantic_search.api.dependencies import get_chroma, get_registry
-from tests.helpers import make_filing_record
+from sec_semantic_search.database.metadata import DatabaseStatistics, TickerStatistics
 
 
-def _client(registry_mock, chroma_mock):
-    """Build a TestClient with overridden dependencies."""
-    app.dependency_overrides[get_registry] = lambda: registry_mock
-    app.dependency_overrides[get_chroma] = lambda: chroma_mock
-    client = TestClient(app, raise_server_exceptions=False)
-    yield client
-    app.dependency_overrides.clear()
+def _make_stats(
+    filing_count=0,
+    tickers=None,
+    form_breakdown=None,
+    ticker_breakdown=None,
+):
+    """Build a DatabaseStatistics with sensible defaults."""
+    return DatabaseStatistics(
+        filing_count=filing_count,
+        tickers=tickers or [],
+        form_breakdown=form_breakdown or {},
+        ticker_breakdown=ticker_breakdown or [],
+    )
 
 
-def _make_client(filings=None, chunk_count=0):
+def _make_client(stats=None, chunk_count=0):
     registry = MagicMock()
-    registry.list_filings.return_value = filings or []
+    registry.get_statistics.return_value = stats or _make_stats()
     chroma = MagicMock()
     chroma.collection_count.return_value = chunk_count
     app.dependency_overrides[get_registry] = lambda: registry
@@ -52,8 +58,15 @@ class TestStatusEndpoint:
         assert data["ticker_breakdown"] == []
 
     def test_single_filing(self):
-        filings = [make_filing_record(ticker="AAPL", form_type="10-K", chunk_count=100)]
-        client = _make_client(filings=filings, chunk_count=100)
+        stats = _make_stats(
+            filing_count=1,
+            tickers=["AAPL"],
+            form_breakdown={"10-K": 1},
+            ticker_breakdown=[
+                TickerStatistics(ticker="AAPL", filings=1, chunks=100, forms=["10-K"]),
+            ],
+        )
+        client = _make_client(stats=stats, chunk_count=100)
         resp = client.get("/api/status/")
         data = resp.json()
         assert data["filing_count"] == 1
@@ -66,30 +79,42 @@ class TestStatusEndpoint:
         assert data["ticker_breakdown"][0]["chunks"] == 100
 
     def test_multiple_tickers_sorted(self):
-        filings = [
-            make_filing_record(id=1, ticker="MSFT", accession_number="acc-1"),
-            make_filing_record(id=2, ticker="AAPL", accession_number="acc-2"),
-        ]
-        client = _make_client(filings=filings, chunk_count=200)
+        stats = _make_stats(
+            filing_count=2,
+            tickers=["AAPL", "MSFT"],
+            form_breakdown={"10-K": 2},
+            ticker_breakdown=[
+                TickerStatistics(ticker="AAPL", filings=1, chunks=100, forms=["10-K"]),
+                TickerStatistics(ticker="MSFT", filings=1, chunks=100, forms=["10-K"]),
+            ],
+        )
+        client = _make_client(stats=stats, chunk_count=200)
         data = client.get("/api/status/").json()
         assert data["tickers"] == ["AAPL", "MSFT"]
 
     def test_form_breakdown_multiple_forms(self):
-        filings = [
-            make_filing_record(id=1, form_type="10-K", accession_number="acc-1"),
-            make_filing_record(id=2, form_type="10-Q", accession_number="acc-2", filing_date="2024-06-01"),
-            make_filing_record(id=3, form_type="10-Q", accession_number="acc-3", filing_date="2024-03-01"),
-        ]
-        client = _make_client(filings=filings, chunk_count=300)
+        stats = _make_stats(
+            filing_count=3,
+            tickers=["AAPL"],
+            form_breakdown={"10-K": 1, "10-Q": 2},
+            ticker_breakdown=[
+                TickerStatistics(ticker="AAPL", filings=3, chunks=300, forms=["10-K", "10-Q"]),
+            ],
+        )
+        client = _make_client(stats=stats, chunk_count=300)
         data = client.get("/api/status/").json()
         assert data["form_breakdown"] == {"10-K": 1, "10-Q": 2}
 
     def test_ticker_breakdown_forms_list(self):
-        filings = [
-            make_filing_record(id=1, form_type="10-K", accession_number="acc-1"),
-            make_filing_record(id=2, form_type="10-Q", accession_number="acc-2", filing_date="2024-06-01"),
-        ]
-        client = _make_client(filings=filings, chunk_count=200)
+        stats = _make_stats(
+            filing_count=2,
+            tickers=["AAPL"],
+            form_breakdown={"10-K": 1, "10-Q": 1},
+            ticker_breakdown=[
+                TickerStatistics(ticker="AAPL", filings=2, chunks=200, forms=["10-K", "10-Q"]),
+            ],
+        )
+        client = _make_client(stats=stats, chunk_count=200)
         data = client.get("/api/status/").json()
         tb = data["ticker_breakdown"][0]
         assert sorted(tb["forms"]) == ["10-K", "10-Q"]
