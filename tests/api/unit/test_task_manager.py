@@ -218,3 +218,39 @@ class TestTaskCleanup:
         manager._tasks[info.task_id] = info
         manager._prune_stale_tasks()
         assert manager.get_task(info.task_id) is None
+
+
+# -----------------------------------------------------------------------
+# Shutdown
+# -----------------------------------------------------------------------
+
+
+class TestShutdown:
+    """TaskManager.shutdown() cancels the cleanup timer."""
+
+    def test_shutdown_sets_event(self, manager):
+        manager.shutdown()
+        assert manager._shutdown_event.is_set()
+
+    def test_shutdown_clears_timer_reference(self, manager):
+        # Start a real timer so there is something to cancel.
+        manager._start_cleanup_timer()
+        assert manager._cleanup_timer is not None
+        manager.shutdown()
+        assert manager._cleanup_timer is None
+
+    def test_start_cleanup_timer_noop_after_shutdown(self, manager):
+        manager.shutdown()
+        manager._start_cleanup_timer()
+        assert manager._cleanup_timer is None
+
+    def test_cleanup_loop_noop_after_shutdown(self, manager):
+        """_cleanup_loop should return early without rescheduling."""
+        info = make_task_info(state=TaskState.COMPLETED)
+        info.completed_at = datetime(2020, 1, 1, tzinfo=timezone.utc)
+        manager._tasks[info.task_id] = info
+        manager.shutdown()
+        # _cleanup_loop should skip pruning and not reschedule.
+        manager._cleanup_loop()
+        # Task still present because pruning was skipped.
+        assert manager.get_task(info.task_id) is not None
