@@ -159,22 +159,22 @@ class TestRollback:
 
 
 class TestPush:
-    """_push() puts messages on the task's queue for WebSocket streaming."""
+    """_push() puts messages on the task's async queue for WebSocket streaming."""
 
-    def test_message_placed_on_queue(self):
+    def test_message_placed_on_queue(self, manager):
         info = make_task_info()
         message = {"type": "step", "step": "Parsing"}
 
-        TaskManager._push(info, message)
+        manager._push(info, message)
 
         assert not info._message_queue.empty()
         assert info._message_queue.get_nowait() == message
 
-    def test_multiple_messages_fifo(self):
+    def test_multiple_messages_fifo(self, manager):
         info = make_task_info()
-        TaskManager._push(info, {"type": "step", "step": "Parsing"})
-        TaskManager._push(info, {"type": "step", "step": "Embedding"})
-        TaskManager._push(info, {"type": "completed", "results": []})
+        manager._push(info, {"type": "step", "step": "Parsing"})
+        manager._push(info, {"type": "step", "step": "Embedding"})
+        manager._push(info, {"type": "completed", "results": []})
 
         msgs = []
         while not info._message_queue.empty():

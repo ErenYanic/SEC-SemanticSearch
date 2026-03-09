@@ -13,6 +13,7 @@ Architecture:
     - No business logic lives here — this is pure wiring.
 """
 
+import asyncio
 from contextlib import asynccontextmanager
 from typing import AsyncIterator
 
@@ -74,6 +75,11 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         fetcher=fetcher,
         orchestrator=orchestrator,
     )
+
+    # Give the TaskManager a reference to the running event loop so
+    # worker threads can bridge messages into the asyncio.Queue via
+    # call_soon_threadsafe.
+    task_manager.set_event_loop(asyncio.get_running_loop())
 
     app.state.registry = registry
     app.state.chroma = chroma
