@@ -6,12 +6,14 @@ import { useFilings, DEFAULT_QUERY_PARAMS } from "../useFilings";
 vi.mock("@/lib/api", () => ({
   getFilings: vi.fn(),
   deleteFiling: vi.fn(),
+  deleteFilingsByIds: vi.fn(),
   clearAllFilings: vi.fn(),
 }));
 
-import { getFilings, deleteFiling, clearAllFilings } from "@/lib/api";
+import { getFilings, deleteFiling, deleteFilingsByIds, clearAllFilings } from "@/lib/api";
 const mockGetFilings = vi.mocked(getFilings);
 const mockDeleteFiling = vi.mocked(deleteFiling);
+const mockDeleteFilingsByIds = vi.mocked(deleteFilingsByIds);
 const mockClearAllFilings = vi.mocked(clearAllFilings);
 
 function createWrapper() {
@@ -127,11 +129,13 @@ describe("useFilings", () => {
     expect(result.current.filings[0].accession_number).toBe("0002-24-000002");
   });
 
-  it("deleteSelected removes multiple filings sequentially", async () => {
+  it("deleteSelected removes multiple filings in a single batch request", async () => {
     mockGetFilings.mockResolvedValue(MOCK_FILINGS);
-    mockDeleteFiling
-      .mockResolvedValueOnce({ accession_number: "0001-24-000001", chunks_deleted: 120 })
-      .mockResolvedValueOnce({ accession_number: "0002-24-000002", chunks_deleted: 80 });
+    mockDeleteFilingsByIds.mockResolvedValue({
+      filings_deleted: 2,
+      chunks_deleted: 200,
+      not_found: [],
+    });
 
     const { result } = renderHook(() => useFilings(DEFAULT_QUERY_PARAMS), {
       wrapper: createWrapper(),
@@ -140,12 +144,13 @@ describe("useFilings", () => {
     await waitFor(() => expect(result.current.filings).toHaveLength(2));
 
     await act(async () => {
-      const results = await result.current.deleteSelected(["0001-24-000001", "0002-24-000002"]);
-      expect(results).toHaveLength(2);
+      const response = await result.current.deleteSelected(["0001-24-000001", "0002-24-000002"]);
+      expect(response.filings_deleted).toBe(2);
     });
 
     await waitFor(() => expect(result.current.filings).toHaveLength(0));
-    expect(mockDeleteFiling).toHaveBeenCalledTimes(2);
+    expect(mockDeleteFilingsByIds).toHaveBeenCalledTimes(1);
+    expect(mockDeleteFilingsByIds.mock.calls[0][0]).toEqual(["0001-24-000001", "0002-24-000002"]);
   });
 
   it("clearAll sets cache to empty", async () => {

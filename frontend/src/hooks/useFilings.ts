@@ -33,11 +33,13 @@ import type {
   Filing,
   FilingListResponse,
   DeleteResponse,
+  DeleteByIdsResponse,
   ClearAllResponse,
 } from "@/lib/types";
 import {
   getFilings,
   deleteFiling,
+  deleteFilingsByIds,
   clearAllFilings,
   type FilingListParams,
 } from "@/lib/api";
@@ -75,8 +77,8 @@ export interface UseFilingsReturn {
 
   /** Delete a single filing by accession number. */
   deleteSingle: (accessionNumber: string) => Promise<DeleteResponse>;
-  /** Delete multiple filings by accession number (sequential calls). */
-  deleteSelected: (accessionNumbers: string[]) => Promise<DeleteResponse[]>;
+  /** Delete multiple filings by accession number (single batch request). */
+  deleteSelected: (accessionNumbers: string[]) => Promise<DeleteByIdsResponse>;
   /** Delete ALL filings in the database. */
   clearAll: () => Promise<ClearAllResponse>;
   /** True while any deletion is in progress. */
@@ -144,22 +146,26 @@ export function useFilings(params: FilingQueryParams): UseFilingsReturn {
     },
   });
 
-  // Multi-select delete: sequential single-delete calls.
-  // The backend has no "delete by list" endpoint, so we loop.
-  // Sequential (not parallel) avoids SQLite lock contention and
-  // lets each optimistic cache removal build on the previous one.
-  async function deleteSelected(
-    accessionNumbers: string[],
-  ): Promise<DeleteResponse[]> {
-    const results: DeleteResponse[] = [];
-    for (const accession of accessionNumbers) {
-      const result = await singleDelete.mutateAsync(accession);
-      results.push(result);
-    }
-    return results;
-  }
+  // Multi-select delete: single batch request via POST /api/filings/delete-by-ids.
+  const batchDelete = useMutation<DeleteByIdsResponse, Error, string[]>({
+    mutationFn: deleteFilingsByIds,
+    onSuccess: (result, accessionNumbers) => {
+      // Optimistic removal: splice all deleted filings from the cache
+      // in a single update for instant visual feedback.
+      const deletedSet = new Set(accessionNumbers);
+      queryClient.setQueryData<FilingListResponse>(queryKey, (old) => {
+        if (!old) return old;
+        const filtered = old.filings.filter(
+          (f) => !deletedSet.has(f.accession_number),
+        );
+        return { filings: filtered, total: filtered.length };
+      });
+      queryClient.invalidateQueries({ queryKey: ["status"] });
+    },
+  });
 
-  const isDeleting = singleDelete.isPending || clearMutation.isPending;
+  const isDeleting =
+    singleDelete.isPending || batchDelete.isPending || clearMutation.isPending;
 
   return {
     filings: data?.filings ?? [],
@@ -169,7 +175,7 @@ export function useFilings(params: FilingQueryParams): UseFilingsReturn {
     error: error ?? null,
 
     deleteSingle: (accession) => singleDelete.mutateAsync(accession),
-    deleteSelected,
+    deleteSelected: (accessions) => batchDelete.mutateAsync(accessions),
     clearAll: () => clearMutation.mutateAsync(),
     isDeleting,
   };

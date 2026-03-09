@@ -13,6 +13,8 @@ from sec_semantic_search.api.schemas import (
     BulkDeleteRequest,
     BulkDeleteResponse,
     ClearAllResponse,
+    DeleteByIdsRequest,
+    DeleteByIdsResponse,
     DeleteResponse,
     ErrorResponse,
     FilingListResponse,
@@ -144,6 +146,36 @@ class TestDeleteResponse:
     def test_valid(self):
         resp = DeleteResponse(accession_number="x", chunks_deleted=50)
         assert resp.chunks_deleted == 50
+
+
+class TestDeleteByIdsRequest:
+    """Delete-by-IDs request validation."""
+
+    def test_valid(self):
+        req = DeleteByIdsRequest(accession_numbers=["acc-1", "acc-2"])
+        assert len(req.accession_numbers) == 2
+
+    def test_empty_list_raises(self):
+        with pytest.raises(ValidationError):
+            DeleteByIdsRequest(accession_numbers=[])
+
+    def test_single_item(self):
+        req = DeleteByIdsRequest(accession_numbers=["acc-1"])
+        assert req.accession_numbers == ["acc-1"]
+
+
+class TestDeleteByIdsResponse:
+    """Delete-by-IDs response."""
+
+    def test_defaults(self):
+        resp = DeleteByIdsResponse(filings_deleted=0, chunks_deleted=0)
+        assert resp.not_found == []
+
+    def test_with_not_found(self):
+        resp = DeleteByIdsResponse(
+            filings_deleted=1, chunks_deleted=50, not_found=["nope"]
+        )
+        assert resp.not_found == ["nope"]
 
 
 class TestBulkDeleteRequest:
