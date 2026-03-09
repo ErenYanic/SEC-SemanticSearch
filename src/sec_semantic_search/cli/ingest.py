@@ -24,7 +24,7 @@ from sec_semantic_search.core import (
 )
 from sec_semantic_search.database import ChromaDBClient, MetadataRegistry
 from sec_semantic_search.pipeline import PipelineOrchestrator
-from sec_semantic_search.pipeline.fetch import FilingFetcher, FilingInfo
+from sec_semantic_search.pipeline.fetch import FilingFetcher
 
 console = Console()
 
@@ -111,36 +111,6 @@ def _fetch_filings(
             ticker, form_type,
             count=count, year=year, start_date=start_date, end_date=end_date,
         )
-
-
-def _list_across_forms(
-    fetcher: FilingFetcher,
-    ticker: str,
-    form_types: tuple[str, ...],
-    *,
-    count: int,
-    year: int | None = None,
-    start_date: str | None = None,
-    end_date: str | None = None,
-) -> list[FilingInfo]:
-    """
-    List available filings across multiple form types, sorted by date.
-
-    Calls ``list_available()`` per form type, merges all results, sorts by
-    ``filing_date`` descending, and returns the top *count* entries.
-    """
-    all_available: list[FilingInfo] = []
-    for form_type in form_types:
-        try:
-            available = fetcher.list_available(
-                ticker, form_type, count=count,
-                year=year, start_date=start_date, end_date=end_date,
-            )
-            all_available.extend(available)
-        except FetchError:
-            continue
-    all_available.sort(key=lambda fi: fi.filing_date, reverse=True)
-    return all_available[:count]
 
 
 def _ingest_one_form(
@@ -376,8 +346,8 @@ def _ingest_across_forms(
         f"Listing available {ticker} filings across "
         f"{', '.join(form_types)}..."
     )
-    selected = _list_across_forms(
-        fetcher, ticker, form_types,
+    selected = fetcher.list_available_across_forms(
+        ticker, form_types,
         count=count, year=year, start_date=start_date, end_date=end_date,
     )
 

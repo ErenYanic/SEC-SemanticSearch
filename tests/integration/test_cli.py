@@ -13,7 +13,7 @@ import pytest
 from typer.testing import CliRunner
 
 from sec_semantic_search.cli.main import app
-from sec_semantic_search.cli.manage import _delete_filings
+from sec_semantic_search.database import delete_filings_batch
 from sec_semantic_search.config.constants import EMBEDDING_DIMENSION
 from sec_semantic_search.core.types import ContentType, IngestResult, Segment
 from sec_semantic_search.pipeline.orchestrator import ProcessedFiling
@@ -298,12 +298,12 @@ class TestManageClear:
 
 
 # -----------------------------------------------------------------------
-# _delete_filings() helper
+# delete_filings_batch() helper
 # -----------------------------------------------------------------------
 
 
-class TestDeleteFilingsHelper:
-    """_delete_filings() orchestrates deletion across both stores."""
+class TestDeleteFilingsBatch:
+    """delete_filings_batch() orchestrates deletion across both stores."""
 
     def test_deletes_multiple_returns_total_chunks(self):
         records = [
@@ -314,7 +314,7 @@ class TestDeleteFilingsHelper:
         mock_chroma.delete_filing.return_value = 50
         mock_registry = MagicMock()
 
-        total = _delete_filings(records, registry=mock_registry, chroma=mock_chroma)
+        total = delete_filings_batch(records, registry=mock_registry, chroma=mock_chroma)
 
         assert total == 100
         assert mock_chroma.delete_filing.call_count == 2
@@ -334,7 +334,7 @@ class TestDeleteFilingsHelper:
             call_order.append(("registry", acc))
         )
 
-        _delete_filings([record], registry=mock_registry, chroma=mock_chroma)
+        delete_filings_batch([record], registry=mock_registry, chroma=mock_chroma)
 
         assert call_order == [
             ("chroma", "ACC-001"),
@@ -345,7 +345,7 @@ class TestDeleteFilingsHelper:
         mock_chroma = MagicMock()
         mock_registry = MagicMock()
 
-        total = _delete_filings([], registry=mock_registry, chroma=mock_chroma)
+        total = delete_filings_batch([], registry=mock_registry, chroma=mock_chroma)
 
         assert total == 0
         mock_chroma.delete_filing.assert_not_called()

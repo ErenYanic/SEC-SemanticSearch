@@ -24,7 +24,7 @@ from sec_semantic_search.api.schemas import (
     FilingSchema,
 )
 from sec_semantic_search.core import DatabaseError, get_logger
-from sec_semantic_search.database import ChromaDBClient, MetadataRegistry
+from sec_semantic_search.database import ChromaDBClient, MetadataRegistry, delete_filings_batch
 from sec_semantic_search.database.metadata import FilingRecord
 
 logger = get_logger(__name__)
@@ -106,37 +106,6 @@ async def get_filing(
             },
         )
     return _record_to_schema(record)
-
-
-# ---------------------------------------------------------------------------
-# Delete helpers
-# ---------------------------------------------------------------------------
-
-
-def _delete_filings(
-    filings: list[FilingRecord],
-    *,
-    chroma: ChromaDBClient,
-    registry: MetadataRegistry,
-) -> int:
-    """
-    Delete a list of filings from both stores (ChromaDB first, then SQLite).
-
-    Returns the total number of chunks deleted.
-    """
-    total_chunks = 0
-    for filing in filings:
-        chunks_deleted = chroma.delete_filing(filing.accession_number)
-        registry.remove_filing(filing.accession_number)
-        total_chunks += chunks_deleted
-        logger.info(
-            "Deleted %s %s (%s) — %d chunks",
-            filing.ticker,
-            filing.form_type,
-            filing.filing_date,
-            chunks_deleted,
-        )
-    return total_chunks
 
 
 # ---------------------------------------------------------------------------
@@ -242,7 +211,7 @@ async def bulk_delete(
         )
 
     try:
-        total_chunks = _delete_filings(
+        total_chunks = delete_filings_batch(
             filings, chroma=chroma, registry=registry,
         )
     except DatabaseError as exc:
@@ -299,7 +268,7 @@ async def clear_all(
         return ClearAllResponse(filings_deleted=0, chunks_deleted=0)
 
     try:
-        total_chunks = _delete_filings(
+        total_chunks = delete_filings_batch(
             filings, chroma=chroma, registry=registry,
         )
     except DatabaseError as exc:

@@ -421,6 +421,47 @@ class FilingFetcher:
 
         return result
 
+    def list_available_across_forms(
+        self,
+        ticker: str,
+        form_types: tuple[str, ...],
+        *,
+        count: int,
+        year: int | None = None,
+        start_date: str | None = None,
+        end_date: str | None = None,
+    ) -> list[FilingInfo]:
+        """
+        List available filings across multiple form types, sorted by date.
+
+        Calls ``list_available()`` per form type, merges all results, sorts
+        by ``filing_date`` descending, and returns the top *count* entries.
+
+        Args:
+            ticker: Stock ticker symbol (e.g., "AAPL").
+            form_types: Form types to search across (e.g., ("10-K", "10-Q")).
+            count: Maximum number of filings to return (newest first).
+            year: Optional filing-year filter.
+            start_date: Optional start-date filter (YYYY-MM-DD).
+            end_date: Optional end-date filter (YYYY-MM-DD).
+
+        Returns:
+            List of ``FilingInfo`` objects, sorted by filing_date descending,
+            truncated to *count*.
+        """
+        all_available: list[FilingInfo] = []
+        for form_type in form_types:
+            try:
+                available = self.list_available(
+                    ticker, form_type, count=count,
+                    year=year, start_date=start_date, end_date=end_date,
+                )
+                all_available.extend(available)
+            except FetchError:
+                continue
+        all_available.sort(key=lambda fi: fi.filing_date, reverse=True)
+        return all_available[:count]
+
     def fetch_latest(
         self,
         ticker: str,
