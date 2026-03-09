@@ -310,12 +310,17 @@ class TaskManager:
             5. Store (ChromaDB first, then SQLite)
 
         HTML is fetched per-filing just before processing, so only one
-        filing's HTML is in memory at a time (see F2 in OPTIMISATIONS.md).
+        filing's HTML is in memory at a time.
         """
         # Build the flat work list of filings to ingest (metadata only).
         work = self._build_work_list(info)
 
         info.progress.filings_total = len(work)
+
+        # Batch duplicate check — single SQL query instead of N individual
+        # is_duplicate() calls, reducing SQLite round-trips from O(N) to O(1).
+        all_accessions = [fi.accession_number for fi in work]
+        existing = self._registry.get_existing_accessions(all_accessions)
 
         for filing_info in work:
             filing_id = filing_info.to_identifier()
@@ -338,7 +343,7 @@ class TaskManager:
             info.progress.step_index = 1
 
             # --- Duplicate check -----------------------------------------
-            if self._registry.is_duplicate(filing_id.accession_number):
+            if filing_id.accession_number in existing:
                 info.progress.filings_skipped += 1
                 info.progress.filings_done += 1
                 self._push(info, {

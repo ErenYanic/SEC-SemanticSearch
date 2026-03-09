@@ -125,6 +125,47 @@ class TestGetStatistics:
         assert stats.ticker_breakdown[0].chunks == 350
 
 
+class TestGetExistingAccessions:
+    """get_existing_accessions() returns the subset that already exist."""
+
+    def test_empty_input(self, registry):
+        """Empty list should return empty set without hitting the database."""
+        assert registry.get_existing_accessions([]) == set()
+
+    def test_no_duplicates(self, registry):
+        """None of the accession numbers exist — should return empty set."""
+        result = registry.get_existing_accessions(["ACC-X", "ACC-Y", "ACC-Z"])
+        assert result == set()
+
+    def test_all_duplicates(self, registry, stored_filing):
+        """All accession numbers exist — should return all of them."""
+        result = registry.get_existing_accessions(
+            [stored_filing.accession_number]
+        )
+        assert result == {stored_filing.accession_number}
+
+    def test_some_duplicates(self, registry):
+        """Mix of existing and non-existing accession numbers."""
+        fid1 = FilingIdentifier("AAPL", "10-K", date(2024, 1, 1), "ACC-1")
+        fid2 = FilingIdentifier("MSFT", "10-K", date(2024, 3, 1), "ACC-2")
+        registry.register_filing(fid1, chunk_count=10)
+        registry.register_filing(fid2, chunk_count=20)
+
+        result = registry.get_existing_accessions(
+            ["ACC-1", "ACC-MISSING", "ACC-2", "ACC-NOPE"]
+        )
+        assert result == {"ACC-1", "ACC-2"}
+
+    def test_sql_injection_safety(self, registry, stored_filing):
+        """Malicious accession numbers should not break the query."""
+        result = registry.get_existing_accessions(
+            ["' OR '1'='1", "'; DROP TABLE filings; --"]
+        )
+        assert result == set()
+        # Table should still be intact.
+        assert registry.count() == 1
+
+
 class TestSQLInjectionSafety:
     """Malicious inputs should not break queries or leak data."""
 
