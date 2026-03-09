@@ -31,6 +31,48 @@ logger = get_logger(__name__)
 
 
 @dataclass
+class TickerStatistics:
+    """
+    Aggregated statistics for a single ticker.
+
+    Produced by ``MetadataRegistry.get_statistics()`` from a SQL
+    ``GROUP BY`` query. Avoids fetching full rows just to count them.
+
+    Attributes:
+        ticker: Stock ticker symbol (e.g., "AAPL").
+        filings: Total number of filings for this ticker.
+        chunks: Total chunks across all filings for this ticker.
+        forms: Sorted list of distinct form types (e.g., ["10-K", "10-Q"]).
+    """
+
+    ticker: str
+    filings: int
+    chunks: int
+    forms: list[str]
+
+
+@dataclass
+class DatabaseStatistics:
+    """
+    Aggregated database statistics computed entirely in SQL.
+
+    Produced by ``MetadataRegistry.get_statistics()``. Replaces the
+    pattern of fetching all filing rows and iterating in Python.
+
+    Attributes:
+        filing_count: Total number of ingested filings.
+        tickers: Sorted list of unique ticker symbols.
+        form_breakdown: Filing count per form type (e.g., {"10-K": 5}).
+        ticker_breakdown: Per-ticker aggregated statistics.
+    """
+
+    filing_count: int
+    tickers: list[str]
+    form_breakdown: dict[str, int]
+    ticker_breakdown: list[TickerStatistics]
+
+
+@dataclass
 class FilingRecord:
     """
     A single row from the filings table.
@@ -366,6 +408,80 @@ class MetadataRegistry:
                 "Failed to count filings",
                 details=str(e),
             ) from e
+
+    # ------------------------------------------------------------------
+    # Aggregation
+    # ------------------------------------------------------------------
+
+    def get_statistics(self) -> DatabaseStatistics:
+        """
+        Return aggregated database statistics computed in SQL.
+
+        Runs a single ``GROUP BY ticker, form_type`` query and derives
+        all aggregates from the result. Much more efficient than fetching
+        all rows and iterating in Python.
+
+        Returns:
+            DatabaseStatistics with filing count, tickers, form breakdown,
+            and per-ticker breakdown.
+
+        Raises:
+            DatabaseError: If the query fails.
+        """
+        sql = """
+            SELECT ticker, form_type, COUNT(*) AS filings,
+                   SUM(chunk_count) AS chunks
+            FROM filings
+            GROUP BY ticker, form_type
+            ORDER BY ticker, form_type
+        """
+        try:
+            with self._connect() as conn:
+                rows = conn.execute(sql).fetchall()
+        except sqlite3.Error as e:
+            raise DatabaseError(
+                "Failed to retrieve database statistics",
+                details=str(e),
+            ) from e
+
+        # Derive all aggregates from the grouped rows.
+        filing_count = 0
+        form_breakdown: dict[str, int] = {}
+        ticker_data: dict[str, dict] = {}
+
+        for row in rows:
+            ticker = row["ticker"]
+            form_type = row["form_type"]
+            filings = row["filings"]
+            chunks = row["chunks"]
+
+            filing_count += filings
+            form_breakdown[form_type] = (
+                form_breakdown.get(form_type, 0) + filings
+            )
+
+            if ticker not in ticker_data:
+                ticker_data[ticker] = {"filings": 0, "chunks": 0, "forms": []}
+            ticker_data[ticker]["filings"] += filings
+            ticker_data[ticker]["chunks"] += chunks
+            ticker_data[ticker]["forms"].append(form_type)
+
+        ticker_breakdown = [
+            TickerStatistics(
+                ticker=ticker,
+                filings=data["filings"],
+                chunks=data["chunks"],
+                forms=sorted(data["forms"]),
+            )
+            for ticker, data in sorted(ticker_data.items())
+        ]
+
+        return DatabaseStatistics(
+            filing_count=filing_count,
+            tickers=sorted(ticker_data.keys()),
+            form_breakdown=dict(sorted(form_breakdown.items())),
+            ticker_breakdown=ticker_breakdown,
+        )
 
     # ------------------------------------------------------------------
     # Internal helpers

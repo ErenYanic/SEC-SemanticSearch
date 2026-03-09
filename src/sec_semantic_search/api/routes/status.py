@@ -6,8 +6,6 @@ per-ticker and per-form breakdowns.  Mirrors the CLI ``manage status``
 command output.
 """
 
-from collections import defaultdict
-
 from fastapi import APIRouter, Depends
 
 from sec_semantic_search.api.dependencies import get_chroma, get_registry
@@ -34,38 +32,24 @@ async def status(
     breakdown, and per-ticker statistics.
     """
     settings = get_settings()
-    filings = registry.list_filings()
+    stats = registry.get_statistics()
     chunk_count = chroma.collection_count()
-
-    # Aggregate per-ticker and per-form statistics from the filing list.
-    tickers_set: set[str] = set()
-    form_counts: dict[str, int] = defaultdict(int)
-    ticker_data: dict[str, dict] = defaultdict(
-        lambda: {"filings": 0, "chunks": 0, "forms": set()}
-    )
-
-    for f in filings:
-        tickers_set.add(f.ticker)
-        form_counts[f.form_type] += 1
-        ticker_data[f.ticker]["filings"] += 1
-        ticker_data[f.ticker]["chunks"] += f.chunk_count
-        ticker_data[f.ticker]["forms"].add(f.form_type)
 
     ticker_breakdown = [
         TickerBreakdown(
-            ticker=ticker,
-            filings=data["filings"],
-            chunks=data["chunks"],
-            forms=sorted(data["forms"]),
+            ticker=ts.ticker,
+            filings=ts.filings,
+            chunks=ts.chunks,
+            forms=ts.forms,
         )
-        for ticker, data in sorted(ticker_data.items())
+        for ts in stats.ticker_breakdown
     ]
 
     return StatusResponse(
-        filing_count=len(filings),
+        filing_count=stats.filing_count,
         max_filings=settings.database.max_filings,
         chunk_count=chunk_count,
-        tickers=sorted(tickers_set),
-        form_breakdown=dict(sorted(form_counts.items())),
+        tickers=stats.tickers,
+        form_breakdown=stats.form_breakdown,
         ticker_breakdown=ticker_breakdown,
     )

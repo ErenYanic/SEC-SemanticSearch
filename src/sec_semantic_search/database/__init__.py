@@ -29,7 +29,12 @@ Usage:
 
 from sec_semantic_search.core import get_logger
 from sec_semantic_search.database.client import ChromaDBClient
-from sec_semantic_search.database.metadata import FilingRecord, MetadataRegistry
+from sec_semantic_search.database.metadata import (
+    DatabaseStatistics,
+    FilingRecord,
+    MetadataRegistry,
+    TickerStatistics,
+)
 
 logger = get_logger(__name__)
 
@@ -78,7 +83,9 @@ __all__ = [
     "ChromaDBClient",
     "MetadataRegistry",
     # Supporting types
+    "DatabaseStatistics",
     "FilingRecord",
+    "TickerStatistics",
     # Helpers
     "delete_filings_batch",
 ]

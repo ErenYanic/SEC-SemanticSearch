@@ -66,6 +66,65 @@ class TestListFilingsOrdering:
         assert result[0].accession_number == "ACC-1"
 
 
+class TestGetStatistics:
+    """get_statistics() returns SQL-aggregated database statistics."""
+
+    def test_empty_database(self, registry):
+        stats = registry.get_statistics()
+        assert stats.filing_count == 0
+        assert stats.tickers == []
+        assert stats.form_breakdown == {}
+        assert stats.ticker_breakdown == []
+
+    def test_single_filing(self, registry, stored_filing):
+        stats = registry.get_statistics()
+        assert stats.filing_count == 1
+        assert stats.tickers == ["AAPL"]
+        assert stats.form_breakdown == {"10-K": 1}
+        assert len(stats.ticker_breakdown) == 1
+        assert stats.ticker_breakdown[0].ticker == "AAPL"
+        assert stats.ticker_breakdown[0].filings == 1
+        assert stats.ticker_breakdown[0].chunks == 42
+        assert stats.ticker_breakdown[0].forms == ["10-K"]
+
+    def test_multiple_tickers_and_forms(self, registry):
+        fid1 = FilingIdentifier("AAPL", "10-K", date(2024, 1, 1), "ACC-1")
+        fid2 = FilingIdentifier("AAPL", "10-Q", date(2024, 6, 1), "ACC-2")
+        fid3 = FilingIdentifier("MSFT", "10-K", date(2024, 3, 1), "ACC-3")
+        registry.register_filing(fid1, chunk_count=10)
+        registry.register_filing(fid2, chunk_count=20)
+        registry.register_filing(fid3, chunk_count=30)
+
+        stats = registry.get_statistics()
+        assert stats.filing_count == 3
+        assert stats.tickers == ["AAPL", "MSFT"]
+        assert stats.form_breakdown == {"10-K": 2, "10-Q": 1}
+
+        # Ticker breakdown — sorted by ticker.
+        assert len(stats.ticker_breakdown) == 2
+        aapl = stats.ticker_breakdown[0]
+        assert aapl.ticker == "AAPL"
+        assert aapl.filings == 2
+        assert aapl.chunks == 30  # 10 + 20
+        assert aapl.forms == ["10-K", "10-Q"]
+
+        msft = stats.ticker_breakdown[1]
+        assert msft.ticker == "MSFT"
+        assert msft.filings == 1
+        assert msft.chunks == 30
+        assert msft.forms == ["10-K"]
+
+    def test_chunk_sum_is_correct(self, registry):
+        """Verify chunk counts are summed, not counted."""
+        fid1 = FilingIdentifier("AAPL", "10-K", date(2024, 1, 1), "ACC-1")
+        fid2 = FilingIdentifier("AAPL", "10-K", date(2023, 1, 1), "ACC-2")
+        registry.register_filing(fid1, chunk_count=100)
+        registry.register_filing(fid2, chunk_count=250)
+
+        stats = registry.get_statistics()
+        assert stats.ticker_breakdown[0].chunks == 350
+
+
 class TestSQLInjectionSafety:
     """Malicious inputs should not break queries or leak data."""
 

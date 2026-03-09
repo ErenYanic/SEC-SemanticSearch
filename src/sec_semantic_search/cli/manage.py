@@ -30,10 +30,9 @@ def status() -> None:
     chroma = ChromaDBClient()
     settings = get_settings()
 
-    filing_count = registry.count()
+    stats = registry.get_statistics()
     chunk_count = chroma.collection_count()
     max_filings = settings.database.max_filings
-    filings = registry.list_filings()
 
     # Build a key-value table for the status metrics.
     table = Table(show_header=False, box=None, padding=(0, 2))
@@ -41,29 +40,22 @@ def status() -> None:
     table.add_column("Value")
 
     # Filings count with capacity indicator.
-    filing_style = "green" if filing_count > 0 else "dim"
-    table.add_row("Filings", Text(f"{filing_count}/{max_filings}", style=filing_style))
+    filing_style = "green" if stats.filing_count > 0 else "dim"
+    table.add_row("Filings", Text(f"{stats.filing_count}/{max_filings}", style=filing_style))
 
     # Chunk count.
     chunk_style = "green" if chunk_count > 0 else "dim"
     table.add_row("Chunks", Text(str(chunk_count), style=chunk_style))
 
-    if filings:
-        # Compute per-form-type breakdown.
-        unique_tickers: set[str] = set()
-        form_counts: dict[str, int] = {}
-        for f in filings:
-            unique_tickers.add(f.ticker)
-            form_counts[f.form_type] = form_counts.get(f.form_type, 0) + 1
-
-        ticker_list = ", ".join(sorted(unique_tickers))
+    if stats.filing_count > 0:
+        ticker_list = ", ".join(stats.tickers)
         table.add_row(
             "Tickers",
-            Text(f"{len(unique_tickers)} ({ticker_list})", style="cyan"),
+            Text(f"{len(stats.tickers)} ({ticker_list})", style="cyan"),
         )
 
         breakdown = "  |  ".join(
-            f"{form}: {count}" for form, count in sorted(form_counts.items())
+            f"{form}: {count}" for form, count in stats.form_breakdown.items()
         )
         table.add_row("Forms", Text(breakdown))
     else:

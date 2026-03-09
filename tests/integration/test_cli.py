@@ -14,6 +14,7 @@ from typer.testing import CliRunner
 
 from sec_semantic_search.cli.main import app
 from sec_semantic_search.database import delete_filings_batch
+from sec_semantic_search.database.metadata import DatabaseStatistics
 from sec_semantic_search.config.constants import EMBEDDING_DIMENSION
 from sec_semantic_search.core.types import ContentType, IngestResult, Segment
 from sec_semantic_search.pipeline.orchestrator import ProcessedFiling
@@ -67,8 +68,12 @@ class TestManageStatus:
             patch("sec_semantic_search.cli.manage.get_settings") as MockSettings,
         ):
             mock_registry = MagicMock()
-            mock_registry.count.return_value = 0
-            mock_registry.list_filings.return_value = []
+            mock_registry.get_statistics.return_value = DatabaseStatistics(
+                filing_count=0,
+                tickers=[],
+                form_breakdown={},
+                ticker_breakdown=[],
+            )
             MockReg.return_value = mock_registry
 
             mock_chroma = MagicMock()
