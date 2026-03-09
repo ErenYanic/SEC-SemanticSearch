@@ -19,7 +19,7 @@ No Redis, no Celery — task state lives in a plain ``dict``.
 
 from __future__ import annotations
 
-import queue
+import asyncio
 import threading
 import time
 import uuid
@@ -121,9 +121,9 @@ class TaskInfo:
     # partial rollback on cancellation.
     _stored_accessions: list[str] = field(default_factory=list)
 
-    # WebSocket message queue — worker thread pushes typed dicts,
-    # WebSocket handler reads them for real-time progress streaming.
-    _message_queue: queue.Queue = field(default_factory=queue.Queue)
+    # WebSocket message queue — worker thread pushes typed dicts via
+    # call_soon_threadsafe; WebSocket handler awaits them directly.
+    _message_queue: asyncio.Queue = field(default_factory=asyncio.Queue)
 
 
 # ---------------------------------------------------------------------------
@@ -160,6 +160,10 @@ class TaskManager:
         self._tasks: dict[str, TaskInfo] = {}
         self._gpu_semaphore = threading.Semaphore(1)
         self._lock = threading.Lock()  # protects _tasks dict mutations
+
+        # Event loop reference — set via set_event_loop() during lifespan
+        # startup.  Used by _push() to bridge sync worker → async queue.
+        self._loop: asyncio.AbstractEventLoop | None = None
 
         # Cleanup timer reference — stored so it can be cancelled on shutdown.
         self._cleanup_timer: threading.Timer | None = None
@@ -264,14 +268,37 @@ class TaskManager:
             self._cleanup_timer = None
         logger.info("TaskManager shut down")
 
+    def set_event_loop(self, loop: asyncio.AbstractEventLoop) -> None:
+        """
+        Store a reference to the running asyncio event loop.
+
+        Called during lifespan startup so that ``_push()`` can use
+        ``call_soon_threadsafe`` to bridge messages from the sync
+        worker thread into the async ``asyncio.Queue``.
+        """
+        self._loop = loop
+
     # ------------------------------------------------------------------
     # WebSocket message helpers
     # ------------------------------------------------------------------
 
-    @staticmethod
-    def _push(info: TaskInfo, message: dict) -> None:
-        """Push a WebSocket message onto the task's queue."""
-        info._message_queue.put(message)
+    def _push(self, info: TaskInfo, message: dict) -> None:
+        """
+        Push a WebSocket message onto the task's async queue.
+
+        When called from a worker thread (the normal case), uses
+        ``call_soon_threadsafe`` to schedule the ``put_nowait`` on the
+        event loop thread — required because ``asyncio.Queue`` is not
+        thread-safe.  Falls back to a direct ``put_nowait`` when no
+        event loop is available (e.g. in unit tests).
+        """
+        loop = self._loop
+        if loop is not None and loop.is_running():
+            loop.call_soon_threadsafe(info._message_queue.put_nowait, message)
+        else:
+            # Fallback: direct put (safe when no coroutine is awaiting
+            # queue.get(), e.g. in unit tests).
+            info._message_queue.put_nowait(message)
 
     # ------------------------------------------------------------------
     # Worker
@@ -422,6 +449,7 @@ class TaskManager:
                 step: str,
                 current: int,
                 total: int,
+                _self: TaskManager = self,
                 _info: TaskInfo = info,
                 _ticker: str = ticker,
                 _form: str = form_type,
@@ -436,7 +464,7 @@ class TaskManager:
                 _info.progress.step_index = current  # 1-based from pipeline
                 _info.progress.step_total = 5
 
-                TaskManager._push(_info, {
+                _self._push(_info, {
                     "type": "step",
                     "ticker": _ticker,
                     "form_type": _form,

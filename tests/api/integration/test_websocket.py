@@ -5,7 +5,6 @@ Uses FastAPI TestClient's ``websocket_connect()`` with task state
 injected directly onto ``app.state.task_manager``.
 """
 
-import queue
 from unittest.mock import MagicMock, patch
 
 from fastapi.testclient import TestClient
@@ -53,7 +52,7 @@ class TestWebSocketSnapshot:
         client = _make_client_with_task(task_info=info)
 
         # Put a cancelled message to terminate the loop.
-        info._message_queue.put({"type": "cancelled"})
+        info._message_queue.put_nowait({"type": "cancelled"})
 
         with client.websocket_connect(f"/ws/ingest/{info.task_id}") as ws:
             snapshot = ws.receive_json()
@@ -69,7 +68,7 @@ class TestWebSocketCompleted:
     def test_completed_task(self):
         info = make_task_info(state=TaskState.COMPLETED)
         # Push a terminal message into the queue.
-        info._message_queue.put({
+        info._message_queue.put_nowait({
             "type": "completed",
             "results": [],
             "summary": {"total": 0},
@@ -89,7 +88,7 @@ class TestWebSocketStreaming:
 
     def test_step_then_terminal(self):
         info = make_task_info(state=TaskState.RUNNING)
-        info._message_queue.put({
+        info._message_queue.put_nowait({
             "type": "step",
             "ticker": "AAPL",
             "form_type": "10-K",
@@ -97,7 +96,7 @@ class TestWebSocketStreaming:
             "step_number": 4,
             "total_steps": 5,
         })
-        info._message_queue.put({
+        info._message_queue.put_nowait({
             "type": "completed",
             "results": [],
             "summary": {"total": 0},
@@ -117,7 +116,7 @@ class TestWebSocketStreaming:
 
     def test_filing_done_message(self):
         info = make_task_info(state=TaskState.RUNNING)
-        info._message_queue.put({
+        info._message_queue.put_nowait({
             "type": "filing_done",
             "ticker": "AAPL",
             "form_type": "10-K",
@@ -127,7 +126,7 @@ class TestWebSocketStreaming:
             "chunks": 110,
             "time": 5.3,
         })
-        info._message_queue.put({"type": "completed", "results": [], "summary": {}})
+        info._message_queue.put_nowait({"type": "completed", "results": [], "summary": {}})
 
         client = _make_client_with_task(task_info=info)
         with client.websocket_connect(f"/ws/ingest/{info.task_id}") as ws:
@@ -139,7 +138,7 @@ class TestWebSocketStreaming:
 
     def test_cancelled_message(self):
         info = make_task_info(state=TaskState.RUNNING)
-        info._message_queue.put({"type": "cancelled"})
+        info._message_queue.put_nowait({"type": "cancelled"})
 
         client = _make_client_with_task(task_info=info)
         with client.websocket_connect(f"/ws/ingest/{info.task_id}") as ws:

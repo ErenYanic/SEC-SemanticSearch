@@ -24,7 +24,6 @@ can catch up.
 from __future__ import annotations
 
 import asyncio
-import queue
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
@@ -111,27 +110,26 @@ async def ingest_progress(websocket: WebSocket, task_id: str) -> None:
         await websocket.close()
         return
 
-    # Stream messages from the task's queue until terminal or disconnect.
-    loop = asyncio.get_running_loop()
-
+    # Stream messages from the task's async queue until terminal or
+    # disconnect.  Uses asyncio.wait_for with a 5s safety timeout —
+    # normal messages arrive near-instantly via call_soon_threadsafe;
+    # the timeout only fires during idle periods (e.g. PENDING state
+    # waiting for the GPU semaphore).
     try:
         while True:
             try:
-                # Read from the sync queue without blocking the event loop.
-                # Timeout of 0.25s keeps the loop responsive for disconnect.
-                message = await loop.run_in_executor(
-                    None, _queue_get, info._message_queue, 0.25,
+                message = await asyncio.wait_for(
+                    info._message_queue.get(), timeout=5.0,
                 )
-            except queue.Empty:
-                # No message within timeout — check if task ended while
-                # the queue was empty (e.g. task completed between our
-                # last read and now).
+            except asyncio.TimeoutError:
+                # No message within timeout — check if the task ended
+                # while the queue was empty (e.g. terminal message was
+                # already consumed by a previous WebSocket connection).
                 if info.state in (
                     TaskState.COMPLETED,
                     TaskState.FAILED,
                     TaskState.CANCELLED,
                 ):
-                    # Drain any remaining messages.
                     await _drain_and_send(websocket, info._message_queue)
                     break
                 continue
@@ -163,23 +161,11 @@ async def ingest_progress(websocket: WebSocket, task_id: str) -> None:
 # ---------------------------------------------------------------------------
 
 
-def _queue_get(q: queue.Queue, timeout: float) -> dict:
-    """
-    Blocking queue read (runs in executor thread).
-
-    Raises ``queue.Empty`` on timeout.
-    """
-    return q.get(block=True, timeout=timeout)
-
-
-async def _drain_and_send(websocket: WebSocket, q: queue.Queue) -> None:
+async def _drain_and_send(websocket: WebSocket, q: asyncio.Queue) -> None:
     """Drain all remaining messages from the queue and send them."""
-    while True:
-        try:
-            message = q.get_nowait()
-            await websocket.send_json(message)
-        except queue.Empty:
-            break
+    while not q.empty():
+        message = q.get_nowait()
+        await websocket.send_json(message)
 
 
 def _drain_terminal_message(info: TaskInfo) -> dict | None:
@@ -189,10 +175,8 @@ def _drain_terminal_message(info: TaskInfo) -> dict | None:
     Returns the message or None if the queue is empty (the terminal
     message was already consumed by a previous WebSocket connection).
     """
-    while True:
-        try:
-            message = info._message_queue.get_nowait()
-            if message.get("type") in _TERMINAL_TYPES:
-                return message
-        except queue.Empty:
-            return None
+    while not info._message_queue.empty():
+        message = info._message_queue.get_nowait()
+        if message.get("type") in _TERMINAL_TYPES:
+            return message
+    return None
