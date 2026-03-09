@@ -10,7 +10,7 @@ from rich.text import Text
 
 from sec_semantic_search.config import get_settings
 from sec_semantic_search.core import DatabaseError
-from sec_semantic_search.database import ChromaDBClient, MetadataRegistry
+from sec_semantic_search.database import ChromaDBClient, MetadataRegistry, delete_filings_batch
 
 console = Console()
 
@@ -128,25 +128,6 @@ def list_filings(
         )
 
     console.print(table)
-
-
-def _delete_filings(
-    filings: list,
-    *,
-    registry: MetadataRegistry,
-    chroma: ChromaDBClient,
-) -> int:
-    """Delete a list of filings from both stores. Returns total chunks deleted."""
-    total_chunks = 0
-    for filing in filings:
-        chunks_deleted = chroma.delete_filing(filing.accession_number)
-        registry.remove_filing(filing.accession_number)
-        total_chunks += chunks_deleted
-        console.print(
-            f"  [green]Removed:[/green] {filing.ticker} {filing.form_type} "
-            f"({filing.filing_date}) — {chunks_deleted} chunks"
-        )
-    return total_chunks
 
 
 @manage_app.command("remove")
@@ -293,7 +274,7 @@ def remove(
 
     try:
         chroma = ChromaDBClient()
-        total_deleted = _delete_filings(
+        total_deleted = delete_filings_batch(
             filings, registry=registry, chroma=chroma,
         )
     except DatabaseError as e:
@@ -351,7 +332,7 @@ def clear(
 
     try:
         chroma = ChromaDBClient()
-        total_deleted = _delete_filings(
+        total_deleted = delete_filings_batch(
             filings, registry=registry, chroma=chroma,
         )
     except DatabaseError as e:

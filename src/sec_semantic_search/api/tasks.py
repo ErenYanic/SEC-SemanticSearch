@@ -590,8 +590,12 @@ class TaskManager:
             if info.count_mode == "total" and info.count is not None:
                 # Cross-form mode: list available across forms, pick
                 # the newest `count`.
-                filings = self._list_across_forms(
-                    ticker, tuple(info.form_types), info,
+                filings = self._fetcher.list_available_across_forms(
+                    ticker, tuple(info.form_types),
+                    count=info.count,
+                    year=info.year,
+                    start_date=info.start_date,
+                    end_date=info.end_date,
                 )
                 work.extend(filings)
             else:
@@ -623,29 +627,6 @@ class TaskManager:
                         )
 
         return work
-
-    def _list_across_forms(
-        self,
-        ticker: str,
-        form_types: tuple[str, ...],
-        info: TaskInfo,
-    ) -> list[FilingInfo]:
-        """List and merge available filings across form types, newest first."""
-        all_available: list[FilingInfo] = []
-        for form_type in form_types:
-            try:
-                available = self._fetcher.list_available(
-                    ticker, form_type,
-                    count=info.count,
-                    year=info.year,
-                    start_date=info.start_date,
-                    end_date=info.end_date,
-                )
-                all_available.extend(available)
-            except FetchError:
-                continue
-        all_available.sort(key=lambda fi: fi.filing_date, reverse=True)
-        return all_available[: info.count]
 
     @staticmethod
     def _effective_count(info: TaskInfo) -> int | None:
