@@ -134,6 +134,25 @@ class BulkDeleteResponse(BaseModel):
     tickers_affected: list[str] = Field(default_factory=list)
 
 
+class DeleteByIdsRequest(BaseModel):
+    """Request body for ``POST /api/filings/delete-by-ids``."""
+
+    accession_numbers: list[str] = Field(
+        ..., min_length=1, max_length=500, description="Accession numbers to delete"
+    )
+
+
+class DeleteByIdsResponse(BaseModel):
+    """Response for ``POST /api/filings/delete-by-ids``."""
+
+    filings_deleted: int = Field(..., ge=0)
+    chunks_deleted: int = Field(..., ge=0)
+    not_found: list[str] = Field(
+        default_factory=list,
+        description="Accession numbers that were not found in the registry",
+    )
+
+
 class ClearAllResponse(BaseModel):
     """Response for ``DELETE /api/filings/?confirm=true``."""
 

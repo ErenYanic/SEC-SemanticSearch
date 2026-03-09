@@ -84,6 +84,18 @@ export interface BulkDeleteResponse {
   tickers_affected: string[];
 }
 
+/** POST /api/filings/delete-by-ids — request body */
+export interface DeleteByIdsRequest {
+  accession_numbers: string[];
+}
+
+/** POST /api/filings/delete-by-ids — response */
+export interface DeleteByIdsResponse {
+  filings_deleted: number;
+  chunks_deleted: number;
+  not_found: string[];
+}
+
 /** DELETE /api/filings/?confirm=true */
 export interface ClearAllResponse {
   filings_deleted: number;

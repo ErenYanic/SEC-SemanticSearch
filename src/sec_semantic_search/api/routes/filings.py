@@ -18,6 +18,8 @@ from sec_semantic_search.api.schemas import (
     BulkDeleteRequest,
     BulkDeleteResponse,
     ClearAllResponse,
+    DeleteByIdsRequest,
+    DeleteByIdsResponse,
     DeleteResponse,
     ErrorResponse,
     FilingListResponse,
@@ -165,6 +167,70 @@ async def delete_filing(
     return DeleteResponse(
         accession_number=accession,
         chunks_deleted=record.chunk_count,
+    )
+
+
+@router.post(
+    "/delete-by-ids",
+    response_model=DeleteByIdsResponse,
+    responses={500: {"model": ErrorResponse}},
+    summary="Delete filings by accession numbers",
+)
+async def delete_by_ids(
+    body: DeleteByIdsRequest,
+    registry: MetadataRegistry = Depends(get_registry),
+    chroma: ChromaDBClient = Depends(get_chroma),
+) -> DeleteByIdsResponse:
+    """
+    Delete specific filings by their accession numbers in a single request.
+
+    Looks up each accession number in the registry, deletes those that exist
+    from both stores, and reports any that were not found.  This is more
+    efficient than making N sequential ``DELETE /api/filings/{accession}``
+    calls from the frontend.
+    """
+    found: list[FilingRecord] = []
+    not_found: list[str] = []
+
+    for accession in body.accession_numbers:
+        record = registry.get_filing(accession)
+        if record is None:
+            not_found.append(accession)
+        else:
+            found.append(record)
+
+    if not found:
+        return DeleteByIdsResponse(
+            filings_deleted=0,
+            chunks_deleted=0,
+            not_found=not_found,
+        )
+
+    try:
+        total_chunks = delete_filings_batch(
+            found, chroma=chroma, registry=registry,
+        )
+    except DatabaseError as exc:
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "error": "database_error",
+                "message": "Delete by IDs failed.",
+                "details": exc.details,
+                "hint": "Check that the data directory is writable.",
+            },
+        ) from exc
+
+    logger.info(
+        "Deleted %d filing(s) by ID — %d chunks, %d not found",
+        len(found),
+        total_chunks,
+        len(not_found),
+    )
+    return DeleteByIdsResponse(
+        filings_deleted=len(found),
+        chunks_deleted=total_chunks,
+        not_found=not_found,
     )
 
 

@@ -19,6 +19,8 @@ import type {
   BulkDeleteRequest,
   BulkDeleteResponse,
   ClearAllResponse,
+  DeleteByIdsRequest,
+  DeleteByIdsResponse,
   DeleteResponse,
   Filing,
   FilingListResponse,
@@ -131,6 +133,17 @@ export async function deleteFiling(
 ): Promise<DeleteResponse> {
   const { data } = await client.delete<DeleteResponse>(
     `/api/filings/${encodeURIComponent(accessionNumber)}`,
+  );
+  return data;
+}
+
+/** Delete specific filings by accession numbers in a single request. */
+export async function deleteFilingsByIds(
+  accessionNumbers: string[],
+): Promise<DeleteByIdsResponse> {
+  const { data } = await client.post<DeleteByIdsResponse>(
+    "/api/filings/delete-by-ids",
+    { accession_numbers: accessionNumbers } satisfies DeleteByIdsRequest,
   );
   return data;
 }
