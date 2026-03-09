@@ -197,6 +197,12 @@ def _ingest_one_form(
     skipped = 0
     failed = 0
 
+    # Batch duplicate check — single SQL query instead of N individual
+    # is_duplicate() calls, reducing SQLite round-trips from O(N) to O(1).
+    existing = registry.get_existing_accessions(
+        [fid.accession_number for fid, _ in filings]
+    )
+
     for filing_idx, (filing_id, html_content) in enumerate(filings):
         filing_num = f" [{filing_idx + 1}/{len(filings)}]" if multi else ""
 
@@ -217,7 +223,7 @@ def _ingest_one_form(
             progress.update(step_task_id, completed=1)  # fetch step already done
 
         # --- Duplicate check -------------------------------------------------
-        if registry.is_duplicate(filing_id.accession_number):
+        if filing_id.accession_number in existing:
             if multi:
                 progress.console.print(
                     f"  [yellow]Already ingested{filing_num}:[/yellow] "
@@ -366,6 +372,12 @@ def _ingest_across_forms(
     skipped = 0
     failed = 0
 
+    # Batch duplicate check — single SQL query instead of N individual
+    # is_duplicate() calls, reducing SQLite round-trips from O(N) to O(1).
+    existing = registry.get_existing_accessions(
+        [fi.accession_number for fi in selected]
+    )
+
     with _make_progress() as progress:
         filing_task = progress.add_task(
             f"{ticker}: 0/{len(selected)} filings", total=len(selected),
@@ -396,7 +408,7 @@ def _ingest_across_forms(
             )
 
             # Duplicate check (before expensive fetch).
-            if registry.is_duplicate(fi.accession_number):
+            if fi.accession_number in existing:
                 progress.console.print(
                     f"  [yellow]Already ingested{filing_num}:[/yellow] "
                     f"{label} ({fi.filing_date})"
@@ -828,6 +840,11 @@ def batch(
 
             progress.advance(step_task)
 
+            # Batch duplicate check for this work item's filings.
+            existing = registry.get_existing_accessions(
+                [fid.accession_number for fid, _ in filings]
+            )
+
             # Process each filing within this work item.
             for filing_idx, (filing_id, html_content) in enumerate(filings):
                 multi = len(filings) > 1
@@ -849,7 +866,7 @@ def batch(
                     progress.update(step_task, completed=1)
 
                 # Duplicate check.
-                if registry.is_duplicate(filing_id.accession_number):
+                if filing_id.accession_number in existing:
                     progress.console.print(
                         f"  [yellow]{label}{filing_num}: Already ingested[/yellow] "
                         f"({filing_id.date_str})"

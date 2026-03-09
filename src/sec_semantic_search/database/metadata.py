@@ -211,6 +211,43 @@ class MetadataRegistry:
                 details=str(e),
             ) from e
 
+    def get_existing_accessions(
+        self, accession_numbers: list[str],
+    ) -> set[str]:
+        """
+        Return the subset of accession numbers that already exist in the registry.
+
+        Performs a single ``SELECT ... WHERE IN (...)`` query instead of
+        N individual ``is_duplicate()`` calls, reducing SQLite connection
+        overhead from O(N) to O(1) for batch operations.
+
+        Args:
+            accession_numbers: Accession numbers to check.
+
+        Returns:
+            Set of accession numbers that are already registered.
+
+        Raises:
+            DatabaseError: If the query fails.
+        """
+        if not accession_numbers:
+            return set()
+
+        placeholders = ", ".join("?" for _ in accession_numbers)
+        sql = (
+            f"SELECT accession_number FROM filings "
+            f"WHERE accession_number IN ({placeholders})"
+        )
+        try:
+            with self._connect() as conn:
+                rows = conn.execute(sql, accession_numbers).fetchall()
+            return {row["accession_number"] for row in rows}
+        except sqlite3.Error as e:
+            raise DatabaseError(
+                "Failed to check for existing accessions",
+                details=str(e),
+            ) from e
+
     # ------------------------------------------------------------------
     # Write operations
     # ------------------------------------------------------------------
