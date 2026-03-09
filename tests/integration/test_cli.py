@@ -143,14 +143,13 @@ class TestManageRemove:
             MockReg.return_value = mock_registry
 
             mock_chroma = MagicMock()
-            mock_chroma.delete_filing.return_value = 100
             MockChroma.return_value = mock_chroma
 
             result = runner.invoke(app, ["manage", "remove", "ACC-001", "--yes"])
 
         assert result.exit_code == 0
         assert "Removed" in result.output
-        assert "100 chunks" in result.output
+        assert "100 chunks" in result.output  # from FilingRecord.chunk_count default
 
     def test_confirmation_rejected(self):
         """Answering 'n' to the confirmation prompt should cancel removal."""
@@ -189,7 +188,6 @@ class TestBulkRemove:
             MockReg.return_value = mock_registry
 
             mock_chroma = MagicMock()
-            mock_chroma.delete_filing.return_value = 50
             MockChroma.return_value = mock_chroma
 
             result = runner.invoke(
@@ -267,7 +265,6 @@ class TestManageClear:
             MockReg.return_value = mock_registry
 
             mock_chroma = MagicMock()
-            mock_chroma.delete_filing.return_value = 50
             MockChroma.return_value = mock_chroma
 
             result = runner.invoke(app, ["manage", "clear", "--yes"])
@@ -311,17 +308,17 @@ class TestDeleteFilingsBatch:
     """delete_filings_batch() orchestrates deletion across both stores."""
 
     def test_deletes_multiple_returns_total_chunks(self):
+        """Total chunks come from FilingRecord.chunk_count, not ChromaDB return."""
         records = [
-            make_filing_record(id=1, accession_number="ACC-001"),
-            make_filing_record(id=2, accession_number="ACC-002"),
+            make_filing_record(id=1, accession_number="ACC-001", chunk_count=50),
+            make_filing_record(id=2, accession_number="ACC-002", chunk_count=50),
         ]
         mock_chroma = MagicMock()
-        mock_chroma.delete_filing.return_value = 50
         mock_registry = MagicMock()
 
         total = delete_filings_batch(records, registry=mock_registry, chroma=mock_chroma)
 
-        assert total == 100
+        assert total == 100  # 50 + 50 from FilingRecord.chunk_count
         assert mock_chroma.delete_filing.call_count == 2
         assert mock_registry.remove_filing.call_count == 2
 
@@ -332,7 +329,7 @@ class TestDeleteFilingsBatch:
 
         mock_chroma = MagicMock()
         mock_chroma.delete_filing.side_effect = lambda acc: (
-            call_order.append(("chroma", acc)) or 50
+            call_order.append(("chroma", acc))
         )
         mock_registry = MagicMock()
         mock_registry.remove_filing.side_effect = lambda acc: (

@@ -122,45 +122,32 @@ class ChromaDBClient:
                 details=str(e),
             ) from e
 
-    def delete_filing(self, accession_number: str) -> int:
+    def delete_filing(self, accession_number: str) -> None:
         """
         Delete all chunks belonging to a filing.
 
-        Retrieves chunk IDs matching the accession number via metadata
-        filter, then deletes them by ID.
+        Uses a single ``delete(where=...)`` call to remove all chunks
+        matching the accession number, avoiding the extra round-trip of
+        querying for IDs first.
+
+        Callers that need the deleted chunk count should read
+        ``FilingRecord.chunk_count`` from the SQLite registry before
+        calling this method.
 
         Args:
             accession_number: SEC accession number of the filing to remove.
-
-        Returns:
-            Number of chunks deleted.
 
         Raises:
             DatabaseError: If the deletion fails.
         """
         try:
-            results = self._collection.get(
+            self._collection.delete(
                 where={"accession_number": accession_number},
-                include=[],  # Only need IDs
             )
-
-            chunk_ids = results["ids"]
-            if not chunk_ids:
-                logger.warning(
-                    "No chunks found in ChromaDB for accession: %s",
-                    accession_number,
-                )
-                return 0
-
-            self._collection.delete(ids=chunk_ids)
-
             logger.info(
-                "Deleted %d chunks from ChromaDB for accession: %s",
-                len(chunk_ids),
+                "Deleted chunks from ChromaDB for accession: %s",
                 accession_number,
             )
-            return len(chunk_ids)
-
         except Exception as e:
             raise DatabaseError(
                 f"Failed to delete filing {accession_number} from ChromaDB",

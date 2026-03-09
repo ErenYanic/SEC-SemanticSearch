@@ -203,7 +203,7 @@ def remove(
 
         try:
             chroma = ChromaDBClient()
-            chunks_deleted = chroma.delete_filing(accession_number)
+            chroma.delete_filing(accession_number)
             registry.remove_filing(accession_number)
         except DatabaseError as e:
             console.print(f"[red]Removal failed:[/red] {e.message}")
@@ -214,7 +214,7 @@ def remove(
 
         console.print(
             f"[green]Removed:[/green] {filing.ticker} {filing.form_type} "
-            f"({filing.filing_date}) — {chunks_deleted} chunks deleted"
+            f"({filing.filing_date}) — {filing.chunk_count} chunks deleted"
         )
         return
 
