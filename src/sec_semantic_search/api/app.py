@@ -87,6 +87,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     logger.info("All singletons initialised. API ready.")
     yield
     logger.info("SEC Semantic Search API shutting down.")
+    task_manager.shutdown()
 
 
 # ---------------------------------------------------------------------------

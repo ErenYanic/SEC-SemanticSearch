@@ -161,6 +161,10 @@ class TaskManager:
         self._gpu_semaphore = threading.Semaphore(1)
         self._lock = threading.Lock()  # protects _tasks dict mutations
 
+        # Cleanup timer reference — stored so it can be cancelled on shutdown.
+        self._cleanup_timer: threading.Timer | None = None
+        self._shutdown_event = threading.Event()
+
         # Start the cleanup timer.
         self._start_cleanup_timer()
 
@@ -246,6 +250,19 @@ class TaskManager:
             t.state in (TaskState.PENDING, TaskState.RUNNING)
             for t in self._tasks.values()
         )
+
+    def shutdown(self) -> None:
+        """
+        Cancel the cleanup timer and prevent further rescheduling.
+
+        Call this during application shutdown (lifespan teardown) to
+        stop the recurring cleanup thread cleanly.
+        """
+        self._shutdown_event.set()
+        if self._cleanup_timer is not None:
+            self._cleanup_timer.cancel()
+            self._cleanup_timer = None
+        logger.info("TaskManager shut down")
 
     # ------------------------------------------------------------------
     # WebSocket message helpers
@@ -693,12 +710,17 @@ class TaskManager:
 
     def _start_cleanup_timer(self) -> None:
         """Schedule periodic pruning of stale tasks."""
+        if self._shutdown_event.is_set():
+            return
         timer = threading.Timer(60.0, self._cleanup_loop)
         timer.daemon = True
         timer.start()
+        self._cleanup_timer = timer
 
     def _cleanup_loop(self) -> None:
         """Prune finished tasks older than TTL, then reschedule."""
+        if self._shutdown_event.is_set():
+            return
         try:
             self._prune_stale_tasks()
         except Exception:
