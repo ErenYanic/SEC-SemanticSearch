@@ -128,7 +128,7 @@ class TestRollback:
 
         manager._chroma.delete_filing.side_effect = [
             DatabaseError("fail"),
-            50,
+            None,
         ]
 
         # Should not raise — errors are logged, not propagated.
@@ -142,7 +142,7 @@ class TestRollback:
 
         call_order = []
         manager._chroma.delete_filing.side_effect = lambda acc: (
-            call_order.append(("chroma", acc)) or 10
+            call_order.append(("chroma", acc))
         )
         manager._registry.remove_filing.side_effect = lambda acc: (
             call_order.append(("registry", acc))

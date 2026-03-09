@@ -142,7 +142,7 @@ async def delete_filing(
         )
 
     try:
-        chunks_deleted = chroma.delete_filing(accession)
+        chroma.delete_filing(accession)
         registry.remove_filing(accession)
     except DatabaseError as exc:
         raise HTTPException(
@@ -160,11 +160,11 @@ async def delete_filing(
         accession,
         record.ticker,
         record.form_type,
-        chunks_deleted,
+        record.chunk_count,
     )
     return DeleteResponse(
         accession_number=accession,
-        chunks_deleted=chunks_deleted,
+        chunks_deleted=record.chunk_count,
     )
 
 

@@ -223,15 +223,13 @@ class TestChromaDBClient:
         pf = _make_processed_filing(sample_chunks, sample_filing_id)
         client.store_filing(pf)
 
-        deleted = client.delete_filing(sample_filing_id.accession_number)
-        assert deleted == len(sample_chunks)
+        client.delete_filing(sample_filing_id.accession_number)
         assert client.collection_count() == 0
 
     def test_delete_nonexistent_filing(self, tmp_chroma_path):
-        """Deleting a non-existent filing should return 0."""
+        """Deleting a non-existent filing should be a no-op."""
         client = ChromaDBClient(chroma_path=tmp_chroma_path)
-        deleted = client.delete_filing("NONEXISTENT-ACC")
-        assert deleted == 0
+        client.delete_filing("NONEXISTENT-ACC")  # Should not raise
 
 
 # -----------------------------------------------------------------------

@@ -65,15 +65,15 @@ def delete_filings_batch(
     """
     total_chunks = 0
     for filing in filings:
-        chunks_deleted = chroma.delete_filing(filing.accession_number)
+        chroma.delete_filing(filing.accession_number)
         registry.remove_filing(filing.accession_number)
-        total_chunks += chunks_deleted
+        total_chunks += filing.chunk_count
         logger.info(
             "Deleted %s %s (%s) — %d chunks",
             filing.ticker,
             filing.form_type,
             filing.filing_date,
-            chunks_deleted,
+            filing.chunk_count,
         )
     return total_chunks
 

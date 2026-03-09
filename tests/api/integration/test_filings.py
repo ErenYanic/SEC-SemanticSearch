@@ -23,7 +23,7 @@ def _make_client(filings=None, chunk_count=0, get_filing_result=None):
 
     chroma = MagicMock()
     chroma.collection_count.return_value = chunk_count
-    chroma.delete_filing.return_value = 50  # default chunks deleted
+    chroma.delete_filing.return_value = None
 
     app.dependency_overrides[get_registry] = lambda: registry
     app.dependency_overrides[get_chroma] = lambda: chroma
@@ -115,11 +115,10 @@ class TestDeleteFiling:
 
     def test_existing(self):
         record = make_filing_record(chunk_count=50)
-        client, _, chroma = _make_client(get_filing_result=record)
-        chroma.delete_filing.return_value = 50
+        client, *_ = _make_client(get_filing_result=record)
         resp = client.delete("/api/filings/0000320193-24-000001")
         assert resp.status_code == 200
-        assert resp.json()["chunks_deleted"] == 50
+        assert resp.json()["chunks_deleted"] == 50  # from FilingRecord.chunk_count
 
     def test_not_found(self):
         client, *_ = _make_client(get_filing_result=None)
@@ -147,15 +146,14 @@ class TestBulkDelete:
         app.dependency_overrides.clear()
 
     def test_by_ticker(self):
-        filings = [make_filing_record()]
-        client, registry, chroma = _make_client()
+        filings = [make_filing_record()]  # chunk_count=100 by default
+        client, registry, _ = _make_client()
         registry.list_filings.return_value = filings
-        chroma.delete_filing.return_value = 100
         resp = client.post("/api/filings/bulk-delete", json={"ticker": "AAPL"})
         assert resp.status_code == 200
         data = resp.json()
         assert data["filings_deleted"] == 1
-        assert data["chunks_deleted"] == 100
+        assert data["chunks_deleted"] == 100  # from FilingRecord.chunk_count
         assert data["tickers_affected"] == ["AAPL"]
 
     def test_no_filters_returns_400(self):
@@ -204,17 +202,16 @@ class TestClearAll:
 
     def test_confirm_with_filings(self):
         filings = [
-            make_filing_record(id=1, accession_number="acc-1"),
-            make_filing_record(id=2, accession_number="acc-2", filing_date="2024-06-01"),
+            make_filing_record(id=1, accession_number="acc-1", chunk_count=50),
+            make_filing_record(id=2, accession_number="acc-2", filing_date="2024-06-01", chunk_count=50),
         ]
-        client, registry, chroma = _make_client()
+        client, registry, _ = _make_client()
         registry.list_filings.return_value = filings
-        chroma.delete_filing.return_value = 50
         resp = client.delete("/api/filings/?confirm=true")
         assert resp.status_code == 200
         data = resp.json()
         assert data["filings_deleted"] == 2
-        assert data["chunks_deleted"] == 100  # 50 * 2
+        assert data["chunks_deleted"] == 100  # 50 + 50 from FilingRecord.chunk_count
 
     def test_database_error(self):
         filings = [make_filing_record()]
