@@ -21,23 +21,47 @@
  * work in Client Components. The child components that don't use
  * hooks (DashboardMetrics) could be Server Components, but since
  * they receive dynamic data as props from this Client Component
- * parent, they render on the client regardless. FormChart and
- * TickerTable are explicitly `"use client"` because they use
- * `useRouter()`.
+ * parent, they render on the client regardless. TickerTable is
+ * explicitly `"use client"` because it uses `useRouter()`.
+ * FormChart is loaded via `next/dynamic` with `ssr: false` to
+ * keep Recharts (~150 KB gzipped) out of the initial bundle.
  */
 
 "use client";
 
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { LayoutDashboard, Database, Upload } from "lucide-react";
 import { useStatus } from "@/hooks/useStatus";
-import { Button, EmptyState } from "@/components/ui";
+import { Button, EmptyState, Skeleton } from "@/components/ui";
 import {
   DashboardMetrics,
   DashboardSkeleton,
-  FormChart,
   TickerTable,
 } from "@/components/dashboard";
+
+// Lazy-load FormChart — Recharts adds ~150 KB (gzipped) to the bundle.
+// Since the chart is only visible on the Dashboard and only when data
+// exists, deferring the import avoids shipping Recharts in the initial
+// page JS.  The `ssr: false` flag skips server rendering (Recharts
+// depends on browser APIs for SVG measurement).
+const FormChart = dynamic(
+  () =>
+    import("@/components/dashboard/FormChart").then((mod) => mod.FormChart),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-gray-950">
+        <Skeleton className="mb-4 h-6 w-48" />
+        <div className="flex h-64 items-end gap-6 px-4 pb-8">
+          <Skeleton className="h-3/4 flex-1 rounded-t-md" />
+          <Skeleton className="h-1/2 flex-1 rounded-t-md" />
+          <Skeleton className="h-5/6 flex-1 rounded-t-md" />
+        </div>
+      </div>
+    ),
+  },
+);
 
 export default function DashboardPage() {
   const { data: status, isLoading, isError } = useStatus();
