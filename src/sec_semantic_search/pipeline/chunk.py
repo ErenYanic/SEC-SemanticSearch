@@ -45,6 +45,9 @@ class TextChunker:
     # Sentence boundary pattern: split after . ! ? followed by whitespace
     SENTENCE_PATTERN = re.compile(r"(?<=[.!?])\s+")
 
+    # Non-whitespace token pattern for counting without list allocation
+    _TOKEN_PATTERN = re.compile(r"\S+")
+
     def __init__(
         self,
         token_limit: int | None = None,
@@ -81,7 +84,7 @@ class TextChunker:
         Returns:
             Approximate token count.
         """
-        return len(text.split())
+        return sum(1 for _ in self._TOKEN_PATTERN.finditer(text))
 
     def _chunk_text(self, text: str) -> list[tuple[str, int]]:
         """
