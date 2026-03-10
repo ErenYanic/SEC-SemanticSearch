@@ -20,7 +20,7 @@
 
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight, Trash2 } from "lucide-react";
 import type { Filing } from "@/lib/types";
 import type { FilingListParams } from "@/lib/api";
@@ -171,15 +171,24 @@ export function FilingTable({
     );
   }
 
-  // ---- Format ingested_at for display ----
-  function formatIngestedAt(iso: string): string {
-    const date = new Date(iso);
-    return date.toLocaleDateString(undefined, {
+  // ---- Pre-format ingested_at dates once per visible page (memoised to
+  // avoid recreating Date objects and calling toLocaleDateString on every
+  // render when only sort/selection state changes) ----
+  const formattedDates = useMemo(() => {
+    const opts: Intl.DateTimeFormatOptions = {
       year: "numeric",
       month: "short",
       day: "numeric",
-    });
-  }
+    };
+    const map = new Map<string, string>();
+    for (const f of visibleFilings) {
+      map.set(
+        f.accession_number,
+        new Date(f.ingested_at).toLocaleDateString(undefined, opts),
+      );
+    }
+    return map;
+  }, [visibleFilings]);
 
   // ---- Empty state (filters active but no matches) ----
   if (filings.length === 0) {
@@ -293,7 +302,7 @@ export function FilingTable({
 
                 {/* Ingested at */}
                 <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
-                  {formatIngestedAt(filing.ingested_at)}
+                  {formattedDates.get(filing.accession_number)}
                 </td>
 
                 {/* Remove button */}
