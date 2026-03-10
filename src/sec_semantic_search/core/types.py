@@ -129,6 +129,7 @@ class Chunk:
     content_type: ContentType
     filing_id: FilingIdentifier
     chunk_index: int = field(default=0)
+    token_count: int = field(default=0)
 
     @property
     def chunk_id(self) -> str:

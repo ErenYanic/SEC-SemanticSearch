@@ -155,6 +155,46 @@ class TestMetadataInheritance:
             assert chunk.filing_id is sample_segments[0].filing_id
 
 
+class TestTokenCount:
+    """Verify token_count is retained on chunks during creation."""
+
+    def test_short_segment_token_count(self, chunker, sample_filing_id):
+        """A short segment's single chunk should have correct token_count."""
+        segment = Segment(
+            path="Root",
+            content_type=ContentType.TEXT,
+            content="Five words in this segment.",
+            filing_id=sample_filing_id,
+        )
+        chunks = chunker.chunk_segment(segment)
+        assert len(chunks) == 1
+        assert chunks[0].token_count == len("Five words in this segment.".split())
+
+    def test_long_segment_token_counts(self, chunker, sample_filing_id):
+        """All chunks from a long segment should have non-zero token_count."""
+        long_text = " ".join(
+            f"Sentence number {i} about some financial topic." for i in range(20)
+        )
+        segment = Segment(
+            path="Part I",
+            content_type=ContentType.TEXT,
+            content=long_text,
+            filing_id=sample_filing_id,
+        )
+        chunks = chunker.chunk_segment(segment)
+        assert len(chunks) >= 2
+        for chunk in chunks:
+            assert chunk.token_count > 0
+            assert chunk.token_count == len(chunk.content.split())
+
+    def test_chunk_segments_token_counts(self, chunker, sample_segments):
+        """chunk_segments() should populate token_count on every chunk."""
+        chunks = chunker.chunk_segments(sample_segments)
+        for chunk in chunks:
+            assert chunk.token_count > 0
+            assert chunk.token_count == len(chunk.content.split())
+
+
 class TestEdgeCases:
     """Error handling and boundary conditions."""
 
