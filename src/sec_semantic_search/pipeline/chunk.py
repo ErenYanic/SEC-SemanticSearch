@@ -83,7 +83,7 @@ class TextChunker:
         """
         return len(text.split())
 
-    def _chunk_text(self, text: str) -> list[str]:
+    def _chunk_text(self, text: str) -> list[tuple[str, int]]:
         """
         Split text into chunks respecting sentence boundaries.
 
@@ -91,18 +91,18 @@ class TextChunker:
             text: Text content to split.
 
         Returns:
-            List of text chunks.
+            List of (chunk_text, token_count) tuples.
         """
         total_tokens = self._count_tokens(text)
 
         # If text already fits, return as single chunk
         if total_tokens <= self.token_limit:
-            return [text]
+            return [(text, total_tokens)]
 
         # Split on sentence boundaries
         sentences = self.SENTENCE_PATTERN.split(text)
 
-        chunks: list[str] = []
+        chunks: list[tuple[str, int]] = []
         current_sentences: list[str] = []
         current_tokens = 0
 
@@ -115,7 +115,7 @@ class TextChunker:
                 current_tokens + sentence_tokens > self.token_limit + self.tolerance
                 and current_sentences
             ):
-                chunks.append(" ".join(current_sentences))
+                chunks.append((" ".join(current_sentences), current_tokens))
                 current_sentences = []
                 current_tokens = 0
 
@@ -124,7 +124,7 @@ class TextChunker:
 
         # Flush remaining sentences
         if current_sentences:
-            chunks.append(" ".join(current_sentences))
+            chunks.append((" ".join(current_sentences), current_tokens))
 
         return chunks
 
@@ -148,8 +148,9 @@ class TextChunker:
                 content_type=segment.content_type,
                 filing_id=segment.filing_id,
                 chunk_index=start_index + i,
+                token_count=tokens,
             )
-            for i, text in enumerate(text_chunks)
+            for i, (text, tokens) in enumerate(text_chunks)
         ]
 
     def chunk_segments(self, segments: list[Segment]) -> list[Chunk]:
@@ -197,8 +198,8 @@ class TextChunker:
             chunks.extend(segment_chunks)
             current_index += len(segment_chunks)
 
-        # Log statistics
-        token_counts = [self._count_tokens(c.content) for c in chunks]
+        # Log statistics — token counts are retained from chunking, no recount
+        token_counts = [c.token_count for c in chunks]
         min_tokens = min(token_counts)
         max_tokens = max(token_counts)
         avg_tokens = sum(token_counts) / len(token_counts)
