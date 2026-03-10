@@ -169,7 +169,6 @@ def _make_processed_filing(chunks, filing_id):
     )
     return ProcessedFiling(
         filing_id=filing_id,
-        segments=[],  # Not needed for storage
         chunks=chunks,
         embeddings=embeddings,
         ingest_result=None,  # Not needed for storage

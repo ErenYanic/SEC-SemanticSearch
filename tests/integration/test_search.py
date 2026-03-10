@@ -60,7 +60,6 @@ def populated_chroma(tmp_chroma_path, sample_chunks, sample_filing_id):
     )
     pf = ProcessedFiling(
         filing_id=sample_filing_id,
-        segments=[],
         chunks=sample_chunks,
         embeddings=embeddings,
         ingest_result=None,
