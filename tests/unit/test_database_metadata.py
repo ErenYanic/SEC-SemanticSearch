@@ -191,3 +191,45 @@ class TestSQLInjectionSafety:
         assert registry.count(form_type="'; DROP TABLE filings; --") == 0
         # Verify table still intact.
         assert registry.count() == 1
+
+
+class TestPersistentConnection:
+    """Verify the persistent connection and close() behaviour."""
+
+    def test_close_prevents_further_operations(self, registry):
+        """After close(), operations should raise (connection is closed)."""
+        registry.close()
+        with pytest.raises(Exception):
+            registry.count()
+
+    def test_thread_safety(self, registry, sample_filing_id):
+        """Concurrent writes from multiple threads should not corrupt data."""
+        import threading
+
+        errors: list[Exception] = []
+
+        def register(i: int) -> None:
+            try:
+                from datetime import date as _date
+
+                fid = FilingIdentifier(
+                    "AAPL", "10-K", _date(2020 + i, 1, 1), f"ACC-THREAD-{i}",
+                )
+                registry.register_filing(fid, chunk_count=i)
+            except Exception as exc:
+                errors.append(exc)
+
+        threads = [threading.Thread(target=register, args=(i,)) for i in range(10)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        assert errors == [], f"Thread errors: {errors}"
+        assert registry.count() == 10
+
+    def test_wal_mode_enabled(self, registry):
+        """WAL journal mode should be active on the persistent connection."""
+        with registry._lock:
+            row = registry._conn.execute("PRAGMA journal_mode").fetchone()
+        assert row[0] == "wal"
