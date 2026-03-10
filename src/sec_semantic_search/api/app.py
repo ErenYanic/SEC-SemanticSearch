@@ -94,6 +94,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     yield
     logger.info("SEC Semantic Search API shutting down.")
     task_manager.shutdown()
+    registry.close()
 
 
 # ---------------------------------------------------------------------------

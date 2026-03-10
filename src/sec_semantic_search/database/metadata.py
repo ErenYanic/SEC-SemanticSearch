@@ -14,6 +14,7 @@ Usage:
 """
 
 import sqlite3
+import threading
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -123,6 +124,10 @@ class MetadataRegistry:
         """
         Initialise the metadata registry.
 
+        Opens a single persistent SQLite connection that is reused across
+        all method calls, protected by a threading lock.  WAL journal mode
+        is enabled for better concurrent read/write performance.
+
         Args:
             db_path: Path to SQLite database file. If None, uses
                      ``settings.database.metadata_db_path``.
@@ -134,16 +139,25 @@ class MetadataRegistry:
         # Ensure parent directory exists
         Path(self._db_path).parent.mkdir(parents=True, exist_ok=True)
 
+        # Persistent connection — shared across all method calls.
+        # check_same_thread=False allows the API's background worker
+        # threads to use the same connection; the lock serialises access.
+        self._conn = sqlite3.connect(
+            self._db_path, check_same_thread=False,
+        )
+        self._conn.row_factory = sqlite3.Row
+        self._conn.execute("PRAGMA journal_mode=WAL")
+        self._lock = threading.Lock()
+
         # Create table on init (idempotent)
         self._create_table()
 
         logger.debug("MetadataRegistry initialised: %s", self._db_path)
 
-    def _connect(self) -> sqlite3.Connection:
-        """Create a new database connection with row factory enabled."""
-        conn = sqlite3.connect(self._db_path)
-        conn.row_factory = sqlite3.Row
-        return conn
+    def close(self) -> None:
+        """Close the persistent database connection."""
+        self._conn.close()
+        logger.debug("MetadataRegistry connection closed: %s", self._db_path)
 
     def _create_table(self) -> None:
         """Create the filings table if it does not exist."""
@@ -160,8 +174,8 @@ class MetadataRegistry:
             )
         """
         try:
-            with self._connect() as conn:
-                conn.execute(sql)
+            with self._lock, self._conn:
+                self._conn.execute(sql)
         except sqlite3.Error as e:
             raise DatabaseError(
                 "Failed to create metadata table",
@@ -202,8 +216,8 @@ class MetadataRegistry:
         """
         sql = "SELECT 1 FROM filings WHERE accession_number = ? LIMIT 1"
         try:
-            with self._connect() as conn:
-                row = conn.execute(sql, (accession_number,)).fetchone()
+            with self._lock:
+                row = self._conn.execute(sql, (accession_number,)).fetchone()
             return row is not None
         except sqlite3.Error as e:
             raise DatabaseError(
@@ -239,8 +253,8 @@ class MetadataRegistry:
             f"WHERE accession_number IN ({placeholders})"
         )
         try:
-            with self._connect() as conn:
-                rows = conn.execute(sql, accession_numbers).fetchall()
+            with self._lock:
+                rows = self._conn.execute(sql, accession_numbers).fetchall()
             return {row["accession_number"] for row in rows}
         except sqlite3.Error as e:
             raise DatabaseError(
@@ -275,8 +289,8 @@ class MetadataRegistry:
         ingested_at = datetime.now(timezone.utc).isoformat()
 
         try:
-            with self._connect() as conn:
-                conn.execute(
+            with self._lock, self._conn:
+                self._conn.execute(
                     sql,
                     (
                         filing_id.ticker,
@@ -320,8 +334,8 @@ class MetadataRegistry:
         """
         sql = "DELETE FROM filings WHERE accession_number = ?"
         try:
-            with self._connect() as conn:
-                cursor = conn.execute(sql, (accession_number,))
+            with self._lock, self._conn:
+                cursor = self._conn.execute(sql, (accession_number,))
                 removed = cursor.rowcount > 0
             if removed:
                 logger.info(
@@ -357,8 +371,8 @@ class MetadataRegistry:
         """
         sql = "SELECT * FROM filings WHERE accession_number = ?"
         try:
-            with self._connect() as conn:
-                row = conn.execute(sql, (accession_number,)).fetchone()
+            with self._lock:
+                row = self._conn.execute(sql, (accession_number,)).fetchone()
             if row is None:
                 return None
             return self._row_to_record(row)
@@ -399,8 +413,8 @@ class MetadataRegistry:
         sql += " ORDER BY filing_date DESC"
 
         try:
-            with self._connect() as conn:
-                rows = conn.execute(sql, params).fetchall()
+            with self._lock:
+                rows = self._conn.execute(sql, params).fetchall()
             return [self._row_to_record(row) for row in rows]
         except sqlite3.Error as e:
             raise DatabaseError(
@@ -437,8 +451,8 @@ class MetadataRegistry:
             params.append(form_type.upper())
 
         try:
-            with self._connect() as conn:
-                row = conn.execute(sql, params).fetchone()
+            with self._lock:
+                row = self._conn.execute(sql, params).fetchone()
             return row[0]
         except sqlite3.Error as e:
             raise DatabaseError(
@@ -473,8 +487,8 @@ class MetadataRegistry:
             ORDER BY ticker, form_type
         """
         try:
-            with self._connect() as conn:
-                rows = conn.execute(sql).fetchall()
+            with self._lock:
+                rows = self._conn.execute(sql).fetchall()
         except sqlite3.Error as e:
             raise DatabaseError(
                 "Failed to retrieve database statistics",
