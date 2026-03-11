@@ -29,6 +29,7 @@
 
 import { useCallback, useEffect, useReducer, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { produce } from "immer";
 import {
   ingestAdd,
   ingestBatch,
@@ -127,198 +128,162 @@ type IngestAction =
   | { type: "RESUME"; taskStatus: TaskStatus }
   | { type: "RESET" };
 
-/** Exported for direct unit testing — not part of the public hook API. */
-export function reducer(state: IngestState, action: IngestAction): IngestState {
-  switch (action.type) {
-    case "START":
-      return {
-        ...INITIAL_STATE,
-        taskId: action.taskId,
-        status: "pending",
-        startedAt: new Date(),
-      };
+/**
+ * Exported for direct unit testing — not part of the public hook API.
+ *
+ * Wrapped with immer's `produce` so that append-heavy actions
+ * (FILING_DONE, FILING_SKIPPED, FILING_FAILED) use O(1) `.push()`
+ * instead of O(n) array spreads, avoiding O(n²) total allocations
+ * over a batch of N filings.
+ */
+export const reducer = produce(
+  (draft: IngestState, action: IngestAction): IngestState | void => {
+    switch (action.type) {
+      case "START":
+        // Full reset — return a new object (immer replaces the draft).
+        return {
+          ...INITIAL_STATE,
+          taskId: action.taskId,
+          status: "pending",
+          startedAt: new Date(),
+        };
 
-    case "SNAPSHOT": {
-      // Map the backend status string to our local status union.
-      const mappedStatus =
-        action.status === "pending" || action.status === "running"
-          ? (action.status as "pending" | "running")
-          : state.status;
-      return {
-        ...state,
-        status: mappedStatus,
-        progress: action.progress,
-        results: action.results,
-      };
+      case "SNAPSHOT": {
+        const mappedStatus =
+          action.status === "pending" || action.status === "running"
+            ? (action.status as "pending" | "running")
+            : draft.status;
+        draft.status = mappedStatus;
+        draft.progress = action.progress;
+        draft.results = action.results;
+        break;
+      }
+
+      case "STEP":
+        draft.status = "running";
+        draft.progress.step_label = action.step;
+        draft.progress.step_index = action.step_number - 1; // WS sends 1-based
+        draft.progress.step_total = action.total_steps;
+        draft.progress.current_ticker = action.ticker ?? draft.progress.current_ticker;
+        draft.progress.current_form_type = action.form_type ?? draft.progress.current_form_type;
+        break;
+
+      case "FILING_DONE":
+        draft.progress.filings_done += 1;
+        draft.results.push({
+          ticker: action.ticker,
+          form_type: action.form_type,
+          filing_date: action.filing_date,
+          accession_number: action.accession_number,
+          segments: action.segments,
+          chunks: action.chunks,
+          time: action.time,
+        });
+        draft.filingEvents.push({
+          type: "done",
+          ticker: action.ticker,
+          form_type: action.form_type,
+          filing_date: action.filing_date,
+          accession_number: action.accession_number,
+          segments: action.segments,
+          chunks: action.chunks,
+          time: action.time,
+        });
+        break;
+
+      case "FILING_SKIPPED":
+        draft.progress.filings_skipped += 1;
+        draft.filingEvents.push({
+          type: "skipped",
+          ticker: action.ticker,
+          form_type: action.form_type,
+          accession_number: action.accession_number,
+          reason: action.reason,
+        });
+        break;
+
+      case "FILING_FAILED":
+        draft.progress.filings_failed += 1;
+        draft.filingEvents.push({
+          type: "failed",
+          ticker: action.ticker,
+          form_type: action.form_type,
+          accession_number: action.accession_number,
+          error: action.error,
+        });
+        break;
+
+      case "COMPLETED":
+        draft.status = "completed";
+        draft.results = action.results;
+        draft.summary = action.summary;
+        draft.completedAt = new Date();
+        break;
+
+      case "FAILED":
+        draft.status = "failed";
+        draft.error = action.details ? `${action.error}: ${action.details}` : action.error;
+        draft.completedAt = new Date();
+        break;
+
+      case "CANCELLED":
+        draft.status = "cancelled";
+        draft.summary = {
+          total: draft.progress.filings_done + draft.progress.filings_skipped + draft.progress.filings_failed,
+          succeeded: draft.progress.filings_done,
+          skipped: draft.progress.filings_skipped,
+          failed: draft.progress.filings_failed,
+        };
+        draft.completedAt = new Date();
+        break;
+
+      case "ERROR":
+        draft.status = "failed";
+        draft.error = action.error;
+        draft.completedAt = new Date();
+        break;
+
+      case "RESUME": {
+        const ts = action.taskStatus;
+        // Convert IngestResult[] from REST API to WsFilingResult[] shape.
+        const wsResults: WsFilingResult[] = ts.results.map((r) => ({
+          ticker: r.ticker,
+          form_type: r.form_type,
+          filing_date: r.filing_date,
+          accession_number: r.accession_number,
+          segments: r.segment_count,
+          chunks: r.chunk_count,
+          time: r.duration_seconds,
+        }));
+        // Reconstruct filing events from results (done events only —
+        // we cannot recover skip/fail events from the REST snapshot,
+        // but the WebSocket snapshot will fill them in on reconnect).
+        const events: FilingEvent[] = ts.results.map((r) => ({
+          type: "done" as const,
+          ticker: r.ticker,
+          form_type: r.form_type,
+          filing_date: r.filing_date,
+          accession_number: r.accession_number,
+          segments: r.segment_count,
+          chunks: r.chunk_count,
+          time: r.duration_seconds,
+        }));
+        return {
+          ...INITIAL_STATE,
+          taskId: ts.task_id,
+          status: ts.status === "pending" || ts.status === "running" ? ts.status : "idle",
+          progress: ts.progress,
+          results: wsResults,
+          filingEvents: events,
+          startedAt: ts.started_at ? new Date(ts.started_at) : new Date(),
+        };
+      }
+
+      case "RESET":
+        return INITIAL_STATE;
     }
-
-    case "STEP":
-      return {
-        ...state,
-        status: "running",
-        progress: {
-          ...state.progress,
-          step_label: action.step,
-          step_index: action.step_number - 1, // WS sends 1-based
-          step_total: action.total_steps,
-          current_ticker: action.ticker ?? state.progress.current_ticker,
-          current_form_type: action.form_type ?? state.progress.current_form_type,
-        },
-      };
-
-    case "FILING_DONE":
-      return {
-        ...state,
-        progress: {
-          ...state.progress,
-          filings_done: state.progress.filings_done + 1,
-        },
-        results: [
-          ...state.results,
-          {
-            ticker: action.ticker,
-            form_type: action.form_type,
-            filing_date: action.filing_date,
-            accession_number: action.accession_number,
-            segments: action.segments,
-            chunks: action.chunks,
-            time: action.time,
-          },
-        ],
-        filingEvents: [
-          ...state.filingEvents,
-          {
-            type: "done",
-            ticker: action.ticker,
-            form_type: action.form_type,
-            filing_date: action.filing_date,
-            accession_number: action.accession_number,
-            segments: action.segments,
-            chunks: action.chunks,
-            time: action.time,
-          },
-        ],
-      };
-
-    case "FILING_SKIPPED":
-      return {
-        ...state,
-        progress: {
-          ...state.progress,
-          filings_skipped: state.progress.filings_skipped + 1,
-        },
-        filingEvents: [
-          ...state.filingEvents,
-          {
-            type: "skipped",
-            ticker: action.ticker,
-            form_type: action.form_type,
-            accession_number: action.accession_number,
-            reason: action.reason,
-          },
-        ],
-      };
-
-    case "FILING_FAILED":
-      return {
-        ...state,
-        progress: {
-          ...state.progress,
-          filings_failed: state.progress.filings_failed + 1,
-        },
-        filingEvents: [
-          ...state.filingEvents,
-          {
-            type: "failed",
-            ticker: action.ticker,
-            form_type: action.form_type,
-            accession_number: action.accession_number,
-            error: action.error,
-          },
-        ],
-      };
-
-    case "COMPLETED":
-      return {
-        ...state,
-        status: "completed",
-        results: action.results,
-        summary: action.summary,
-        completedAt: new Date(),
-      };
-
-    case "FAILED":
-      return {
-        ...state,
-        status: "failed",
-        error: action.details ? `${action.error}: ${action.details}` : action.error,
-        completedAt: new Date(),
-      };
-
-    case "CANCELLED":
-      return {
-        ...state,
-        status: "cancelled",
-        summary: {
-          total: state.progress.filings_done + state.progress.filings_skipped + state.progress.filings_failed,
-          succeeded: state.progress.filings_done,
-          skipped: state.progress.filings_skipped,
-          failed: state.progress.filings_failed,
-        },
-        completedAt: new Date(),
-      };
-
-    case "ERROR":
-      return {
-        ...state,
-        status: "failed",
-        error: action.error,
-        completedAt: new Date(),
-      };
-
-    case "RESUME": {
-      const ts = action.taskStatus;
-      // Convert IngestResult[] from REST API to WsFilingResult[] shape.
-      const wsResults: WsFilingResult[] = ts.results.map((r) => ({
-        ticker: r.ticker,
-        form_type: r.form_type,
-        filing_date: r.filing_date,
-        accession_number: r.accession_number,
-        segments: r.segment_count,
-        chunks: r.chunk_count,
-        time: r.duration_seconds,
-      }));
-      // Reconstruct filing events from results (done events only —
-      // we cannot recover skip/fail events from the REST snapshot,
-      // but the WebSocket snapshot will fill them in on reconnect).
-      const events: FilingEvent[] = ts.results.map((r) => ({
-        type: "done" as const,
-        ticker: r.ticker,
-        form_type: r.form_type,
-        filing_date: r.filing_date,
-        accession_number: r.accession_number,
-        segments: r.segment_count,
-        chunks: r.chunk_count,
-        time: r.duration_seconds,
-      }));
-      return {
-        ...INITIAL_STATE,
-        taskId: ts.task_id,
-        status: ts.status === "pending" || ts.status === "running" ? ts.status : "idle",
-        progress: ts.progress,
-        results: wsResults,
-        filingEvents: events,
-        startedAt: ts.started_at ? new Date(ts.started_at) : new Date(),
-      };
-    }
-
-    case "RESET":
-      return INITIAL_STATE;
-
-    default:
-      return state;
-  }
-}
+  },
+);
 
 // ---------------------------------------------------------------------------
 // Hook
