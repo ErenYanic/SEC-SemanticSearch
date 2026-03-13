@@ -11,7 +11,7 @@ Provides full CRUD (minus create — that's ingest) for the filing registry:
 
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Path, Query
 
 from sec_semantic_search.api.dependencies import get_chroma, get_registry
 from sec_semantic_search.api.schemas import (
@@ -89,7 +89,7 @@ async def list_filings(
     summary="Get a single filing",
 )
 async def get_filing(
-    accession: str,
+    accession: str = Path(..., max_length=20, pattern=r"^[0-9]{10}-[0-9]{2}-[0-9]{6}$"),
     registry: MetadataRegistry = Depends(get_registry),
 ) -> FilingSchema:
     """
@@ -122,7 +122,7 @@ async def get_filing(
     summary="Delete a single filing",
 )
 async def delete_filing(
-    accession: str,
+    accession: str = Path(..., max_length=20, pattern=r"^[0-9]{10}-[0-9]{2}-[0-9]{6}$"),
     registry: MetadataRegistry = Depends(get_registry),
     chroma: ChromaDBClient = Depends(get_chroma),
 ) -> DeleteResponse:
@@ -147,12 +147,13 @@ async def delete_filing(
         chroma.delete_filing(accession)
         registry.remove_filing(accession)
     except DatabaseError as exc:
+        logger.error("Delete filing %s failed: %s", accession, exc.details)
         raise HTTPException(
             status_code=500,
             detail={
                 "error": "database_error",
-                "message": f"Failed to delete filing: {accession}",
-                "details": exc.details,
+                "message": "Database operation failed. Check server logs.",
+                "details": None,
                 "hint": "Check that the data directory is writable.",
             },
         ) from exc
@@ -211,12 +212,13 @@ async def delete_by_ids(
             found, chroma=chroma, registry=registry,
         )
     except DatabaseError as exc:
+        logger.error("Delete by IDs failed: %s", exc.details)
         raise HTTPException(
             status_code=500,
             detail={
                 "error": "database_error",
-                "message": "Delete by IDs failed.",
-                "details": exc.details,
+                "message": "Database operation failed. Check server logs.",
+                "details": None,
                 "hint": "Check that the data directory is writable.",
             },
         ) from exc
@@ -281,12 +283,13 @@ async def bulk_delete(
             filings, chroma=chroma, registry=registry,
         )
     except DatabaseError as exc:
+        logger.error("Bulk delete failed: %s", exc.details)
         raise HTTPException(
             status_code=500,
             detail={
                 "error": "database_error",
-                "message": "Bulk delete failed.",
-                "details": exc.details,
+                "message": "Database operation failed. Check server logs.",
+                "details": None,
                 "hint": "Check that the data directory is writable.",
             },
         ) from exc
@@ -338,12 +341,13 @@ async def clear_all(
             filings, chroma=chroma, registry=registry,
         )
     except DatabaseError as exc:
+        logger.error("Clear all failed: %s", exc.details)
         raise HTTPException(
             status_code=500,
             detail={
                 "error": "database_error",
-                "message": "Clear all failed.",
-                "details": exc.details,
+                "message": "Database operation failed. Check server logs.",
+                "details": None,
                 "hint": "Check that the data directory is writable.",
             },
         ) from exc

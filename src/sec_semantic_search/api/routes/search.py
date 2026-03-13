@@ -63,17 +63,18 @@ async def search(
                 detail={
                     "error": "validation_error",
                     "message": exc.message,
-                    "details": exc.details,
+                    "details": None,
                     "hint": "Provide a non-empty search query.",
                 },
             ) from exc
 
+        logger.error("Search failed: %s — %s", exc.message, exc.details)
         raise HTTPException(
             status_code=500,
             detail={
                 "error": "search_error",
-                "message": exc.message,
-                "details": exc.details,
+                "message": "Search operation failed. Check server logs.",
+                "details": None,
                 "hint": "Ensure filings have been ingested and the database is accessible.",
             },
         ) from exc
