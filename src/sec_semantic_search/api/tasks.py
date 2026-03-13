@@ -43,6 +43,9 @@ logger = get_logger(__name__)
 # Completed tasks are pruned after this many seconds.
 _TASK_TTL_SECONDS = 3600  # 1 hour
 
+# Maximum number of active (pending + running) tasks allowed.
+_MAX_ACTIVE_TASKS = 5
+
 
 # ---------------------------------------------------------------------------
 # Task state
@@ -191,7 +194,22 @@ class TaskManager:
         Create a new ingestion task and start it in a background thread.
 
         Returns the task ID (UUID4 hex string).
+
+        Raises:
+            TaskQueueFullError: If the active task queue is at capacity.
         """
+        # Guard against unbounded task queue (GPU semaphore starvation).
+        with self._lock:
+            active_count = sum(
+                1 for t in self._tasks.values()
+                if t.state in (TaskState.PENDING, TaskState.RUNNING)
+            )
+            if active_count >= _MAX_ACTIVE_TASKS:
+                raise TaskQueueFullError(
+                    f"Task queue is full ({active_count} active). "
+                    "Wait for existing tasks to complete before submitting new ones."
+                )
+
         task_id = uuid.uuid4().hex
         info = TaskInfo(
             task_id=task_id,
@@ -785,3 +803,7 @@ class TaskManager:
 
 class _CancelledError(Exception):
     """Raised inside a progress callback to abort the pipeline."""
+
+
+class TaskQueueFullError(Exception):
+    """Raised when the active task queue exceeds the maximum allowed size."""
