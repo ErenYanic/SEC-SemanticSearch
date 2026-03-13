@@ -94,6 +94,19 @@ async def ingest_progress(websocket: WebSocket, task_id: str) -> None:
         await websocket.close(code=4003, reason="Origin not allowed")
         return
 
+    # --- API key validation ------------------------------------------------
+    # Browser WebSocket API does not support custom headers, so the key
+    # is accepted via query parameter (?api_key=...) or X-API-Key header.
+    settings = get_settings()
+    if settings.api.key is not None:
+        ws_key = (
+            websocket.query_params.get("api_key")
+            or websocket.headers.get("x-api-key")
+        )
+        if ws_key != settings.api.key:
+            await websocket.close(code=4001, reason="Invalid or missing API key")
+            return
+
     await websocket.accept()
 
     # Retrieve the TaskManager from app state.

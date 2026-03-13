@@ -117,6 +117,7 @@ class ApiSettings(BaseSettings):
     host: str = "127.0.0.1"
     port: int = 8000
     cors_origins: list[str] = ["http://localhost:3000"]
+    key: Optional[str] = None  # API key; None = auth disabled (local dev)
 
     model_config = SettingsConfigDict(env_prefix="API_")
 

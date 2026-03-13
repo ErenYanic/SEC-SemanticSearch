@@ -18,11 +18,43 @@ Usage in route modules::
         return registry.list_filings()
 """
 
-from fastapi import Request
+from fastapi import HTTPException, Request, Security
+from fastapi.security import APIKeyHeader
 
+from sec_semantic_search.config import get_settings
 from sec_semantic_search.database import ChromaDBClient, MetadataRegistry
 from sec_semantic_search.pipeline import EmbeddingGenerator, FilingFetcher
 from sec_semantic_search.search import SearchEngine
+
+# ---------------------------------------------------------------------------
+# API key authentication
+# ---------------------------------------------------------------------------
+
+_api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
+
+
+async def verify_api_key(
+    api_key: str | None = Security(_api_key_header),
+) -> None:
+    """Validate the ``X-API-Key`` header when authentication is enabled.
+
+    If ``API_KEY`` is not configured (``None``), authentication is
+    disabled and all requests are allowed.  This keeps local development
+    frictionless while requiring a key in deployed environments.
+    """
+    expected = get_settings().api.key
+    if expected is None:
+        # Auth disabled — allow all requests.
+        return
+    if api_key is None or api_key != expected:
+        raise HTTPException(
+            status_code=401,
+            detail={
+                "error": "unauthorised",
+                "message": "Invalid or missing API key.",
+                "hint": "Provide a valid key via the X-API-Key header.",
+            },
+        )
 
 
 def get_registry(request: Request) -> MetadataRegistry:

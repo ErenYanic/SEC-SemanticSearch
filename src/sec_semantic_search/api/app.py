@@ -17,11 +17,12 @@ import asyncio
 from contextlib import asynccontextmanager
 from typing import AsyncIterator
 
-from fastapi import FastAPI, Request, Response
+from fastapi import Depends, FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 
 from sec_semantic_search import __version__
+from sec_semantic_search.api.dependencies import verify_api_key
 from sec_semantic_search.config import get_settings
 from sec_semantic_search.core import get_logger
 
@@ -166,12 +167,13 @@ def create_app() -> FastAPI:
     from sec_semantic_search.api.websocket import router as ws_router
     from sec_semantic_search.api.routes.resources import router as resources_router
 
-    application.include_router(status_router, prefix="/api/status", tags=["status"])
-    application.include_router(filings_router, prefix="/api/filings", tags=["filings"])
-    application.include_router(search_router, prefix="/api/search", tags=["search"])
-    application.include_router(ingest_router, prefix="/api/ingest", tags=["ingest"])
-    application.include_router(ws_router, tags=["websocket"])
-    application.include_router(resources_router, prefix="/api/resources", tags=["resources"])
+    auth = [Depends(verify_api_key)]
+    application.include_router(status_router, prefix="/api/status", tags=["status"], dependencies=auth)
+    application.include_router(filings_router, prefix="/api/filings", tags=["filings"], dependencies=auth)
+    application.include_router(search_router, prefix="/api/search", tags=["search"], dependencies=auth)
+    application.include_router(ingest_router, prefix="/api/ingest", tags=["ingest"], dependencies=auth)
+    application.include_router(ws_router, tags=["websocket"])  # WS validates key in handler
+    application.include_router(resources_router, prefix="/api/resources", tags=["resources"], dependencies=auth)
 
     # -- Health check -------------------------------------------------------
     @application.get("/api/health", tags=["meta"], summary="Health check")
