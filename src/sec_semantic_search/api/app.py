@@ -23,6 +23,7 @@ from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoin
 
 from sec_semantic_search import __version__
 from sec_semantic_search.api.dependencies import verify_api_key
+from sec_semantic_search.api.rate_limit import RateLimitMiddleware
 from sec_semantic_search.config import get_settings
 from sec_semantic_search.core import get_logger
 
@@ -145,6 +146,15 @@ def create_app() -> FastAPI:
         redoc_url="/redoc",
         openapi_url="/openapi.json",
         lifespan=lifespan,
+    )
+
+    # -- Rate limiting ------------------------------------------------------
+    application.add_middleware(
+        RateLimitMiddleware,
+        search_rpm=settings.api.rate_limit_search,
+        ingest_rpm=settings.api.rate_limit_ingest,
+        delete_rpm=settings.api.rate_limit_delete,
+        general_rpm=settings.api.rate_limit_general,
     )
 
     # -- Security headers ---------------------------------------------------
