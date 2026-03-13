@@ -27,7 +27,7 @@ from sec_semantic_search.api.schemas import (
     TaskResponse,
     TaskStatus,
 )
-from sec_semantic_search.api.tasks import TaskInfo, TaskManager
+from sec_semantic_search.api.tasks import TaskInfo, TaskManager, TaskQueueFullError
 from sec_semantic_search.core import get_logger
 
 logger = get_logger(__name__)
@@ -78,15 +78,26 @@ def _task_info_to_status(info: TaskInfo) -> TaskStatus:
 
 def _create_task(body: IngestRequest, manager: TaskManager) -> TaskResponse:
     """Shared logic for both add and batch endpoints."""
-    task_id = manager.create_task(
-        tickers=body.tickers,
-        form_types=body.form_types,
-        count_mode=body.count_mode,
-        count=body.count,
-        year=body.year,
-        start_date=body.start_date,
-        end_date=body.end_date,
-    )
+    try:
+        task_id = manager.create_task(
+            tickers=body.tickers,
+            form_types=body.form_types,
+            count_mode=body.count_mode,
+            count=body.count,
+            year=body.year,
+            start_date=body.start_date,
+            end_date=body.end_date,
+        )
+    except TaskQueueFullError as exc:
+        raise HTTPException(
+            status_code=429,
+            detail={
+                "error": "queue_full",
+                "message": str(exc),
+                "details": None,
+                "hint": "Wait for existing tasks to complete before submitting new ones.",
+            },
+        ) from exc
 
     logger.info(
         "Ingest task %s created: tickers=%s, forms=%s, mode=%s",
