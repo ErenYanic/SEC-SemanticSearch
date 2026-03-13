@@ -15,9 +15,16 @@ All datetime strings are ISO 8601.  Similarity scores are floats in [0.0, 1.0].
 
 from __future__ import annotations
 
+import re
 from datetime import datetime
 
 from pydantic import BaseModel, Field, field_validator
+
+# SEC ticker symbols: 1–5 uppercase letters, optionally with dots (e.g. BRK.B).
+_TICKER_RE = re.compile(r"^[A-Z][A-Z.]{0,4}$")
+
+# SEC accession number format: NNNNNNNNNN-YY-NNNNNN
+_ACCESSION_RE = re.compile(r"^[0-9]{10}-[0-9]{2}-[0-9]{6}$")
 
 
 # ---------------------------------------------------------------------------
@@ -113,6 +120,18 @@ class BulkDeleteRequest(BaseModel):
     ticker: str | None = Field(None, description="Filter by ticker symbol")
     form_type: str | None = Field(None, description="Filter by form type (10-K or 10-Q)")
 
+    @field_validator("ticker")
+    @classmethod
+    def validate_ticker(cls, v: str | None) -> str | None:
+        """Normalise and validate ticker format."""
+        if v is None:
+            return None
+        upper = v.upper().strip()
+        if not _TICKER_RE.match(upper):
+            msg = f"Invalid ticker symbol: '{v}'. Expected 1–5 uppercase letters (e.g. AAPL, BRK.B)"
+            raise ValueError(msg)
+        return upper
+
     @field_validator("form_type")
     @classmethod
     def validate_form_type(cls, v: str | None) -> str | None:
@@ -140,6 +159,16 @@ class DeleteByIdsRequest(BaseModel):
     accession_numbers: list[str] = Field(
         ..., min_length=1, max_length=500, description="Accession numbers to delete"
     )
+
+    @field_validator("accession_numbers")
+    @classmethod
+    def validate_accession_numbers(cls, v: list[str]) -> list[str]:
+        """Validate all accession numbers match SEC format."""
+        invalid = [a for a in v if not _ACCESSION_RE.match(a)]
+        if invalid:
+            msg = f"Invalid accession number format: {invalid[:3]}. Expected NNNNNNNNNN-YY-NNNNNN"
+            raise ValueError(msg)
+        return v
 
 
 class DeleteByIdsResponse(BaseModel):
@@ -187,7 +216,7 @@ class SearchResultSchema(BaseModel):
 class SearchRequest(BaseModel):
     """Request body for ``POST /api/search/``."""
 
-    query: str = Field(..., min_length=1, description="Natural language search query")
+    query: str = Field(..., min_length=1, max_length=2000, description="Natural language search query")
     top_k: int = Field(5, ge=1, le=100, description="Maximum number of results")
     ticker: str | None = Field(None, description="Filter to a specific ticker")
     form_type: str | None = Field(None, description="Filter to '10-K' or '10-Q'")
@@ -195,8 +224,19 @@ class SearchRequest(BaseModel):
         0.0, ge=0.0, le=1.0, description="Minimum similarity threshold"
     )
     accession_number: str | None = Field(
-        None, description="Restrict search to a single filing"
+        None, max_length=20, description="Restrict search to a single filing"
     )
+
+    @field_validator("accession_number")
+    @classmethod
+    def validate_accession_number(cls, v: str | None) -> str | None:
+        """Validate accession number format (NNNNNNNNNN-YY-NNNNNN)."""
+        if v is None:
+            return None
+        if not _ACCESSION_RE.match(v):
+            msg = f"Invalid accession number format: '{v}'. Expected NNNNNNNNNN-YY-NNNNNN"
+            raise ValueError(msg)
+        return v
 
     @field_validator("form_type")
     @classmethod
@@ -213,8 +253,14 @@ class SearchRequest(BaseModel):
     @field_validator("ticker")
     @classmethod
     def normalise_ticker(cls, v: str | None) -> str | None:
-        """Normalise ticker to uppercase."""
-        return v.upper() if v else None
+        """Normalise and validate ticker format."""
+        if v is None:
+            return None
+        upper = v.upper().strip()
+        if not _TICKER_RE.match(upper):
+            msg = f"Invalid ticker symbol: '{v}'. Expected 1–5 uppercase letters (e.g. AAPL, BRK.B)"
+            raise ValueError(msg)
+        return upper
 
 
 class SearchResponse(BaseModel):
@@ -310,8 +356,13 @@ class IngestRequest(BaseModel):
     @field_validator("tickers")
     @classmethod
     def normalise_tickers(cls, v: list[str]) -> list[str]:
-        """Normalise tickers to uppercase and strip whitespace."""
-        return [t.upper().strip() for t in v if t.strip()]
+        """Normalise tickers to uppercase, strip whitespace, and validate format."""
+        result = [t.upper().strip() for t in v if t.strip()]
+        invalid = [t for t in result if not _TICKER_RE.match(t)]
+        if invalid:
+            msg = f"Invalid ticker symbol(s): {invalid}. Expected 1–5 uppercase letters (e.g. AAPL, BRK.B)"
+            raise ValueError(msg)
+        return result
 
     @field_validator("form_types")
     @classmethod
