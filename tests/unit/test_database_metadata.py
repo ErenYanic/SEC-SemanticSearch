@@ -193,6 +193,80 @@ class TestSQLInjectionSafety:
         assert registry.count() == 1
 
 
+class TestRegisterFilingIfNew:
+    """register_filing_if_new() atomically checks and inserts."""
+
+    def test_registers_new_filing(self, registry, sample_filing_id):
+        """New filing should be registered and return True."""
+        result = registry.register_filing_if_new(sample_filing_id, chunk_count=42)
+        assert result is True
+        assert registry.count() == 1
+
+    def test_returns_false_for_existing(self, registry, sample_filing_id):
+        """Existing filing should return False without error."""
+        registry.register_filing(sample_filing_id, chunk_count=42)
+        result = registry.register_filing_if_new(sample_filing_id, chunk_count=42)
+        assert result is False
+        # Should still be exactly 1 filing.
+        assert registry.count() == 1
+
+    def test_atomicity_under_contention(self, registry):
+        """Only one thread should succeed when racing to register the same filing."""
+        import threading
+
+        fid = FilingIdentifier("AAPL", "10-K", date(2024, 1, 1), "ACC-RACE")
+        results: list[bool] = []
+        errors: list[Exception] = []
+        barrier = threading.Barrier(10)
+
+        def try_register() -> None:
+            try:
+                barrier.wait()  # Synchronise start
+                registered = registry.register_filing_if_new(fid, chunk_count=10)
+                results.append(registered)
+            except Exception as exc:
+                errors.append(exc)
+
+        threads = [threading.Thread(target=try_register) for _ in range(10)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        assert errors == [], f"Unexpected errors: {errors}"
+        # Exactly one thread should have registered the filing.
+        assert results.count(True) == 1
+        assert results.count(False) == 9
+        assert registry.count() == 1
+
+    def test_different_filings_all_succeed(self, registry):
+        """Distinct filings should all be registered concurrently."""
+        import threading
+
+        results: list[bool] = []
+        errors: list[Exception] = []
+
+        def register(i: int) -> None:
+            try:
+                fid = FilingIdentifier(
+                    "AAPL", "10-K", date(2020 + i, 1, 1), f"ACC-ATOMIC-{i}",
+                )
+                registered = registry.register_filing_if_new(fid, chunk_count=i)
+                results.append(registered)
+            except Exception as exc:
+                errors.append(exc)
+
+        threads = [threading.Thread(target=register, args=(i,)) for i in range(10)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        assert errors == [], f"Unexpected errors: {errors}"
+        assert all(results)
+        assert registry.count() == 10
+
+
 class TestPersistentConnection:
     """Verify the persistent connection and close() behaviour."""
 
