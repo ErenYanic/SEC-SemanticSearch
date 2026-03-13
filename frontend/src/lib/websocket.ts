@@ -72,7 +72,9 @@ export class IngestWebSocket {
     // rewrites /ws/* to the FastAPI backend.  We derive the URL from
     // the current page location so it works in both dev and production.
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const url = `${protocol}//${window.location.host}/ws/ingest/${this.taskId}`;
+    const apiKey = process.env.NEXT_PUBLIC_API_KEY;
+    const query = apiKey ? `?api_key=${encodeURIComponent(apiKey)}` : "";
+    const url = `${protocol}//${window.location.host}/ws/ingest/${this.taskId}${query}`;
 
     this.ws = new WebSocket(url);
 
