@@ -128,8 +128,12 @@ async def ingest_progress(websocket: WebSocket, task_id: str) -> None:
     # terminal message and close — no need to stream further.
     if info.state in (TaskState.COMPLETED, TaskState.FAILED, TaskState.CANCELLED):
         terminal_msg = _drain_terminal_message(info)
-        if terminal_msg is not None:
-            await websocket.send_json(terminal_msg)
+        if terminal_msg is None:
+            # Queue was empty — message consumed by prior connection or
+            # not yet delivered via call_soon_threadsafe.  Reconstruct
+            # from authoritative TaskInfo state.
+            terminal_msg = _build_terminal_from_state(info)
+        await websocket.send_json(terminal_msg)
         await websocket.close()
         return
 
@@ -144,16 +148,28 @@ async def ingest_progress(websocket: WebSocket, task_id: str) -> None:
                 message = await asyncio.wait_for(
                     info._message_queue.get(), timeout=5.0,
                 )
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 # No message within timeout — check if the task ended
                 # while the queue was empty (e.g. terminal message was
-                # already consumed by a previous WebSocket connection).
+                # already consumed by a previous WebSocket connection,
+                # or hasn't been delivered yet via call_soon_threadsafe).
                 if info.state in (
                     TaskState.COMPLETED,
                     TaskState.FAILED,
                     TaskState.CANCELLED,
                 ):
-                    await _drain_and_send(websocket, info._message_queue)
+                    # Yield to the event loop so any pending
+                    # call_soon_threadsafe callbacks can execute.
+                    await asyncio.sleep(0)
+                    sent_terminal = await _drain_and_send(
+                        websocket, info._message_queue,
+                    )
+                    if not sent_terminal:
+                        # Queue didn't contain a terminal message —
+                        # synthesise one from authoritative TaskInfo.
+                        await websocket.send_json(
+                            _build_terminal_from_state(info)
+                        )
                     break
                 continue
 
@@ -184,11 +200,18 @@ async def ingest_progress(websocket: WebSocket, task_id: str) -> None:
 # ---------------------------------------------------------------------------
 
 
-async def _drain_and_send(websocket: WebSocket, q: asyncio.Queue) -> None:
-    """Drain all remaining messages from the queue and send them."""
+async def _drain_and_send(websocket: WebSocket, q: asyncio.Queue) -> bool:
+    """Drain all remaining messages from the queue and send them.
+
+    Returns ``True`` if a terminal message was among those sent.
+    """
+    sent_terminal = False
     while not q.empty():
         message = q.get_nowait()
         await websocket.send_json(message)
+        if message.get("type") in _TERMINAL_TYPES:
+            sent_terminal = True
+    return sent_terminal
 
 
 def _drain_terminal_message(info: TaskInfo) -> dict | None:
@@ -203,3 +226,42 @@ def _drain_terminal_message(info: TaskInfo) -> dict | None:
         if message.get("type") in _TERMINAL_TYPES:
             return message
     return None
+
+
+def _build_terminal_from_state(info: TaskInfo) -> dict:
+    """Construct a terminal message from the current ``TaskInfo`` state.
+
+    This is the authoritative fallback when the terminal queue message
+    was consumed by a prior WebSocket connection or hasn't arrived yet
+    due to the ``call_soon_threadsafe`` scheduling delay (race window
+    between ``info.state`` assignment and ``asyncio.Queue.put_nowait``).
+    """
+    if info.state == TaskState.COMPLETED:
+        return {
+            "type": "completed",
+            "results": [
+                {
+                    "ticker": r.ticker,
+                    "form_type": r.form_type,
+                    "filing_date": r.filing_date,
+                    "accession_number": r.accession_number,
+                    "segments": r.segment_count,
+                    "chunks": r.chunk_count,
+                    "time": round(r.duration_seconds, 1),
+                }
+                for r in info.results
+            ],
+            "summary": {
+                "ingested": len(info.results),
+                "skipped": info.progress.filings_skipped,
+                "failed": info.progress.filings_failed,
+            },
+        }
+    if info.state == TaskState.FAILED:
+        return {
+            "type": "failed",
+            "error": info.error or "Unknown error",
+            "details": None,
+        }
+    # CANCELLED
+    return {"type": "cancelled"}
