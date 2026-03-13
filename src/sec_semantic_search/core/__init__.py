@@ -29,6 +29,7 @@ from sec_semantic_search.core.exceptions import (
     SECSemanticSearchError,
 )
 from sec_semantic_search.core.logging import (
+    audit_log,
     configure_logging,
     get_logger,
     suppress_third_party_loggers,
@@ -61,6 +62,7 @@ __all__ = [
     "FilingLimitExceededError",
     "SearchError",
     # Logging
+    "audit_log",
     "get_logger",
     "configure_logging",
     "suppress_third_party_loggers",

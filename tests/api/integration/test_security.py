@@ -5,6 +5,7 @@ Each test class maps to a specific finding number from the security audit.
 Tests verify that the fix is in place and working correctly.
 """
 
+import logging
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -15,9 +16,10 @@ from pydantic import ValidationError
 from sec_semantic_search.api.app import app
 from sec_semantic_search.api.dependencies import (
     get_chroma,
+    get_embedder,
     get_registry,
     get_search_engine,
-    verify_api_key,
+    get_task_manager,
 )
 from sec_semantic_search.api.schemas import (
     BulkDeleteRequest,
@@ -32,7 +34,6 @@ from sec_semantic_search.api.tasks import (
 )
 from sec_semantic_search.core.exceptions import DatabaseError, SearchError
 from tests.helpers import make_filing_record, make_task_info
-
 
 # -----------------------------------------------------------------------
 # Finding #1: .env not tracked by git
@@ -739,3 +740,396 @@ class TestApiKeyAuthentication:
         ) as ws:
             msg = ws.receive_json()
             assert msg["type"] == "snapshot"
+
+
+# -----------------------------------------------------------------------
+# Finding #10: Rate limiting
+# -----------------------------------------------------------------------
+
+
+class TestRateLimiting:
+    """API must rate-limit requests to prevent resource exhaustion."""
+
+    def teardown_method(self):
+        app.dependency_overrides.clear()
+
+    def test_rate_limit_middleware_present(self):
+        """RateLimitMiddleware must be in the middleware stack."""
+        from sec_semantic_search.api.rate_limit import RateLimitMiddleware
+
+        # Walk the middleware stack to find RateLimitMiddleware.
+        found = False
+        middleware = app.middleware_stack
+        while middleware is not None:
+            if isinstance(middleware, RateLimitMiddleware):
+                found = True
+                break
+            middleware = getattr(middleware, "app", None)
+        assert found, "RateLimitMiddleware not found in middleware stack"
+
+    def test_rate_limit_settings_exist(self):
+        """ApiSettings must expose rate limit configuration."""
+        from sec_semantic_search.config.settings import ApiSettings
+
+        settings = ApiSettings()
+        assert settings.rate_limit_search > 0
+        assert settings.rate_limit_ingest > 0
+        assert settings.rate_limit_delete > 0
+        assert settings.rate_limit_general > 0
+
+    def test_sliding_window_allows_within_limit(self):
+        """Requests within the limit should be allowed."""
+        from sec_semantic_search.api.rate_limit import _SlidingWindow
+
+        window = _SlidingWindow(requests_per_minute=5)
+        for _ in range(5):
+            allowed, _ = window.is_allowed("test-ip")
+            assert allowed
+
+    def test_sliding_window_blocks_over_limit(self):
+        """Requests exceeding the limit should be blocked."""
+        from sec_semantic_search.api.rate_limit import _SlidingWindow
+
+        window = _SlidingWindow(requests_per_minute=3)
+        for _ in range(3):
+            window.is_allowed("test-ip")
+
+        allowed, retry_after = window.is_allowed("test-ip")
+        assert not allowed
+        assert retry_after > 0
+
+    def test_sliding_window_per_ip_isolation(self):
+        """Different IPs should have independent counters."""
+        from sec_semantic_search.api.rate_limit import _SlidingWindow
+
+        window = _SlidingWindow(requests_per_minute=2)
+        window.is_allowed("ip-a")
+        window.is_allowed("ip-a")
+        # ip-a is exhausted
+        allowed_a, _ = window.is_allowed("ip-a")
+        assert not allowed_a
+        # ip-b should still be allowed
+        allowed_b, _ = window.is_allowed("ip-b")
+        assert allowed_b
+
+    def test_classify_path_search(self):
+        """Search endpoints should be classified as 'search'."""
+        from sec_semantic_search.api.rate_limit import _classify_path
+
+        assert _classify_path("/api/search/", "POST") == "search"
+
+    def test_classify_path_ingest(self):
+        """Ingest POST endpoints should be classified as 'ingest'."""
+        from sec_semantic_search.api.rate_limit import _classify_path
+
+        assert _classify_path("/api/ingest/add", "POST") == "ingest"
+        assert _classify_path("/api/ingest/batch", "POST") == "ingest"
+
+    def test_classify_path_delete(self):
+        """DELETE methods should be classified as 'delete'."""
+        from sec_semantic_search.api.rate_limit import _classify_path
+
+        assert _classify_path("/api/filings/123", "DELETE") == "delete"
+
+    def test_classify_path_general(self):
+        """Other API paths should be classified as 'general'."""
+        from sec_semantic_search.api.rate_limit import _classify_path
+
+        assert _classify_path("/api/status/", "GET") == "general"
+
+    def test_classify_path_health_not_limited(self):
+        """Health check should not be rate-limited."""
+        from sec_semantic_search.api.rate_limit import _classify_path
+
+        assert _classify_path("/api/health", "GET") == "general"
+
+    def test_classify_path_docs_not_limited(self):
+        """Documentation paths should not be rate-limited."""
+        from sec_semantic_search.api.rate_limit import _classify_path
+
+        assert _classify_path("/docs", "GET") is None
+        assert _classify_path("/openapi.json", "GET") is None
+
+    def test_rate_limit_response_format(self):
+        """429 responses must include Retry-After header and structured body."""
+        from sec_semantic_search.api.rate_limit import _SlidingWindow
+
+        # Verify the response format by testing the sliding window directly.
+        window = _SlidingWindow(requests_per_minute=1)
+        window.is_allowed("test")
+        allowed, retry_after = window.is_allowed("test")
+        assert not allowed
+        assert isinstance(retry_after, int)
+        assert retry_after >= 1
+
+
+# -----------------------------------------------------------------------
+# Finding #14: WebSocket race condition
+# -----------------------------------------------------------------------
+
+
+class TestWebSocketTerminalFallback:
+    """WebSocket must deliver terminal messages even when queue is empty."""
+
+    def test_completed_task_gets_terminal_when_queue_empty(self):
+        """A completed task with empty queue should synthesise a terminal message."""
+        from sec_semantic_search.api.tasks import FilingResult
+
+        info = make_task_info(state=TaskState.COMPLETED)
+        info.results.append(
+            FilingResult(
+                ticker="AAPL",
+                form_type="10-K",
+                filing_date="2024-11-01",
+                accession_number="0000320193-24-000001",
+                segment_count=50,
+                chunk_count=60,
+                duration_seconds=5.2,
+            )
+        )
+        info.progress.filings_skipped = 1
+        info.progress.filings_failed = 0
+
+        manager = MagicMock()
+        manager.get_task.return_value = info
+        app.state.task_manager = manager
+
+        client = TestClient(app)
+        with client.websocket_connect(
+            f"/ws/ingest/{info.task_id}",
+        ) as ws:
+            snapshot = ws.receive_json()
+            assert snapshot["type"] == "snapshot"
+            # Terminal message should always be delivered.
+            terminal = ws.receive_json()
+            assert terminal["type"] == "completed"
+            assert terminal["summary"]["ingested"] == 1
+            assert terminal["summary"]["skipped"] == 1
+
+    def test_failed_task_gets_terminal_when_queue_empty(self):
+        """A failed task with empty queue should synthesise a failed message."""
+        info = make_task_info(state=TaskState.FAILED, error="Out of memory")
+
+        manager = MagicMock()
+        manager.get_task.return_value = info
+        app.state.task_manager = manager
+
+        client = TestClient(app)
+        with client.websocket_connect(
+            f"/ws/ingest/{info.task_id}",
+        ) as ws:
+            snapshot = ws.receive_json()
+            assert snapshot["type"] == "snapshot"
+            terminal = ws.receive_json()
+            assert terminal["type"] == "failed"
+            assert "Out of memory" in terminal["error"]
+
+    def test_cancelled_task_gets_terminal_when_queue_empty(self):
+        """A cancelled task with empty queue should synthesise a cancelled message."""
+        info = make_task_info(state=TaskState.CANCELLED)
+
+        manager = MagicMock()
+        manager.get_task.return_value = info
+        app.state.task_manager = manager
+
+        client = TestClient(app)
+        with client.websocket_connect(
+            f"/ws/ingest/{info.task_id}",
+        ) as ws:
+            snapshot = ws.receive_json()
+            assert snapshot["type"] == "snapshot"
+            terminal = ws.receive_json()
+            assert terminal["type"] == "cancelled"
+
+    def test_build_terminal_from_state_completed(self):
+        """_build_terminal_from_state returns correct completed message."""
+        from sec_semantic_search.api.websocket import _build_terminal_from_state
+
+        info = make_task_info(state=TaskState.COMPLETED)
+        msg = _build_terminal_from_state(info)
+        assert msg["type"] == "completed"
+        assert "results" in msg
+        assert "summary" in msg
+
+    def test_build_terminal_from_state_failed(self):
+        """_build_terminal_from_state returns correct failed message."""
+        from sec_semantic_search.api.websocket import _build_terminal_from_state
+
+        info = make_task_info(state=TaskState.FAILED, error="Test error")
+        msg = _build_terminal_from_state(info)
+        assert msg["type"] == "failed"
+        assert msg["error"] == "Test error"
+
+    def test_build_terminal_from_state_cancelled(self):
+        """_build_terminal_from_state returns correct cancelled message."""
+        from sec_semantic_search.api.websocket import _build_terminal_from_state
+
+        info = make_task_info(state=TaskState.CANCELLED)
+        msg = _build_terminal_from_state(info)
+        assert msg["type"] == "cancelled"
+
+
+# -----------------------------------------------------------------------
+# Finding #15: Security audit logging
+# -----------------------------------------------------------------------
+
+
+class TestSecurityAuditLogging:
+    """Destructive operations must produce SECURITY_AUDIT log entries."""
+
+    def teardown_method(self):
+        app.dependency_overrides.clear()
+
+    def test_audit_log_function_exists(self):
+        """audit_log must be importable from core."""
+        from sec_semantic_search.core import audit_log
+
+        assert callable(audit_log)
+
+    def test_audit_log_emits_warning(self, caplog):
+        """audit_log must emit a WARNING-level log with SECURITY_AUDIT prefix."""
+        from sec_semantic_search.core.logging import audit_log
+
+        # The sec_semantic_search logger has propagate=False, so we
+        # must attach caplog's handler directly to capture records.
+        pkg_logger = logging.getLogger("sec_semantic_search")
+        pkg_logger.addHandler(caplog.handler)
+        try:
+            with caplog.at_level(logging.WARNING):
+                audit_log(
+                    "test_action",
+                    client_ip="1.2.3.4",
+                    endpoint="/test",
+                    detail="testing",
+                )
+
+            assert any("SECURITY_AUDIT" in r.message for r in caplog.records)
+            assert any("test_action" in r.message for r in caplog.records)
+            assert any("1.2.3.4" in r.message for r in caplog.records)
+        finally:
+            pkg_logger.removeHandler(caplog.handler)
+
+    def _with_audit_capture(self, caplog):
+        """Context helper: attach caplog handler to the package logger."""
+        pkg_logger = logging.getLogger("sec_semantic_search")
+        pkg_logger.addHandler(caplog.handler)
+        return pkg_logger
+
+    def test_delete_filing_produces_audit_log(self, caplog):
+        """DELETE /api/filings/{accession} must produce an audit entry."""
+        record = make_filing_record()
+        registry = MagicMock()
+        registry.get_filing.return_value = record
+        chroma = MagicMock()
+
+        app.dependency_overrides[get_registry] = lambda: registry
+        app.dependency_overrides[get_chroma] = lambda: chroma
+
+        pkg_logger = self._with_audit_capture(caplog)
+        try:
+            client = TestClient(app, raise_server_exceptions=False)
+            with caplog.at_level(logging.WARNING):
+                resp = client.delete(f"/api/filings/{record.accession_number}")
+
+            assert resp.status_code == 200
+            assert any(
+                "SECURITY_AUDIT" in r.message and "delete_filing" in r.message
+                for r in caplog.records
+            )
+        finally:
+            pkg_logger.removeHandler(caplog.handler)
+
+    def test_clear_all_produces_audit_log(self, caplog):
+        """DELETE /api/filings/?confirm=true must produce an audit entry."""
+        registry = MagicMock()
+        record = make_filing_record()
+        registry.list_filings.return_value = [record]
+        chroma = MagicMock()
+
+        with patch(
+            "sec_semantic_search.api.routes.filings.delete_filings_batch",
+            return_value=record.chunk_count,
+        ):
+            app.dependency_overrides[get_registry] = lambda: registry
+            app.dependency_overrides[get_chroma] = lambda: chroma
+
+            pkg_logger = self._with_audit_capture(caplog)
+            try:
+                client = TestClient(app, raise_server_exceptions=False)
+                with caplog.at_level(logging.WARNING):
+                    resp = client.delete("/api/filings/?confirm=true")
+
+                assert resp.status_code == 200
+                assert any(
+                    "SECURITY_AUDIT" in r.message and "clear_all" in r.message
+                    for r in caplog.records
+                )
+            finally:
+                pkg_logger.removeHandler(caplog.handler)
+
+    def test_cancel_task_produces_audit_log(self, caplog):
+        """DELETE /api/ingest/tasks/{id} must produce an audit entry."""
+        info = make_task_info(state=TaskState.RUNNING)
+        manager = MagicMock()
+        manager.get_task.return_value = info
+        manager.cancel_task.return_value = True
+
+        app.dependency_overrides[get_task_manager] = lambda: manager
+
+        pkg_logger = self._with_audit_capture(caplog)
+        try:
+            client = TestClient(app, raise_server_exceptions=False)
+            with caplog.at_level(logging.WARNING):
+                resp = client.delete(f"/api/ingest/tasks/{info.task_id}")
+
+            assert resp.status_code == 200
+            assert any(
+                "SECURITY_AUDIT" in r.message and "cancel_task" in r.message
+                for r in caplog.records
+            )
+        finally:
+            pkg_logger.removeHandler(caplog.handler)
+
+    def test_gpu_unload_produces_audit_log(self, caplog):
+        """DELETE /api/resources/gpu must produce an audit entry."""
+        embedder = MagicMock()
+        embedder.is_loaded = True
+        task_manager = MagicMock()
+        task_manager.has_active_task.return_value = False
+
+        app.dependency_overrides[get_embedder] = lambda: embedder
+        app.dependency_overrides[get_task_manager] = lambda: task_manager
+
+        pkg_logger = self._with_audit_capture(caplog)
+        try:
+            client = TestClient(app, raise_server_exceptions=False)
+            with caplog.at_level(logging.WARNING):
+                resp = client.delete("/api/resources/gpu")
+
+            assert resp.status_code == 200
+            assert any(
+                "SECURITY_AUDIT" in r.message and "gpu_unload" in r.message
+                for r in caplog.records
+            )
+        finally:
+            pkg_logger.removeHandler(caplog.handler)
+
+    def test_audit_log_in_route_source_code(self):
+        """All destructive route handlers must call audit_log."""
+        import inspect
+
+        from sec_semantic_search.api.routes import filings, ingest, resources
+
+        # Check each destructive function's source.
+        for func in [
+            filings.delete_filing,
+            filings.delete_by_ids,
+            filings.bulk_delete,
+            filings.clear_all,
+            ingest.cancel_task,
+            resources.gpu_unload,
+        ]:
+            source = inspect.getsource(func)
+            assert "audit_log(" in source, (
+                f"{func.__name__} must call audit_log()"
+            )

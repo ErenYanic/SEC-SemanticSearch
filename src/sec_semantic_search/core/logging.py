@@ -136,6 +136,31 @@ def get_logger(name: str) -> logging.Logger:
     return logging.getLogger(name)
 
 
+def audit_log(
+    action: str,
+    *,
+    client_ip: str = "unknown",
+    detail: str = "",
+    endpoint: str = "",
+) -> None:
+    """Log a security-relevant action with structured context.
+
+    All destructive operations (delete, clear, cancel, GPU unload) should
+    call this so that security events are identifiable in log output
+    without needing to parse generic log messages.
+
+    The ``SECURITY_AUDIT:`` prefix makes entries easy to grep/filter.
+    """
+    logger = get_logger("security.audit")
+    logger.warning(
+        "SECURITY_AUDIT: action=%s client=%s endpoint=%s %s",
+        action,
+        client_ip,
+        endpoint,
+        detail,
+    )
+
+
 def suppress_third_party_loggers() -> None:
     """
     Suppress verbose logging from third-party libraries.

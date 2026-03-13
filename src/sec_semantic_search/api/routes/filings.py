@@ -11,7 +11,7 @@ Provides full CRUD (minus create — that's ingest) for the filing registry:
 
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Path, Query
+from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request
 
 from sec_semantic_search.api.dependencies import get_chroma, get_registry
 from sec_semantic_search.api.schemas import (
@@ -25,7 +25,7 @@ from sec_semantic_search.api.schemas import (
     FilingListResponse,
     FilingSchema,
 )
-from sec_semantic_search.core import DatabaseError, get_logger
+from sec_semantic_search.core import DatabaseError, audit_log, get_logger
 from sec_semantic_search.database import ChromaDBClient, MetadataRegistry, delete_filings_batch
 from sec_semantic_search.database.metadata import FilingRecord
 
@@ -122,6 +122,7 @@ async def get_filing(
     summary="Delete a single filing",
 )
 async def delete_filing(
+    request: Request,
     accession: str = Path(..., max_length=20, pattern=r"^[0-9]{10}-[0-9]{2}-[0-9]{6}$"),
     registry: MetadataRegistry = Depends(get_registry),
     chroma: ChromaDBClient = Depends(get_chroma),
@@ -158,12 +159,12 @@ async def delete_filing(
             },
         ) from exc
 
-    logger.info(
-        "Deleted filing %s (%s %s) — %d chunks",
-        accession,
-        record.ticker,
-        record.form_type,
-        record.chunk_count,
+    client_ip = request.client.host if request.client else "unknown"
+    audit_log(
+        "delete_filing",
+        client_ip=client_ip,
+        endpoint="DELETE /api/filings/{accession}",
+        detail=f"accession={accession} ticker={record.ticker} form={record.form_type} chunks={record.chunk_count}",
     )
     return DeleteResponse(
         accession_number=accession,
@@ -178,6 +179,7 @@ async def delete_filing(
     summary="Delete filings by accession numbers",
 )
 async def delete_by_ids(
+    request: Request,
     body: DeleteByIdsRequest,
     registry: MetadataRegistry = Depends(get_registry),
     chroma: ChromaDBClient = Depends(get_chroma),
@@ -223,11 +225,12 @@ async def delete_by_ids(
             },
         ) from exc
 
-    logger.info(
-        "Deleted %d filing(s) by ID — %d chunks, %d not found",
-        len(found),
-        total_chunks,
-        len(not_found),
+    client_ip = request.client.host if request.client else "unknown"
+    audit_log(
+        "delete_by_ids",
+        client_ip=client_ip,
+        endpoint="POST /api/filings/delete-by-ids",
+        detail=f"deleted={len(found)} chunks={total_chunks} not_found={len(not_found)}",
     )
     return DeleteByIdsResponse(
         filings_deleted=len(found),
@@ -243,6 +246,7 @@ async def delete_by_ids(
     summary="Bulk delete filings by filter",
 )
 async def bulk_delete(
+    request: Request,
     body: BulkDeleteRequest,
     registry: MetadataRegistry = Depends(get_registry),
     chroma: ChromaDBClient = Depends(get_chroma),
@@ -295,6 +299,14 @@ async def bulk_delete(
         ) from exc
 
     tickers_affected = sorted({f.ticker for f in filings})
+
+    client_ip = request.client.host if request.client else "unknown"
+    audit_log(
+        "bulk_delete",
+        client_ip=client_ip,
+        endpoint="POST /api/filings/bulk-delete",
+        detail=f"filings={len(filings)} chunks={total_chunks} tickers={tickers_affected}",
+    )
     return BulkDeleteResponse(
         filings_deleted=len(filings),
         chunks_deleted=total_chunks,
@@ -309,6 +321,7 @@ async def bulk_delete(
     summary="Clear all filings",
 )
 async def clear_all(
+    request: Request,
     confirm: bool = Query(
         False, description="Safety flag — must be true to proceed"
     ),
@@ -352,10 +365,12 @@ async def clear_all(
             },
         ) from exc
 
-    logger.info(
-        "Cleared database: %d filing(s), %d chunks deleted",
-        len(filings),
-        total_chunks,
+    client_ip = request.client.host if request.client else "unknown"
+    audit_log(
+        "clear_all",
+        client_ip=client_ip,
+        endpoint="DELETE /api/filings/?confirm=true",
+        detail=f"filings={len(filings)} chunks={total_chunks}",
     )
     return ClearAllResponse(
         filings_deleted=len(filings),
