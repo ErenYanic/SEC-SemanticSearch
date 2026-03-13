@@ -539,10 +539,41 @@ class TaskManager:
                 return
 
             try:
-                self._chroma.store_filing(result)
-                self._registry.register_filing(
+                # Atomic check-then-insert: holds the SQLite lock across
+                # both the duplicate check and the INSERT, preventing the
+                # race window where two threads both pass is_duplicate()
+                # and then both attempt to register the same filing.
+                # SQLite registration is done first so that a late
+                # duplicate is caught before writing to ChromaDB.
+                registered = self._registry.register_filing_if_new(
                     result.filing_id, result.ingest_result.chunk_count,
                 )
+                if not registered:
+                    # Another thread registered this filing between the
+                    # batch duplicate check and now — treat as a skip.
+                    info.progress.filings_skipped += 1
+                    info.progress.filings_done += 1
+                    self._push(info, {
+                        "type": "filing_skipped",
+                        "ticker": ticker,
+                        "form_type": form_type,
+                        "accession_number": filing_id.accession_number,
+                        "reason": "duplicate",
+                    })
+                    logger.info(
+                        "Task %s: skipped late duplicate %s",
+                        info.task_id[:8],
+                        filing_id.accession_number,
+                    )
+                    continue
+
+                try:
+                    self._chroma.store_filing(result)
+                except DatabaseError:
+                    # ChromaDB store failed after SQLite succeeded —
+                    # roll back the SQLite entry to maintain consistency.
+                    self._registry.remove_filing(filing_id.accession_number)
+                    raise
             except DatabaseError as exc:
                 info.progress.filings_failed += 1
                 info.progress.filings_done += 1

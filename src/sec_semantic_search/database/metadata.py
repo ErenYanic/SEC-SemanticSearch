@@ -319,6 +319,81 @@ class MetadataRegistry:
                 details=str(e),
             ) from e
 
+    def register_filing_if_new(
+        self,
+        filing_id: FilingIdentifier,
+        chunk_count: int,
+    ) -> bool:
+        """
+        Atomically check for duplicate and register a filing if new.
+
+        Holds the threading lock across both the duplicate check and the
+        insert, closing the race window where two threads could both pass
+        ``is_duplicate()`` and then both attempt ``register_filing()``.
+
+        Args:
+            filing_id: Identifier of the filing to register.
+            chunk_count: Number of chunks stored in ChromaDB.
+
+        Returns:
+            True if the filing was registered, False if it already existed.
+
+        Raises:
+            DatabaseError: If the query or insert fails.
+        """
+        sql_check = "SELECT 1 FROM filings WHERE accession_number = ? LIMIT 1"
+        sql_insert = """
+            INSERT INTO filings (ticker, form_type, filing_date,
+                                 accession_number, chunk_count, ingested_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """
+        ingested_at = datetime.now(timezone.utc).isoformat()
+
+        try:
+            with self._lock, self._conn:
+                exists = self._conn.execute(
+                    sql_check, (filing_id.accession_number,),
+                ).fetchone()
+                if exists is not None:
+                    logger.debug(
+                        "Filing already registered (atomic check): %s",
+                        filing_id.accession_number,
+                    )
+                    return False
+
+                self._conn.execute(
+                    sql_insert,
+                    (
+                        filing_id.ticker,
+                        filing_id.form_type,
+                        filing_id.date_str,
+                        filing_id.accession_number,
+                        chunk_count,
+                        ingested_at,
+                    ),
+                )
+        except sqlite3.IntegrityError:
+            # Defensive: UNIQUE constraint caught a race despite the check.
+            logger.debug(
+                "Filing already registered (integrity constraint): %s",
+                filing_id.accession_number,
+            )
+            return False
+        except sqlite3.Error as e:
+            raise DatabaseError(
+                "Failed to register filing atomically",
+                details=str(e),
+            ) from e
+
+        logger.info(
+            "Registered filing: %s %s (%s) — %d chunks",
+            filing_id.ticker,
+            filing_id.form_type,
+            filing_id.date_str,
+            chunk_count,
+        )
+        return True
+
     def remove_filing(self, accession_number: str) -> bool:
         """
         Remove a filing from the registry by accession number.
