@@ -6,12 +6,12 @@ Provides ``GET /api/resources/gpu`` to check model status and
 model and free VRAM.
 """
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 
 from sec_semantic_search.api.dependencies import get_embedder, get_task_manager
 from sec_semantic_search.api.schemas import GPUStatusResponse, GPUUnloadResponse
 from sec_semantic_search.api.tasks import TaskManager
-from sec_semantic_search.core import get_logger
+from sec_semantic_search.core import audit_log, get_logger
 from sec_semantic_search.pipeline import EmbeddingGenerator
 
 logger = get_logger(__name__)
@@ -47,6 +47,7 @@ async def gpu_status(
     summary="Unload embedding model",
 )
 async def gpu_unload(
+    request: Request,
     embedder: EmbeddingGenerator = Depends(get_embedder),
     task_manager: TaskManager = Depends(get_task_manager),
 ) -> GPUUnloadResponse:
@@ -71,4 +72,11 @@ async def gpu_unload(
         return GPUUnloadResponse(status="already_unloaded")
 
     embedder.unload()
+
+    client_ip = request.client.host if request.client else "unknown"
+    audit_log(
+        "gpu_unload",
+        client_ip=client_ip,
+        endpoint="DELETE /api/resources/gpu",
+    )
     return GPUUnloadResponse(status="unloaded")

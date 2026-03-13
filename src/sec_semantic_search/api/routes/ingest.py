@@ -15,7 +15,7 @@ converts internal dataclasses into Pydantic response schemas.
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 
 from sec_semantic_search.api.dependencies import get_task_manager
 from sec_semantic_search.api.schemas import (
@@ -28,7 +28,7 @@ from sec_semantic_search.api.schemas import (
     TaskStatus,
 )
 from sec_semantic_search.api.tasks import TaskInfo, TaskManager, TaskQueueFullError
-from sec_semantic_search.core import get_logger
+from sec_semantic_search.core import audit_log, get_logger
 
 logger = get_logger(__name__)
 
@@ -232,6 +232,7 @@ async def get_task(
     summary="Cancel a running ingestion task",
 )
 async def cancel_task(
+    request: Request,
     task_id: str,
     manager: TaskManager = Depends(get_task_manager),
 ) -> dict[str, str]:
@@ -266,5 +267,11 @@ async def cancel_task(
             },
         )
 
-    logger.info("Cancel requested for task %s via API", task_id[:8])
+    client_ip = request.client.host if request.client else "unknown"
+    audit_log(
+        "cancel_task",
+        client_ip=client_ip,
+        endpoint=f"DELETE /api/ingest/tasks/{task_id[:8]}",
+        detail=f"task_id={task_id}",
+    )
     return {"task_id": task_id, "status": "cancelling"}
