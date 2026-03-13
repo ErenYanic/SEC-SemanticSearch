@@ -28,6 +28,7 @@ import asyncio
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from sec_semantic_search.api.tasks import TaskInfo, TaskState
+from sec_semantic_search.config import get_settings
 from sec_semantic_search.core import get_logger
 
 logger = get_logger(__name__)
@@ -80,10 +81,19 @@ async def ingest_progress(websocket: WebSocket, task_id: str) -> None:
     """
     Stream real-time ingestion progress for a specific task.
 
-    On connect, sends a ``snapshot`` message with the current state.
-    Then continuously forwards messages from the task's internal queue
-    until the task reaches a terminal state or the client disconnects.
+    On connect, validates the ``Origin`` header against allowed CORS
+    origins (WebSocket upgrades are not protected by CORS).  Then sends
+    a ``snapshot`` message with the current state and continuously
+    forwards messages from the task's internal queue until the task
+    reaches a terminal state or the client disconnects.
     """
+    # --- Origin validation (WebSocket is not protected by CORS) ----------
+    origin = websocket.headers.get("origin")
+    allowed_origins = get_settings().api.cors_origins
+    if origin is not None and origin not in allowed_origins:
+        await websocket.close(code=4003, reason="Origin not allowed")
+        return
+
     await websocket.accept()
 
     # Retrieve the TaskManager from app state.
