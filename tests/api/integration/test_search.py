@@ -111,6 +111,6 @@ class TestSearchEndpoint:
 
     def test_accession_number_passed(self):
         client, engine = _make_client()
-        client.post("/api/search/", json={"query": "test", "accession_number": "acc-123"})
+        client.post("/api/search/", json={"query": "test", "accession_number": "0000320193-24-000001"})
         _, kwargs = engine.search.call_args
-        assert kwargs["accession_number"] == "acc-123"
+        assert kwargs["accession_number"] == "0000320193-24-000001"
