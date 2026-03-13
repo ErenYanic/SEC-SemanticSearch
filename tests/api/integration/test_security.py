@@ -5,6 +5,7 @@ Each test class maps to a specific finding number from the security audit.
 Tests verify that the fix is in place and working correctly.
 """
 
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -397,3 +398,92 @@ class TestSecurityHeaders:
         assert resp.status_code == 404
         assert resp.headers.get("X-Content-Type-Options") == "nosniff"
         app.dependency_overrides.clear()
+
+
+# -----------------------------------------------------------------------
+# Finding #7: Database path validation
+# -----------------------------------------------------------------------
+
+
+class TestDatabasePathValidation:
+    """Database paths must not escape the project directory."""
+
+    def test_default_paths_accepted(self):
+        """Default relative paths within the project should be valid."""
+        from sec_semantic_search.config.settings import DatabaseSettings
+
+        settings = DatabaseSettings()
+        assert settings.chroma_path == "./data/chroma_db"
+        assert settings.metadata_db_path == "./data/metadata.sqlite"
+
+    def test_nested_relative_path_accepted(self):
+        """Deeper relative paths within the project should be valid."""
+        from sec_semantic_search.config.settings import DatabaseSettings
+
+        settings = DatabaseSettings(
+            chroma_path="./data/deep/nested/chroma",
+            metadata_db_path="./data/deep/nested/meta.sqlite",
+        )
+        assert "deep/nested" in settings.chroma_path
+
+    def test_path_traversal_chroma_rejected(self, monkeypatch):
+        """Path traversal via chroma_path must be rejected."""
+        from sec_semantic_search.config.settings import DatabaseSettings
+
+        with pytest.raises(ValidationError, match="outside the project directory"):
+            DatabaseSettings(chroma_path="../../etc/evil_chroma")
+
+    def test_path_traversal_metadata_rejected(self, monkeypatch):
+        """Path traversal via metadata_db_path must be rejected."""
+        from sec_semantic_search.config.settings import DatabaseSettings
+
+        with pytest.raises(ValidationError, match="outside the project directory"):
+            DatabaseSettings(metadata_db_path="../../../tmp/evil.sqlite")
+
+    def test_absolute_path_outside_cwd_rejected(self):
+        """Absolute paths outside the working directory must be rejected."""
+        from sec_semantic_search.config.settings import DatabaseSettings
+
+        with pytest.raises(ValidationError, match="outside the project directory"):
+            DatabaseSettings(chroma_path="/tmp/evil_chroma")
+
+    def test_absolute_path_inside_cwd_accepted(self):
+        """Absolute paths within the working directory should be valid."""
+        import os
+
+        from sec_semantic_search.config.settings import DatabaseSettings
+
+        safe_path = os.path.join(os.getcwd(), "data", "safe_chroma")
+        settings = DatabaseSettings(chroma_path=safe_path)
+        assert settings.chroma_path == safe_path
+
+    def test_symlink_in_path_rejected(self, tmp_path):
+        """Symlinks in database path components must be rejected."""
+        import os
+
+        from sec_semantic_search.config.settings import DatabaseSettings
+
+        # Create a symlink inside CWD that points outside CWD
+        link_path = Path(os.getcwd()) / "data" / "symlink_test"
+        link_path.parent.mkdir(parents=True, exist_ok=True)
+        target = tmp_path / "outside"
+        target.mkdir()
+
+        try:
+            link_path.symlink_to(target)
+            with pytest.raises(ValidationError, match="symlink"):
+                DatabaseSettings(
+                    chroma_path=str(link_path / "chroma_db"),
+                )
+        finally:
+            # Clean up the symlink
+            if link_path.is_symlink():
+                link_path.unlink()
+
+    def test_env_var_path_traversal_rejected(self, monkeypatch):
+        """Path traversal via environment variables must be rejected."""
+        from sec_semantic_search.config.settings import DatabaseSettings
+
+        monkeypatch.setenv("DB_CHROMA_PATH", "../../../../etc/shadow_chroma")
+        with pytest.raises(ValidationError, match="outside the project directory"):
+            DatabaseSettings()
