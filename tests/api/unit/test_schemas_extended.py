@@ -27,10 +27,10 @@ class TestSearchRequestExtended:
         req = SearchRequest(query="   ")
         assert req.query == "   "
 
-    def test_very_long_query_accepted(self):
-        """Long queries should be accepted (no max_length on query)."""
-        req = SearchRequest(query="a" * 10000)
-        assert len(req.query) == 10000
+    def test_very_long_query_rejected(self):
+        """Queries over 2000 characters should be rejected (DoS prevention)."""
+        with pytest.raises(ValidationError, match="at most 2000"):
+            SearchRequest(query="a" * 10000)
 
     def test_none_ticker_and_form_type(self):
         req = SearchRequest(query="test", ticker=None, form_type=None)
@@ -67,23 +67,25 @@ class TestIngestRequestDates:
         assert len(req.tickers) == 2
 
     def test_max_tickers_reasonable(self):
-        """Sanity: large ticker list should be accepted at schema level."""
-        req = IngestRequest(tickers=[f"T{i}" for i in range(50)])
+        """Sanity: large ticker list with valid format should be accepted."""
+        # Generate valid 1–5 letter tickers.
+        tickers = [f"T{chr(65 + i % 26)}" for i in range(50)]
+        req = IngestRequest(tickers=tickers)
         assert len(req.tickers) == 50
 
 
 class TestBulkDeleteRequestExtended:
     """BulkDeleteRequest ticker normalisation."""
 
-    def test_ticker_preserved_as_given(self):
-        """BulkDeleteRequest does not normalise ticker (normalisation is route-level)."""
+    def test_ticker_normalised_to_uppercase(self):
+        """BulkDeleteRequest now normalises ticker to uppercase at schema level."""
         req = BulkDeleteRequest(ticker="aapl")
-        assert req.ticker == "aapl"
+        assert req.ticker == "AAPL"
 
-    def test_ticker_whitespace_preserved(self):
-        """No strip_whitespace validator on BulkDeleteRequest.ticker."""
-        req = BulkDeleteRequest(ticker=" msft ")
-        assert req.ticker == " msft "
+    def test_ticker_whitespace_stripped(self):
+        """BulkDeleteRequest strips whitespace and normalises ticker."""
+        req = BulkDeleteRequest(ticker=" MSFT ")
+        assert req.ticker == "MSFT"
 
     def test_both_filters(self):
         req = BulkDeleteRequest(ticker="AAPL", form_type="10-K")

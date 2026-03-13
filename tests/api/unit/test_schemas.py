@@ -152,7 +152,9 @@ class TestDeleteByIdsRequest:
     """Delete-by-IDs request validation."""
 
     def test_valid(self):
-        req = DeleteByIdsRequest(accession_numbers=["acc-1", "acc-2"])
+        req = DeleteByIdsRequest(
+            accession_numbers=["0000320193-24-000001", "0000320193-24-000002"]
+        )
         assert len(req.accession_numbers) == 2
 
     def test_empty_list_raises(self):
@@ -160,8 +162,8 @@ class TestDeleteByIdsRequest:
             DeleteByIdsRequest(accession_numbers=[])
 
     def test_single_item(self):
-        req = DeleteByIdsRequest(accession_numbers=["acc-1"])
-        assert req.accession_numbers == ["acc-1"]
+        req = DeleteByIdsRequest(accession_numbers=["0000320193-24-000001"])
+        assert req.accession_numbers == ["0000320193-24-000001"]
 
 
 class TestDeleteByIdsResponse:

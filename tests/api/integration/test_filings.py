@@ -68,8 +68,8 @@ class TestListFilings:
 
     def test_sort_by_ticker_asc(self):
         filings = [
-            make_filing_record(id=1, ticker="MSFT", accession_number="acc-1"),
-            make_filing_record(id=2, ticker="AAPL", accession_number="acc-2"),
+            make_filing_record(id=1, ticker="MSFT", accession_number="0000000001-24-000001"),
+            make_filing_record(id=2, ticker="AAPL", accession_number="0000000002-24-000002"),
         ]
         client, *_ = _make_client(filings=filings)
         data = client.get("/api/filings/?sort_by=ticker&order=asc").json()
@@ -97,7 +97,7 @@ class TestGetFiling:
 
     def test_not_found(self):
         client, *_ = _make_client(get_filing_result=None)
-        resp = client.get("/api/filings/nonexistent")
+        resp = client.get("/api/filings/9999999999-99-999999")
         assert resp.status_code == 404
         assert resp.json()["detail"]["error"] == "not_found"
 
@@ -122,7 +122,7 @@ class TestDeleteFiling:
 
     def test_not_found(self):
         client, *_ = _make_client(get_filing_result=None)
-        resp = client.delete("/api/filings/nonexistent")
+        resp = client.delete("/api/filings/9999999999-99-999999")
         assert resp.status_code == 404
 
     def test_database_error(self):
@@ -146,13 +146,13 @@ class TestDeleteByIds:
         app.dependency_overrides.clear()
 
     def test_all_found(self):
-        rec1 = make_filing_record(id=1, accession_number="acc-1", chunk_count=50)
-        rec2 = make_filing_record(id=2, accession_number="acc-2", filing_date="2024-06-01", chunk_count=30)
+        rec1 = make_filing_record(id=1, accession_number="0000000001-24-000001", chunk_count=50)
+        rec2 = make_filing_record(id=2, accession_number="0000000002-24-000002", filing_date="2024-06-01", chunk_count=30)
         client, registry, _ = _make_client()
-        registry.get_filing.side_effect = lambda acc: {"acc-1": rec1, "acc-2": rec2}.get(acc)
+        registry.get_filing.side_effect = lambda acc: {"0000000001-24-000001": rec1, "0000000002-24-000002": rec2}.get(acc)
         resp = client.post(
             "/api/filings/delete-by-ids",
-            json={"accession_numbers": ["acc-1", "acc-2"]},
+            json={"accession_numbers": ["0000000001-24-000001", "0000000002-24-000002"]},
         )
         assert resp.status_code == 200
         data = resp.json()
@@ -161,31 +161,31 @@ class TestDeleteByIds:
         assert data["not_found"] == []
 
     def test_some_not_found(self):
-        rec1 = make_filing_record(id=1, accession_number="acc-1", chunk_count=40)
+        rec1 = make_filing_record(id=1, accession_number="0000000001-24-000001", chunk_count=40)
         client, registry, _ = _make_client()
-        registry.get_filing.side_effect = lambda acc: rec1 if acc == "acc-1" else None
+        registry.get_filing.side_effect = lambda acc: rec1 if acc == "0000000001-24-000001" else None
         resp = client.post(
             "/api/filings/delete-by-ids",
-            json={"accession_numbers": ["acc-1", "nonexistent"]},
+            json={"accession_numbers": ["0000000001-24-000001", "9999999999-99-999999"]},
         )
         assert resp.status_code == 200
         data = resp.json()
         assert data["filings_deleted"] == 1
         assert data["chunks_deleted"] == 40
-        assert data["not_found"] == ["nonexistent"]
+        assert data["not_found"] == ["9999999999-99-999999"]
 
     def test_all_not_found(self):
         client, registry, _ = _make_client()
         registry.get_filing.return_value = None
         resp = client.post(
             "/api/filings/delete-by-ids",
-            json={"accession_numbers": ["nope-1", "nope-2"]},
+            json={"accession_numbers": ["9999999991-99-999991", "9999999992-99-999992"]},
         )
         assert resp.status_code == 200
         data = resp.json()
         assert data["filings_deleted"] == 0
         assert data["chunks_deleted"] == 0
-        assert set(data["not_found"]) == {"nope-1", "nope-2"}
+        assert set(data["not_found"]) == {"9999999991-99-999991", "9999999992-99-999992"}
 
     def test_empty_list_returns_422(self):
         client, *_ = _make_client()
@@ -196,13 +196,13 @@ class TestDeleteByIds:
         assert resp.status_code == 422  # Pydantic min_length=1
 
     def test_database_error(self):
-        rec = make_filing_record(accession_number="acc-1")
+        rec = make_filing_record(accession_number="0000000001-24-000001")
         client, registry, chroma = _make_client()
         registry.get_filing.return_value = rec
         chroma.delete_filing.side_effect = DatabaseError("disk full", details="ENOSPC")
         resp = client.post(
             "/api/filings/delete-by-ids",
-            json={"accession_numbers": ["acc-1"]},
+            json={"accession_numbers": ["0000000001-24-000001"]},
         )
         assert resp.status_code == 500
         assert resp.json()["detail"]["error"] == "database_error"
@@ -276,8 +276,8 @@ class TestClearAll:
 
     def test_confirm_with_filings(self):
         filings = [
-            make_filing_record(id=1, accession_number="acc-1", chunk_count=50),
-            make_filing_record(id=2, accession_number="acc-2", filing_date="2024-06-01", chunk_count=50),
+            make_filing_record(id=1, accession_number="0000000001-24-000001", chunk_count=50),
+            make_filing_record(id=2, accession_number="0000000002-24-000002", filing_date="2024-06-01", chunk_count=50),
         ]
         client, registry, _ = _make_client()
         registry.list_filings.return_value = filings
