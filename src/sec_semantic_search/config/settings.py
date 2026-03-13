@@ -119,6 +119,12 @@ class ApiSettings(BaseSettings):
     cors_origins: list[str] = ["http://localhost:3000"]
     key: Optional[str] = None  # API key; None = auth disabled (local dev)
 
+    # Rate limiting (requests per minute; 0 = disabled)
+    rate_limit_search: int = 60
+    rate_limit_ingest: int = 10
+    rate_limit_delete: int = 30
+    rate_limit_general: int = 120
+
     model_config = SettingsConfigDict(env_prefix="API_")
 
 
