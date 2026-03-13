@@ -13,7 +13,12 @@ from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
 from sec_semantic_search.api.app import app
-from sec_semantic_search.api.dependencies import get_chroma, get_registry, get_search_engine
+from sec_semantic_search.api.dependencies import (
+    get_chroma,
+    get_registry,
+    get_search_engine,
+    verify_api_key,
+)
 from sec_semantic_search.api.schemas import (
     BulkDeleteRequest,
     DeleteByIdsRequest,
@@ -548,3 +553,189 @@ class TestDatabasePathValidation:
         monkeypatch.setenv("DB_CHROMA_PATH", "../../../../etc/shadow_chroma")
         with pytest.raises(ValidationError, match="outside the project directory"):
             DatabaseSettings()
+
+
+# -----------------------------------------------------------------------
+# Finding #4: API key authentication
+# -----------------------------------------------------------------------
+
+
+class TestApiKeyAuthentication:
+    """API endpoints must reject unauthenticated requests when API_KEY is set."""
+
+    TEST_KEY = "test-secret-key-12345"
+
+    def setup_method(self):
+        """Inject mock dependencies so routes don't touch real stores."""
+        registry = MagicMock()
+        registry.list_filings.return_value = []
+        registry.get_statistics.return_value = MagicMock(
+            filing_count=0,
+            tickers=[],
+            form_breakdown={},
+            ticker_breakdown=[],
+        )
+        chroma = MagicMock()
+        chroma.collection_count.return_value = 0
+
+        app.dependency_overrides[get_registry] = lambda: registry
+        app.dependency_overrides[get_chroma] = lambda: chroma
+
+    def teardown_method(self):
+        app.dependency_overrides.clear()
+
+    def _enable_auth(self, monkeypatch):
+        """Patch settings to enable API key authentication."""
+        monkeypatch.setattr(
+            "sec_semantic_search.api.dependencies.get_settings",
+            lambda: MagicMock(api=MagicMock(key=self.TEST_KEY)),
+        )
+
+    # -- Health check is always public --
+
+    def test_health_accessible_without_key(self, monkeypatch):
+        """Health check should be accessible even when auth is enabled."""
+        self._enable_auth(monkeypatch)
+        client = TestClient(app, raise_server_exceptions=False)
+        resp = client.get("/api/health")
+        assert resp.status_code == 200
+
+    # -- Auth disabled (default) --
+
+    def test_no_key_configured_allows_all(self):
+        """When API_KEY is not set, all endpoints are accessible."""
+        # Default settings have key=None — no auth needed.
+        client = TestClient(app)
+        resp = client.get("/api/status/")
+        assert resp.status_code == 200
+
+    # -- Auth enabled: missing key --
+
+    def test_missing_key_returns_401(self, monkeypatch):
+        """Requests without X-API-Key header should get 401."""
+        self._enable_auth(monkeypatch)
+        client = TestClient(app, raise_server_exceptions=False)
+        resp = client.get("/api/status/")
+        assert resp.status_code == 401
+        assert "unauthorised" in resp.json()["detail"]["error"]
+
+    # -- Auth enabled: wrong key --
+
+    def test_wrong_key_returns_401(self, monkeypatch):
+        """Requests with an incorrect API key should get 401."""
+        self._enable_auth(monkeypatch)
+        client = TestClient(app, raise_server_exceptions=False)
+        resp = client.get(
+            "/api/status/",
+            headers={"X-API-Key": "wrong-key"},
+        )
+        assert resp.status_code == 401
+
+    # -- Auth enabled: correct key --
+
+    def test_correct_key_allows_request(self, monkeypatch):
+        """Requests with the correct API key should succeed."""
+        self._enable_auth(monkeypatch)
+        client = TestClient(app, raise_server_exceptions=False)
+        resp = client.get(
+            "/api/status/",
+            headers={"X-API-Key": self.TEST_KEY},
+        )
+        assert resp.status_code == 200
+
+    # -- Multiple endpoints protected --
+
+    def test_search_requires_key(self, monkeypatch):
+        """POST /api/search/ should require API key."""
+        self._enable_auth(monkeypatch)
+        client = TestClient(app, raise_server_exceptions=False)
+        resp = client.post("/api/search/", json={"query": "revenue"})
+        assert resp.status_code == 401
+
+    def test_filings_requires_key(self, monkeypatch):
+        """GET /api/filings/ should require API key."""
+        self._enable_auth(monkeypatch)
+        client = TestClient(app, raise_server_exceptions=False)
+        resp = client.get("/api/filings/")
+        assert resp.status_code == 401
+
+    def test_ingest_requires_key(self, monkeypatch):
+        """POST /api/ingest/add should require API key."""
+        self._enable_auth(monkeypatch)
+        client = TestClient(app, raise_server_exceptions=False)
+        resp = client.post(
+            "/api/ingest/add",
+            json={"tickers": ["AAPL"]},
+        )
+        assert resp.status_code == 401
+
+    def test_resources_requires_key(self, monkeypatch):
+        """GET /api/resources/gpu should require API key."""
+        self._enable_auth(monkeypatch)
+        client = TestClient(app, raise_server_exceptions=False)
+        resp = client.get("/api/resources/gpu")
+        assert resp.status_code == 401
+
+    def test_delete_requires_key(self, monkeypatch):
+        """DELETE /api/filings/ should require API key."""
+        self._enable_auth(monkeypatch)
+        client = TestClient(app, raise_server_exceptions=False)
+        resp = client.delete("/api/filings/?confirm=true")
+        assert resp.status_code == 401
+
+    # -- WebSocket auth --
+
+    def test_websocket_rejects_without_key(self, monkeypatch):
+        """WebSocket should reject connections when API key is wrong."""
+        monkeypatch.setattr(
+            "sec_semantic_search.api.websocket.get_settings",
+            lambda: MagicMock(
+                api=MagicMock(key=self.TEST_KEY, cors_origins=["http://localhost:3000"]),
+            ),
+        )
+        info = make_task_info(state=TaskState.COMPLETED)
+        manager = MagicMock()
+        manager.get_task.return_value = info
+        app.state.task_manager = manager
+
+        client = TestClient(app)
+        # Connection with wrong key should fail.
+        with pytest.raises(Exception):
+            with client.websocket_connect(
+                f"/ws/ingest/{info.task_id}?api_key=wrong-key",
+            ) as ws:
+                ws.receive_json()
+
+    def test_websocket_accepts_correct_key(self, monkeypatch):
+        """WebSocket should accept connections with correct API key."""
+        monkeypatch.setattr(
+            "sec_semantic_search.api.websocket.get_settings",
+            lambda: MagicMock(
+                api=MagicMock(key=self.TEST_KEY, cors_origins=["http://localhost:3000"]),
+            ),
+        )
+        info = make_task_info(state=TaskState.COMPLETED)
+        manager = MagicMock()
+        manager.get_task.return_value = info
+        app.state.task_manager = manager
+
+        client = TestClient(app)
+        with client.websocket_connect(
+            f"/ws/ingest/{info.task_id}?api_key={self.TEST_KEY}",
+        ) as ws:
+            msg = ws.receive_json()
+            assert msg["type"] == "snapshot"
+
+    def test_websocket_accepts_no_key_when_auth_disabled(self):
+        """WebSocket should work without key when auth is disabled."""
+        info = make_task_info(state=TaskState.COMPLETED)
+        manager = MagicMock()
+        manager.get_task.return_value = info
+        app.state.task_manager = manager
+
+        client = TestClient(app)
+        with client.websocket_connect(
+            f"/ws/ingest/{info.task_id}",
+        ) as ws:
+            msg = ws.receive_json()
+            assert msg["type"] == "snapshot"
