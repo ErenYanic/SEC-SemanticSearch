@@ -300,6 +300,31 @@ The frontend runs on `http://localhost:3000` and proxies API requests to `http:/
 
 Full API documentation available at `http://localhost:8000/docs` when the server is running.
 
+### Production Deployment
+
+> **HTTPS is required for production.** The API server runs over HTTP by default, which is acceptable for local development. Any deployment beyond localhost **must** use TLS to protect API keys, search queries, and filing content in transit.
+
+**Option 1 — Reverse proxy (recommended):**
+
+Place nginx, Caddy, or a cloud load balancer in front of the API to handle TLS termination:
+
+```
+Client ──HTTPS──▶ nginx (TLS) ──HTTP──▶ sec-search-api (127.0.0.1:8000)
+```
+
+**Option 2 — Direct TLS via uvicorn (simple deployments):**
+
+```bash
+sec-search-api --ssl-certfile cert.pem --ssl-keyfile key.pem
+```
+
+**Additional production recommendations:**
+
+- Set `API_KEY` to a strong random value (enables API key authentication)
+- Set `API_HOST=127.0.0.1` (default) — only expose via the reverse proxy
+- Set `LOG_REDACT_QUERIES=true` to hash search queries and tickers in logs
+- Set rate limits via `API_RATE_LIMIT_*` environment variables
+
 ## Pipeline
 
 ```
