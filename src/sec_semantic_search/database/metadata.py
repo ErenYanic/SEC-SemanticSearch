@@ -13,12 +13,13 @@ Usage:
     filings = registry.list_filings(ticker="AAPL")
 """
 
+import json
 import sqlite3
 import threading
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 from sec_semantic_search.config import get_settings
 from sec_semantic_search.core import (
@@ -160,8 +161,8 @@ class MetadataRegistry:
         logger.debug("MetadataRegistry connection closed: %s", self._db_path)
 
     def _create_table(self) -> None:
-        """Create the filings table if it does not exist."""
-        sql = """
+        """Create the filings and task_history tables if they do not exist."""
+        filings_sql = """
             CREATE TABLE IF NOT EXISTS filings (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 ticker TEXT NOT NULL,
@@ -173,12 +174,28 @@ class MetadataRegistry:
                 UNIQUE(ticker, form_type, filing_date)
             )
         """
+        task_history_sql = """
+            CREATE TABLE IF NOT EXISTS task_history (
+                task_id TEXT PRIMARY KEY,
+                status TEXT NOT NULL,
+                tickers TEXT NOT NULL,
+                form_types TEXT NOT NULL,
+                results TEXT NOT NULL,
+                error TEXT,
+                started_at TEXT,
+                completed_at TEXT,
+                filings_done INTEGER NOT NULL DEFAULT 0,
+                filings_skipped INTEGER NOT NULL DEFAULT 0,
+                filings_failed INTEGER NOT NULL DEFAULT 0
+            )
+        """
         try:
             with self._lock, self._conn:
-                self._conn.execute(sql)
+                self._conn.execute(filings_sql)
+                self._conn.execute(task_history_sql)
         except sqlite3.Error as e:
             raise DatabaseError(
-                "Failed to create metadata table",
+                "Failed to create metadata tables",
                 details=str(e),
             ) from e
 
@@ -608,6 +625,112 @@ class MetadataRegistry:
             form_breakdown=dict(sorted(form_breakdown.items())),
             ticker_breakdown=ticker_breakdown,
         )
+
+    # ------------------------------------------------------------------
+    # Task history (persistence for completed/failed/cancelled tasks)
+    # ------------------------------------------------------------------
+
+    def save_task_history(
+        self,
+        task_id: str,
+        *,
+        status: str,
+        tickers: list[str],
+        form_types: list[str],
+        results: list[dict[str, Any]],
+        error: str | None = None,
+        started_at: str | None = None,
+        completed_at: str | None = None,
+        filings_done: int = 0,
+        filings_skipped: int = 0,
+        filings_failed: int = 0,
+    ) -> None:
+        """Persist a completed task's metadata to SQLite.
+
+        Called by ``TaskManager`` just before pruning the in-memory entry.
+        Uses ``INSERT OR REPLACE`` so re-saving is idempotent.
+        """
+        sql = """
+            INSERT OR REPLACE INTO task_history
+                (task_id, status, tickers, form_types, results, error,
+                 started_at, completed_at,
+                 filings_done, filings_skipped, filings_failed)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """
+        try:
+            with self._lock, self._conn:
+                self._conn.execute(sql, (
+                    task_id,
+                    status,
+                    json.dumps(tickers),
+                    json.dumps(form_types),
+                    json.dumps(results),
+                    error,
+                    started_at,
+                    completed_at,
+                    filings_done,
+                    filings_skipped,
+                    filings_failed,
+                ))
+            logger.debug("Persisted task history: %s", task_id[:8])
+        except sqlite3.Error as e:
+            raise DatabaseError(
+                "Failed to save task history",
+                details=str(e),
+            ) from e
+
+    def get_task_history(self, task_id: str) -> dict[str, Any] | None:
+        """Retrieve a persisted task by ID.
+
+        Returns a dict matching the ``TaskStatus`` schema fields, or
+        ``None`` if the task was never persisted.
+        """
+        sql = "SELECT * FROM task_history WHERE task_id = ?"
+        try:
+            with self._lock:
+                row = self._conn.execute(sql, (task_id,)).fetchone()
+            if row is None:
+                return None
+            return {
+                "task_id": row["task_id"],
+                "status": row["status"],
+                "tickers": json.loads(row["tickers"]),
+                "form_types": json.loads(row["form_types"]),
+                "results": json.loads(row["results"]),
+                "error": row["error"],
+                "started_at": row["started_at"],
+                "completed_at": row["completed_at"],
+                "filings_done": row["filings_done"],
+                "filings_skipped": row["filings_skipped"],
+                "filings_failed": row["filings_failed"],
+            }
+        except sqlite3.Error as e:
+            raise DatabaseError(
+                "Failed to retrieve task history",
+                details=str(e),
+            ) from e
+
+    def prune_task_history(self, max_age_days: int = 7) -> int:
+        """Remove task history entries older than *max_age_days*.
+
+        Returns the number of entries removed.
+        """
+        cutoff = datetime.now(timezone.utc).isoformat()
+        # SQLite date arithmetic: entries with completed_at older than cutoff
+        sql = """
+            DELETE FROM task_history
+            WHERE completed_at IS NOT NULL
+              AND completed_at < datetime(?, '-' || ? || ' days')
+        """
+        try:
+            with self._lock, self._conn:
+                cursor = self._conn.execute(sql, (cutoff, max_age_days))
+                return cursor.rowcount
+        except sqlite3.Error as e:
+            raise DatabaseError(
+                "Failed to prune task history",
+                details=str(e),
+            ) from e
 
     # ------------------------------------------------------------------
     # Internal helpers

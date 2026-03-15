@@ -20,9 +20,12 @@ from tests.helpers import make_task_info
 @pytest.fixture
 def manager():
     """TaskManager with all dependencies mocked and _run_task patched out."""
+    mock_registry = MagicMock()
+    # get_task_history returns None by default (no persisted history).
+    mock_registry.get_task_history.return_value = None
     with patch.object(TaskManager, "_start_cleanup_timer"):
         mgr = TaskManager(
-            registry=MagicMock(),
+            registry=mock_registry,
             chroma=MagicMock(),
             fetcher=MagicMock(),
             orchestrator=MagicMock(),
