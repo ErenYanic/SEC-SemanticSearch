@@ -1133,3 +1133,88 @@ class TestSecurityAuditLogging:
             assert "audit_log(" in source, (
                 f"{func.__name__} must call audit_log()"
             )
+
+
+# -----------------------------------------------------------------------
+# Finding #17: Search query logging — redact in production
+# -----------------------------------------------------------------------
+
+
+class TestQueryLogRedaction:
+    """Verify that search and ingest routes use redact_for_log()."""
+
+    def test_search_route_uses_redact_for_log(self):
+        """The search route must call redact_for_log on the query before logging."""
+        import inspect
+
+        from sec_semantic_search.api.routes import search
+
+        source = inspect.getsource(search.search)
+        assert "redact_for_log(" in source, (
+            "search route must call redact_for_log() before logging the query"
+        )
+
+    def test_ingest_route_uses_redact_for_log(self):
+        """The ingest helper must call redact_for_log on tickers before logging."""
+        import inspect
+
+        from sec_semantic_search.api.routes import ingest
+
+        source = inspect.getsource(ingest._create_task)
+        assert "redact_for_log(" in source, (
+            "_create_task must call redact_for_log() before logging tickers"
+        )
+
+    def test_search_redacts_query_in_log_output(self, monkeypatch, caplog):
+        """With LOG_REDACT_QUERIES=true, the actual query must not appear in logs."""
+        monkeypatch.setenv("LOG_REDACT_QUERIES", "true")
+
+        mock_engine = MagicMock()
+        mock_engine.search.return_value = []
+        app.dependency_overrides[get_search_engine] = lambda: mock_engine
+
+        pkg_logger = logging.getLogger("sec_semantic_search")
+        caplog.handler.setLevel(logging.DEBUG)
+        pkg_logger.addHandler(caplog.handler)
+
+        try:
+            client = TestClient(app, raise_server_exceptions=False)
+            with caplog.at_level(logging.INFO):
+                resp = client.post(
+                    "/api/search/",
+                    json={"query": "revenue growth forecast"},
+                )
+
+            assert resp.status_code == 200
+            # The actual query text must NOT appear in any log record
+            for record in caplog.records:
+                assert "revenue growth forecast" not in record.message
+            # But a redacted marker should appear
+            assert any("<redacted:" in r.message for r in caplog.records)
+        finally:
+            pkg_logger.removeHandler(caplog.handler)
+
+    def test_search_shows_query_when_redaction_disabled(self, monkeypatch, caplog):
+        """With LOG_REDACT_QUERIES unset, the query appears normally in logs."""
+        monkeypatch.delenv("LOG_REDACT_QUERIES", raising=False)
+
+        mock_engine = MagicMock()
+        mock_engine.search.return_value = []
+        app.dependency_overrides[get_search_engine] = lambda: mock_engine
+
+        pkg_logger = logging.getLogger("sec_semantic_search")
+        caplog.handler.setLevel(logging.DEBUG)
+        pkg_logger.addHandler(caplog.handler)
+
+        try:
+            client = TestClient(app, raise_server_exceptions=False)
+            with caplog.at_level(logging.INFO):
+                resp = client.post(
+                    "/api/search/",
+                    json={"query": "revenue growth forecast"},
+                )
+
+            assert resp.status_code == 200
+            assert any("revenue growth forecast" in r.message for r in caplog.records)
+        finally:
+            pkg_logger.removeHandler(caplog.handler)
