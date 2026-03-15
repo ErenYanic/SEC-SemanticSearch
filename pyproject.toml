@@ -24,40 +24,40 @@ classifiers = [
 
 dependencies = [
     # SEC filing retrieval
-    "edgartools>=5.13.0",
+    "edgartools==5.21.1",
 
     # HTML parsing
-    "doc2dict>=0.6.9",
+    "doc2dict==0.6.9",
 
     # Embeddings and ML
-    "sentence-transformers>=5.0.0",
-    "torch>=2.10.0",
+    "sentence-transformers==5.2.2",
+    "torch>=2.10.0",  # not pinned exactly — local CUDA build suffix varies
 
     # Vector database
-    "chromadb>=1.0.0",
+    "chromadb==1.5.2",
 
     # REST API
-    "fastapi>=0.115.0",
-    "uvicorn[standard]>=0.30.0",
-    "websockets>=13.0",
+    "fastapi==0.135.1",
+    "uvicorn[standard]==0.41.0",
+    "websockets==16.0",
 
     # CLI framework
-    "typer>=0.15.0",
-    "rich>=14.0.0",
+    "typer==0.24.1",
+    "rich==14.3.3",
 
     # Configuration
-    "pydantic-settings>=2.0.0",
-    "python-dotenv>=1.0.0",
+    "pydantic-settings==2.13.1",
+    "python-dotenv==1.2.2",
 ]
 
 [project.optional-dependencies]
 dev = [
-    "pytest>=9.0.0",
-    "pytest-cov>=7.0.0",
-    "pytest-asyncio>=1.0.0",
-    "httpx>=0.28.0",
-    "ruff>=0.15.0",
-    "mypy>=1.19.0",
+    "pytest==9.0.2",
+    "pytest-cov==7.0.0",
+    "pytest-asyncio==1.3.0",
+    "httpx==0.28.1",
+    "ruff==0.15.5",
+    "mypy==1.19.1",
 ]
 
 [project.scripts]
