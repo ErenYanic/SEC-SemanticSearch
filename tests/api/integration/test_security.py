@@ -1218,3 +1218,44 @@ class TestQueryLogRedaction:
             assert any("revenue growth forecast" in r.message for r in caplog.records)
         finally:
             pkg_logger.removeHandler(caplog.handler)
+
+
+# -----------------------------------------------------------------------
+# Finding #18: HTTPS enforcement — documentation and SSL support
+# -----------------------------------------------------------------------
+
+
+class TestHttpsEnforcement:
+    """Verify that HTTPS/TLS support is documented and available."""
+
+    def test_run_module_accepts_ssl_certfile(self):
+        """The API entry point must accept --ssl-certfile."""
+        import inspect
+
+        from sec_semantic_search.api import run
+
+        source = inspect.getsource(run.main)
+        assert "--ssl-certfile" in source
+
+    def test_run_module_accepts_ssl_keyfile(self):
+        """The API entry point must accept --ssl-keyfile."""
+        import inspect
+
+        from sec_semantic_search.api import run
+
+        source = inspect.getsource(run.main)
+        assert "--ssl-keyfile" in source
+
+    def test_readme_documents_https_requirement(self):
+        """The README must document HTTPS as a production requirement."""
+        readme = Path(__file__).parents[3] / "README.md"
+        content = readme.read_text()
+        assert "HTTPS" in content
+        assert "ssl-certfile" in content
+
+    def test_run_module_docstring_mentions_tls(self):
+        """The run module docstring must mention TLS/HTTPS."""
+        from sec_semantic_search.api import run
+
+        assert run.__doc__ is not None
+        assert "HTTPS" in run.__doc__ or "TLS" in run.__doc__
