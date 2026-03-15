@@ -16,7 +16,7 @@ from sec_semantic_search.api.schemas import (
     SearchResponse,
     SearchResultSchema,
 )
-from sec_semantic_search.core import SearchError, get_logger
+from sec_semantic_search.core import SearchError, get_logger, redact_for_log
 from sec_semantic_search.search import SearchEngine
 
 logger = get_logger(__name__)
@@ -98,7 +98,7 @@ async def search(
 
     logger.info(
         "Search '%s' returned %d result(s) in %.1f ms",
-        body.query[:80],
+        redact_for_log(body.query[:80]),
         len(result_schemas),
         elapsed_ms,
     )
