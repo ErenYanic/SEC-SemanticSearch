@@ -16,6 +16,7 @@ from sec_semantic_search.core.logging import (
     _get_log_level,
     configure_logging,
     get_logger,
+    redact_for_log,
     suppress_third_party_loggers,
 )
 
@@ -109,6 +110,53 @@ class TestGetLogger:
     def test_returns_logging_logger(self):
         logger = get_logger("test")
         assert isinstance(logger, logging.Logger)
+
+
+class TestRedactForLog:
+    """redact_for_log() hides sensitive text when LOG_REDACT_QUERIES is set."""
+
+    def test_returns_original_when_disabled(self, monkeypatch):
+        monkeypatch.delenv("LOG_REDACT_QUERIES", raising=False)
+        assert redact_for_log("revenue growth forecast") == "revenue growth forecast"
+
+    def test_returns_original_when_empty(self, monkeypatch):
+        monkeypatch.setenv("LOG_REDACT_QUERIES", "")
+        assert redact_for_log("secret query") == "secret query"
+
+    @pytest.mark.parametrize("flag", ["1", "true", "yes", "TRUE", "Yes"])
+    def test_redacts_when_enabled(self, monkeypatch, flag):
+        monkeypatch.setenv("LOG_REDACT_QUERIES", flag)
+        result = redact_for_log("revenue growth forecast")
+        assert result.startswith("<redacted:")
+        assert result.endswith(">")
+        assert "revenue" not in result
+
+    def test_deterministic_hash(self, monkeypatch):
+        """Same input always produces the same redacted output."""
+        monkeypatch.setenv("LOG_REDACT_QUERIES", "true")
+        a = redact_for_log("same query")
+        b = redact_for_log("same query")
+        assert a == b
+
+    def test_different_inputs_different_hashes(self, monkeypatch):
+        monkeypatch.setenv("LOG_REDACT_QUERIES", "true")
+        a = redact_for_log("query one")
+        b = redact_for_log("query two")
+        assert a != b
+
+    def test_hash_format_is_8_hex_chars(self, monkeypatch):
+        monkeypatch.setenv("LOG_REDACT_QUERIES", "1")
+        result = redact_for_log("test")
+        # Format: <redacted:XXXXXXXX>
+        import re
+
+        assert re.match(r"^<redacted:[0-9a-f]{8}>$", result)
+
+    def test_false_values_do_not_redact(self, monkeypatch):
+        """Values like '0', 'false', 'no' should not trigger redaction."""
+        for val in ("0", "false", "no", "FALSE"):
+            monkeypatch.setenv("LOG_REDACT_QUERIES", val)
+            assert redact_for_log("visible") == "visible"
 
 
 class TestSuppressThirdParty:
