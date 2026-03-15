@@ -6,6 +6,7 @@ Tests verify that the fix is in place and working correctly.
 """
 
 import logging
+from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -1259,3 +1260,204 @@ class TestHttpsEnforcement:
 
         assert run.__doc__ is not None
         assert "HTTPS" in run.__doc__ or "TLS" in run.__doc__
+
+
+# -----------------------------------------------------------------------
+# Finding #19: Pinned dependency versions
+# -----------------------------------------------------------------------
+
+
+class TestPinnedDependencies:
+    """Verify that production dependencies use exact version pins."""
+
+    def test_dependencies_are_pinned(self):
+        """Production deps in pyproject.toml must use == pins (except torch)."""
+        import tomllib
+
+        pyproject = Path(__file__).parents[3] / "pyproject.toml"
+        with open(pyproject, "rb") as f:
+            data = tomllib.load(f)
+
+        deps = data["project"]["dependencies"]
+        for dep in deps:
+            # torch is excluded — local CUDA build suffix varies
+            if dep.startswith("torch"):
+                continue
+            assert "==" in dep, (
+                f"Dependency '{dep}' is not pinned to an exact version"
+            )
+
+    def test_dev_dependencies_are_pinned(self):
+        """Dev deps in pyproject.toml must use == pins."""
+        import tomllib
+
+        pyproject = Path(__file__).parents[3] / "pyproject.toml"
+        with open(pyproject, "rb") as f:
+            data = tomllib.load(f)
+
+        deps = data["project"]["optional-dependencies"]["dev"]
+        for dep in deps:
+            assert "==" in dep, (
+                f"Dev dependency '{dep}' is not pinned to an exact version"
+            )
+
+
+# -----------------------------------------------------------------------
+# Finding #20: Task TTL data loss — persistence and extended TTL
+# -----------------------------------------------------------------------
+
+
+class TestTaskPersistence:
+    """Verify that completed tasks are persisted and recoverable."""
+
+    def test_ttl_is_24_hours(self):
+        """In-memory TTL must be 24 hours, not 1 hour."""
+        from sec_semantic_search.api.tasks import _TASK_TTL_SECONDS
+
+        assert _TASK_TTL_SECONDS == 86_400
+
+    def test_task_history_table_created(self, tmp_path, monkeypatch):
+        """MetadataRegistry must create the task_history table."""
+        monkeypatch.setenv("DB_METADATA_DB_PATH", str(tmp_path / "test.sqlite"))
+        monkeypatch.setenv("DB_CHROMA_PATH", str(tmp_path / "chroma"))
+
+        from sec_semantic_search.config import reload_settings
+        reload_settings()
+
+        from sec_semantic_search.database.metadata import MetadataRegistry
+
+        registry = MetadataRegistry(str(tmp_path / "test.sqlite"))
+        try:
+            import sqlite3
+            conn = sqlite3.connect(str(tmp_path / "test.sqlite"))
+            tables = conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table'"
+            ).fetchall()
+            table_names = [t[0] for t in tables]
+            assert "task_history" in table_names
+            conn.close()
+        finally:
+            registry.close()
+
+    def test_save_and_retrieve_task_history(self, tmp_path, monkeypatch):
+        """Tasks can be saved to and retrieved from task_history."""
+        monkeypatch.setenv("DB_METADATA_DB_PATH", str(tmp_path / "test.sqlite"))
+        monkeypatch.setenv("DB_CHROMA_PATH", str(tmp_path / "chroma"))
+
+        from sec_semantic_search.config import reload_settings
+        reload_settings()
+
+        from sec_semantic_search.database.metadata import MetadataRegistry
+
+        registry = MetadataRegistry(str(tmp_path / "test.sqlite"))
+        try:
+            registry.save_task_history(
+                "abc123",
+                status="completed",
+                tickers=["AAPL"],
+                form_types=["10-K"],
+                results=[{
+                    "ticker": "AAPL",
+                    "form_type": "10-K",
+                    "filing_date": "2024-11-01",
+                    "accession_number": "0000320193-24-000001",
+                    "segment_count": 50,
+                    "chunk_count": 100,
+                    "duration_seconds": 12.5,
+                }],
+                started_at="2024-11-15T10:00:00+00:00",
+                completed_at="2024-11-15T10:01:00+00:00",
+                filings_done=1,
+                filings_skipped=0,
+                filings_failed=0,
+            )
+
+            result = registry.get_task_history("abc123")
+            assert result is not None
+            assert result["task_id"] == "abc123"
+            assert result["status"] == "completed"
+            assert result["tickers"] == ["AAPL"]
+            assert len(result["results"]) == 1
+            assert result["results"][0]["chunk_count"] == 100
+            assert result["filings_done"] == 1
+        finally:
+            registry.close()
+
+    def test_get_task_history_returns_none_for_missing(self, tmp_path, monkeypatch):
+        """get_task_history returns None for unknown task IDs."""
+        monkeypatch.setenv("DB_METADATA_DB_PATH", str(tmp_path / "test.sqlite"))
+        monkeypatch.setenv("DB_CHROMA_PATH", str(tmp_path / "chroma"))
+
+        from sec_semantic_search.config import reload_settings
+        reload_settings()
+
+        from sec_semantic_search.database.metadata import MetadataRegistry
+
+        registry = MetadataRegistry(str(tmp_path / "test.sqlite"))
+        try:
+            assert registry.get_task_history("nonexistent") is None
+        finally:
+            registry.close()
+
+    def test_task_manager_get_task_falls_back_to_history(self):
+        """get_task() checks SQLite when task not found in memory."""
+        from sec_semantic_search.api.tasks import TaskManager
+
+        mock_registry = MagicMock()
+        mock_registry.get_task_history.return_value = {
+            "task_id": "persisted123",
+            "status": "completed",
+            "tickers": ["MSFT"],
+            "form_types": ["10-Q"],
+            "results": [],
+            "error": None,
+            "started_at": "2024-11-15T10:00:00+00:00",
+            "completed_at": "2024-11-15T10:01:00+00:00",
+            "filings_done": 2,
+            "filings_skipped": 1,
+            "filings_failed": 0,
+        }
+
+        with patch.object(TaskManager, "_start_cleanup_timer"):
+            mgr = TaskManager(
+                registry=mock_registry,
+                chroma=MagicMock(),
+                fetcher=MagicMock(),
+                orchestrator=MagicMock(),
+            )
+
+        info = mgr.get_task("persisted123")
+        assert info is not None
+        assert info.task_id == "persisted123"
+        assert info.state.value == "completed"
+        assert info.tickers == ["MSFT"]
+        assert info.progress.filings_done == 2
+        assert info.progress.filings_skipped == 1
+
+    def test_prune_persists_before_removing(self):
+        """_prune_stale_tasks must save to history before deleting from memory."""
+        from sec_semantic_search.api.tasks import TaskManager, TaskState
+
+        mock_registry = MagicMock()
+
+        with patch.object(TaskManager, "_start_cleanup_timer"):
+            mgr = TaskManager(
+                registry=mock_registry,
+                chroma=MagicMock(),
+                fetcher=MagicMock(),
+                orchestrator=MagicMock(),
+            )
+
+        info = make_task_info(task_id="prunable", state=TaskState.COMPLETED)
+        # Set completed_at far in the past so TTL check triggers
+        info.completed_at = datetime(2020, 1, 1, tzinfo=timezone.utc)
+        mgr._tasks["prunable"] = info
+
+        mgr._prune_stale_tasks()
+
+        # Task should be removed from memory
+        assert "prunable" not in mgr._tasks
+        # But persisted to history
+        mock_registry.save_task_history.assert_called_once()
+        call_kwargs = mock_registry.save_task_history.call_args
+        assert call_kwargs[0][0] == "prunable"  # first positional arg = task_id
