@@ -40,8 +40,8 @@ from sec_semantic_search.pipeline.fetch import FilingFetcher, FilingInfo
 
 logger = get_logger(__name__)
 
-# Completed tasks are pruned after this many seconds.
-_TASK_TTL_SECONDS = 3600  # 1 hour
+# In-memory TTL — tasks are persisted to SQLite before pruning.
+_TASK_TTL_SECONDS = 86_400  # 24 hours
 
 # Maximum number of active (pending + running) tasks allowed.
 _MAX_ACTIVE_TASKS = 5
@@ -243,8 +243,55 @@ class TaskManager:
         return task_id
 
     def get_task(self, task_id: str) -> TaskInfo | None:
-        """Return task info or None if not found."""
-        return self._tasks.get(task_id)
+        """Return task info, falling back to SQLite history if pruned."""
+        info = self._tasks.get(task_id)
+        if info is not None:
+            return info
+
+        # Check persisted history.
+        try:
+            history = self._registry.get_task_history(task_id)
+        except Exception:
+            logger.debug("Task history lookup failed for %s", task_id[:8])
+            return None
+
+        if history is None:
+            return None
+
+        return self._reconstruct_task_info(history)
+
+    @staticmethod
+    def _reconstruct_task_info(history: dict) -> TaskInfo:
+        """Build a read-only ``TaskInfo`` from persisted history data."""
+        info = TaskInfo(
+            task_id=history["task_id"],
+            tickers=history["tickers"],
+            form_types=history["form_types"],
+        )
+        info.state = TaskState(history["status"])
+        info.error = history["error"]
+        info.progress = TaskProgress(
+            filings_done=history["filings_done"],
+            filings_skipped=history["filings_skipped"],
+            filings_failed=history["filings_failed"],
+        )
+        info.results = [
+            FilingResult(
+                ticker=r["ticker"],
+                form_type=r["form_type"],
+                filing_date=r["filing_date"],
+                accession_number=r["accession_number"],
+                segment_count=r["segment_count"],
+                chunk_count=r["chunk_count"],
+                duration_seconds=r["duration_seconds"],
+            )
+            for r in history["results"]
+        ]
+        if history["started_at"]:
+            info.started_at = datetime.fromisoformat(history["started_at"])
+        if history["completed_at"]:
+            info.completed_at = datetime.fromisoformat(history["completed_at"])
+        return info
 
     def list_tasks(self) -> list[TaskInfo]:
         """Return all tasks (active and recent)."""
@@ -806,7 +853,7 @@ class TaskManager:
             self._start_cleanup_timer()
 
     def _prune_stale_tasks(self) -> None:
-        """Remove completed/failed/cancelled tasks older than the TTL."""
+        """Persist and remove completed/failed/cancelled tasks older than the TTL."""
         now = time.time()
         terminal = (TaskState.COMPLETED, TaskState.FAILED, TaskState.CANCELLED)
         to_remove: list[str] = []
@@ -821,10 +868,55 @@ class TaskManager:
                 to_remove.append(task_id)
 
         if to_remove:
+            # Persist to SQLite before removing from memory.
+            for task_id in to_remove:
+                info = self._tasks[task_id]
+                try:
+                    self._registry.save_task_history(
+                        task_id,
+                        status=info.state.value,
+                        tickers=info.tickers,
+                        form_types=info.form_types,
+                        results=[
+                            {
+                                "ticker": r.ticker,
+                                "form_type": r.form_type,
+                                "filing_date": r.filing_date,
+                                "accession_number": r.accession_number,
+                                "segment_count": r.segment_count,
+                                "chunk_count": r.chunk_count,
+                                "duration_seconds": r.duration_seconds,
+                            }
+                            for r in info.results
+                        ],
+                        error=info.error,
+                        started_at=(
+                            info.started_at.isoformat()
+                            if info.started_at else None
+                        ),
+                        completed_at=(
+                            info.completed_at.isoformat()
+                            if info.completed_at else None
+                        ),
+                        filings_done=info.progress.filings_done,
+                        filings_skipped=info.progress.filings_skipped,
+                        filings_failed=info.progress.filings_failed,
+                    )
+                except Exception:
+                    logger.exception(
+                        "Failed to persist task %s to history", task_id[:8],
+                    )
+
             with self._lock:
                 for task_id in to_remove:
                     del self._tasks[task_id]
             logger.info("Pruned %d stale task(s)", len(to_remove))
+
+            # Also prune old history entries (> 7 days).
+            try:
+                self._registry.prune_task_history()
+            except Exception:
+                logger.exception("Failed to prune task history")
 
 
 # ---------------------------------------------------------------------------
