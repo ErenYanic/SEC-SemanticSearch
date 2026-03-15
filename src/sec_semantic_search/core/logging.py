@@ -15,6 +15,7 @@ Usage:
     logger.info("Processing filing", extra={"ticker": "AAPL"})
 """
 
+import hashlib
 import logging
 import os
 import sys
@@ -159,6 +160,26 @@ def audit_log(
         endpoint,
         detail,
     )
+
+
+def redact_for_log(value: str) -> str:
+    """Return *value* unchanged or a SHA-256 digest prefix when redaction is enabled.
+
+    Controlled by the ``LOG_REDACT_QUERIES`` environment variable.  When set
+    to a truthy value (``1``, ``true``, ``yes`` — case-insensitive), the
+    original text is replaced with ``<redacted:XXXXXXXX>`` where ``XXXXXXXX``
+    is the first 8 hex characters of its SHA-256 hash.  This preserves log
+    correlation (same input → same hash) while hiding the actual content.
+
+    The check reads ``os.environ`` directly so it can be used from any module
+    without depending on the Pydantic settings hierarchy (avoids circular
+    imports).
+    """
+    flag = os.environ.get("LOG_REDACT_QUERIES", "").lower()
+    if flag in ("1", "true", "yes"):
+        digest = hashlib.sha256(value.encode()).hexdigest()[:8]
+        return f"<redacted:{digest}>"
+    return value
 
 
 def suppress_third_party_loggers() -> None:

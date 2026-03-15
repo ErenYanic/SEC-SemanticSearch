@@ -32,6 +32,7 @@ from sec_semantic_search.core.logging import (
     audit_log,
     configure_logging,
     get_logger,
+    redact_for_log,
     suppress_third_party_loggers,
 )
 from sec_semantic_search.core.types import (
@@ -65,5 +66,6 @@ __all__ = [
     "audit_log",
     "get_logger",
     "configure_logging",
+    "redact_for_log",
     "suppress_third_party_loggers",
 ]

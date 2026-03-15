@@ -28,7 +28,7 @@ from sec_semantic_search.api.schemas import (
     TaskStatus,
 )
 from sec_semantic_search.api.tasks import TaskInfo, TaskManager, TaskQueueFullError
-from sec_semantic_search.core import audit_log, get_logger
+from sec_semantic_search.core import audit_log, get_logger, redact_for_log
 
 logger = get_logger(__name__)
 
@@ -102,7 +102,7 @@ def _create_task(body: IngestRequest, manager: TaskManager) -> TaskResponse:
     logger.info(
         "Ingest task %s created: tickers=%s, forms=%s, mode=%s",
         task_id[:8],
-        body.tickers,
+        [redact_for_log(t) for t in body.tickers],
         body.form_types,
         body.count_mode,
     )
