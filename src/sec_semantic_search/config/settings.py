@@ -16,10 +16,20 @@ load_dotenv()
 
 
 class EdgarSettings(BaseSettings):
-    """SEC EDGAR API credentials."""
+    """SEC EDGAR API credentials and rate limiting.
 
-    identity_name: str
-    identity_email: str
+    In web deployments (Scenarios B/C) where ``EDGAR_SESSION_REQUIRED=true``,
+    ``identity_name`` and ``identity_email`` may be unset — each user provides
+    their own credentials per session via HTTP headers.  The CLI still requires
+    them.
+    """
+
+    identity_name: Optional[str] = None
+    identity_email: Optional[str] = None
+
+    # Global EDGAR rate limiter (requests per second).  SEC allows 10 req/s;
+    # default 8 provides a safe margin.
+    rate_limit_rps: int = 8
 
     model_config = SettingsConfigDict(env_prefix="EDGAR_")
 
@@ -50,6 +60,13 @@ class DatabaseSettings(BaseSettings):
     chroma_path: str = "./data/chroma_db"
     metadata_db_path: str = "./data/metadata.sqlite"
     max_filings: int = 500
+
+    # SQLCipher encryption key; unset = plain sqlite3 (local dev).
+    encryption_key: Optional[str] = None
+
+    # Task history privacy settings.
+    task_history_retention_days: int = 0  # 0 = keep indefinitely
+    task_history_persist_tickers: bool = False
 
     model_config = SettingsConfigDict(env_prefix="DB_")
 
@@ -103,6 +120,18 @@ class SearchSettings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="SEARCH_")
 
 
+class LoggingSettings(BaseSettings):
+    """Logging configuration for optional file logging."""
+
+    # Optional file logging (in addition to stdout).
+    # Env vars: LOG_FILE_PATH, LOG_FILE_MAX_BYTES, LOG_FILE_BACKUP_COUNT
+    path: Optional[str] = None  # unset = stdout only
+    max_bytes: int = 10_485_760  # 10 MB
+    backup_count: int = 3
+
+    model_config = SettingsConfigDict(env_prefix="LOG_FILE_")
+
+
 class HuggingFaceSettings(BaseSettings):
     """Hugging Face configuration."""
 
@@ -125,6 +154,25 @@ class ApiSettings(BaseSettings):
     rate_limit_delete: int = 30
     rate_limit_general: int = 120
 
+    # Admin key for destructive operations; unset = unrestricted (Scenario A).
+    admin_key: Optional[str] = None
+
+    # Per-session EDGAR credentials requirement.
+    edgar_session_required: bool = False
+
+    # Demo mode — FIFO eviction, nightly reset banner, "clear all" disabled.
+    demo_mode: bool = False
+    demo_eviction_buffer: int = 500
+
+    # Task queue size (maximum concurrent + pending ingest tasks).
+    max_task_queue_size: int = 5
+
+    # Abuse prevention caps (0 = unlimited/disabled).
+    max_tickers_per_request: int = 0
+    max_filings_per_request: int = 0
+    ingest_cooldown_seconds: int = 0
+    max_task_duration_minutes: int = 0
+
     model_config = SettingsConfigDict(env_prefix="API_")
 
 
@@ -136,6 +184,7 @@ class Settings(BaseSettings):
     chunking: ChunkingSettings = ChunkingSettings()
     database: DatabaseSettings = DatabaseSettings()
     search: SearchSettings = SearchSettings()
+    log_file: LoggingSettings = LoggingSettings()
     hugging_face: HuggingFaceSettings = HuggingFaceSettings()
     api: ApiSettings = ApiSettings()
 

@@ -24,10 +24,13 @@ from sec_semantic_search.config.constants import (
     parse_form_types,
 )
 from sec_semantic_search.config.settings import (
+    ApiSettings,
     ChunkingSettings,
     DatabaseSettings,
+    EdgarSettings,
     EmbeddingSettings,
     HuggingFaceSettings,
+    LoggingSettings,
     SearchSettings,
     Settings,
     get_settings,
@@ -217,3 +220,162 @@ class TestSingleton:
         assert get_settings() is not s_old
         # Restore original to avoid side effects on other tests
         settings_module._settings_instance = s_old
+
+
+# -----------------------------------------------------------------------
+# W5.1 — New configuration settings
+# -----------------------------------------------------------------------
+
+
+class TestEdgarSettingsW5:
+    """EdgarSettings fields are now optional for web deployment scenarios."""
+
+    def test_edgar_fields_optional(self, monkeypatch):
+        """identity_name and identity_email default to None."""
+        monkeypatch.delenv("EDGAR_IDENTITY_NAME", raising=False)
+        monkeypatch.delenv("EDGAR_IDENTITY_EMAIL", raising=False)
+        s = EdgarSettings()
+        assert s.identity_name is None
+        assert s.identity_email is None
+
+    def test_edgar_fields_set(self, monkeypatch):
+        monkeypatch.setenv("EDGAR_IDENTITY_NAME", "Test User")
+        monkeypatch.setenv("EDGAR_IDENTITY_EMAIL", "test@example.com")
+        s = EdgarSettings()
+        assert s.identity_name == "Test User"
+        assert s.identity_email == "test@example.com"
+
+    def test_edgar_rate_limit_default(self, monkeypatch):
+        monkeypatch.delenv("EDGAR_RATE_LIMIT_RPS", raising=False)
+        s = EdgarSettings()
+        assert s.rate_limit_rps == 8
+
+    def test_edgar_rate_limit_override(self, monkeypatch):
+        monkeypatch.setenv("EDGAR_RATE_LIMIT_RPS", "5")
+        s = EdgarSettings()
+        assert s.rate_limit_rps == 5
+
+
+class TestDatabaseSettingsW5:
+    """New privacy fields on DatabaseSettings."""
+
+    def test_encryption_key_default_none(self, monkeypatch):
+        monkeypatch.delenv("DB_ENCRYPTION_KEY", raising=False)
+        s = DatabaseSettings()
+        assert s.encryption_key is None
+
+    def test_encryption_key_set(self, monkeypatch):
+        monkeypatch.setenv("DB_ENCRYPTION_KEY", "my-secret-key")
+        s = DatabaseSettings()
+        assert s.encryption_key == "my-secret-key"
+
+    def test_task_history_retention_default(self, monkeypatch):
+        monkeypatch.delenv("DB_TASK_HISTORY_RETENTION_DAYS", raising=False)
+        s = DatabaseSettings()
+        assert s.task_history_retention_days == 0
+
+    def test_task_history_persist_tickers_default_false(self, monkeypatch):
+        monkeypatch.delenv("DB_TASK_HISTORY_PERSIST_TICKERS", raising=False)
+        s = DatabaseSettings()
+        assert s.task_history_persist_tickers is False
+
+    def test_task_history_persist_tickers_true(self, monkeypatch):
+        monkeypatch.setenv("DB_TASK_HISTORY_PERSIST_TICKERS", "true")
+        s = DatabaseSettings()
+        assert s.task_history_persist_tickers is True
+
+
+class TestLoggingSettings:
+    """New LoggingSettings class for optional file logging."""
+
+    def test_defaults(self, monkeypatch):
+        monkeypatch.delenv("LOG_FILE_PATH", raising=False)
+        monkeypatch.delenv("LOG_FILE_MAX_BYTES", raising=False)
+        monkeypatch.delenv("LOG_FILE_BACKUP_COUNT", raising=False)
+        s = LoggingSettings()
+        assert s.path is None
+        assert s.max_bytes == 10_485_760
+        assert s.backup_count == 3
+
+    def test_file_path_set(self, monkeypatch):
+        monkeypatch.setenv("LOG_FILE_PATH", "./logs/app.log")
+        s = LoggingSettings()
+        assert s.path == "./logs/app.log"
+
+    def test_rotation_overrides(self, monkeypatch):
+        monkeypatch.setenv("LOG_FILE_MAX_BYTES", "5242880")
+        monkeypatch.setenv("LOG_FILE_BACKUP_COUNT", "5")
+        s = LoggingSettings()
+        assert s.max_bytes == 5_242_880
+        assert s.backup_count == 5
+
+
+class TestApiSettingsW5:
+    """New W5 fields on ApiSettings."""
+
+    def test_admin_key_default_none(self, monkeypatch):
+        monkeypatch.delenv("API_ADMIN_KEY", raising=False)
+        s = ApiSettings()
+        assert s.admin_key is None
+
+    def test_edgar_session_required_default_false(self, monkeypatch):
+        monkeypatch.delenv("API_EDGAR_SESSION_REQUIRED", raising=False)
+        s = ApiSettings()
+        assert s.edgar_session_required is False
+
+    def test_demo_mode_default_false(self, monkeypatch):
+        monkeypatch.delenv("API_DEMO_MODE", raising=False)
+        s = ApiSettings()
+        assert s.demo_mode is False
+
+    def test_demo_eviction_buffer_default(self, monkeypatch):
+        monkeypatch.delenv("API_DEMO_EVICTION_BUFFER", raising=False)
+        s = ApiSettings()
+        assert s.demo_eviction_buffer == 500
+
+    def test_max_task_queue_size_default(self, monkeypatch):
+        monkeypatch.delenv("API_MAX_TASK_QUEUE_SIZE", raising=False)
+        s = ApiSettings()
+        assert s.max_task_queue_size == 5
+
+    def test_max_task_queue_size_override(self, monkeypatch):
+        monkeypatch.setenv("API_MAX_TASK_QUEUE_SIZE", "10")
+        s = ApiSettings()
+        assert s.max_task_queue_size == 10
+
+    def test_abuse_prevention_defaults(self, monkeypatch):
+        """All abuse prevention caps default to 0 (disabled)."""
+        for var in (
+            "API_MAX_TICKERS_PER_REQUEST",
+            "API_MAX_FILINGS_PER_REQUEST",
+            "API_INGEST_COOLDOWN_SECONDS",
+            "API_MAX_TASK_DURATION_MINUTES",
+        ):
+            monkeypatch.delenv(var, raising=False)
+        s = ApiSettings()
+        assert s.max_tickers_per_request == 0
+        assert s.max_filings_per_request == 0
+        assert s.ingest_cooldown_seconds == 0
+        assert s.max_task_duration_minutes == 0
+
+    def test_abuse_prevention_overrides(self, monkeypatch):
+        monkeypatch.setenv("API_MAX_TICKERS_PER_REQUEST", "100")
+        monkeypatch.setenv("API_MAX_FILINGS_PER_REQUEST", "200")
+        monkeypatch.setenv("API_INGEST_COOLDOWN_SECONDS", "60")
+        monkeypatch.setenv("API_MAX_TASK_DURATION_MINUTES", "30")
+        s = ApiSettings()
+        assert s.max_tickers_per_request == 100
+        assert s.max_filings_per_request == 200
+        assert s.ingest_cooldown_seconds == 60
+        assert s.max_task_duration_minutes == 30
+
+
+class TestRootSettingsW5:
+    """Root Settings now includes log_file section."""
+
+    def test_has_log_file_section(self, monkeypatch):
+        monkeypatch.setenv("EDGAR_IDENTITY_NAME", "Test User")
+        monkeypatch.setenv("EDGAR_IDENTITY_EMAIL", "test@example.com")
+        s = Settings()
+        assert hasattr(s, "log_file")
+        assert isinstance(s.log_file, LoggingSettings)

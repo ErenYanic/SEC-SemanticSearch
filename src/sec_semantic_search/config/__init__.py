@@ -22,6 +22,7 @@ from sec_semantic_search.config.settings import (
     EdgarSettings,
     EmbeddingSettings,
     HuggingFaceSettings,
+    LoggingSettings,
     SearchSettings,
     Settings,
     get_settings,
@@ -52,6 +53,7 @@ __all__ = [
     "DatabaseSettings",
     "SearchSettings",
     "HuggingFaceSettings",
+    "LoggingSettings",
     "get_settings",
     "reload_settings",
 ]
