@@ -27,6 +27,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
 
+from sec_semantic_search.config import get_settings
 from sec_semantic_search.core import (
     DatabaseError,
     FetchError,
@@ -42,9 +43,6 @@ logger = get_logger(__name__)
 
 # In-memory TTL — tasks are persisted to SQLite before pruning.
 _TASK_TTL_SECONDS = 86_400  # 24 hours
-
-# Maximum number of active (pending + running) tasks allowed.
-_MAX_ACTIVE_TASKS = 5
 
 
 # ---------------------------------------------------------------------------
@@ -199,12 +197,13 @@ class TaskManager:
             TaskQueueFullError: If the active task queue is at capacity.
         """
         # Guard against unbounded task queue (GPU semaphore starvation).
+        max_active = get_settings().api.max_task_queue_size
         with self._lock:
             active_count = sum(
                 1 for t in self._tasks.values()
                 if t.state in (TaskState.PENDING, TaskState.RUNNING)
             )
-            if active_count >= _MAX_ACTIVE_TASKS:
+            if active_count >= max_active:
                 raise TaskQueueFullError(
                     f"Task queue is full ({active_count} active). "
                     "Wait for existing tasks to complete before submitting new ones."

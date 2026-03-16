@@ -109,31 +109,44 @@ class FilingFetcher:
     """
 
     def __init__(self) -> None:
-        """Initialise the fetcher and configure EDGAR identity."""
+        """Initialise the fetcher and configure EDGAR identity (if available)."""
         self.settings = get_settings()
         self.max_filings = self.settings.database.max_filings
         self._configure_identity()
 
     def _configure_identity(self) -> None:
-        """
-        Configure SEC EDGAR identity from settings.
+        """Configure SEC EDGAR identity from settings (if both fields are set).
 
-        SEC EDGAR requires identification for API access. This sets
-        the identity using credentials from environment variables.
-
-        Raises:
-            FetchError: If identity credentials are missing.
+        In web deployments (Scenarios B/C), server-side credentials may be
+        unset — each user provides their own via ``set_identity()`` per
+        request.  The fetcher still works; the caller is responsible for
+        calling ``set_identity()`` before any EDGAR requests.
         """
-        try:
-            name = self.settings.edgar.identity_name
-            email = self.settings.edgar.identity_email
-            set_identity(f"{name} {email}")
-            logger.debug("EDGAR identity configured: %s", email)
-        except Exception as e:
-            raise FetchError(
-                "Failed to configure EDGAR identity",
-                details=str(e),
-            ) from e
+        name = self.settings.edgar.identity_name
+        email = self.settings.edgar.identity_email
+        if name and email:
+            try:
+                set_identity(f"{name} {email}")
+                logger.debug("EDGAR identity configured: %s", email)
+            except Exception as e:
+                raise FetchError(
+                    "Failed to configure EDGAR identity",
+                    details=str(e),
+                ) from e
+        else:
+            logger.debug(
+                "EDGAR identity not configured — "
+                "per-session credentials required"
+            )
+
+    def set_identity(self, name: str, email: str) -> None:
+        """Set EDGAR identity for the current request (per-session credentials).
+
+        Called by the API layer when users supply credentials via HTTP
+        headers (``X-Edgar-Name`` / ``X-Edgar-Email``).
+        """
+        set_identity(f"{name} {email}")
+        logger.debug("EDGAR identity set for session: %s", email)
 
     def _validate_form_type(self, form_type: str) -> str:
         """
