@@ -5,6 +5,12 @@ This module provides a lightweight relational layer for operations that
 ChromaDB does not handle well: duplicate detection, listing with filters,
 aggregation statistics, and filing limit enforcement.
 
+When ``DB_ENCRYPTION_KEY`` is set, the module uses ``pysqlcipher3`` (a
+drop-in replacement for Python's ``sqlite3``) and issues ``PRAGMA key``
+immediately after opening the connection.  When the key is unset **or**
+``pysqlcipher3`` is not installed, standard ``sqlite3`` is used — this
+is the default for local development (Scenario A).
+
 Usage:
     from sec_semantic_search.database import MetadataRegistry
 
@@ -16,6 +22,7 @@ Usage:
 import json
 import sqlite3
 import threading
+import types
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -30,6 +37,28 @@ from sec_semantic_search.core import (
 )
 
 logger = get_logger(__name__)
+
+
+def _get_sqlite_module(encryption_key: str | None) -> types.ModuleType:
+    """Return the appropriate SQLite driver module.
+
+    When *encryption_key* is set, attempts to import ``pysqlcipher3``.
+    Falls back to the standard ``sqlite3`` module if the key is unset
+    or if ``pysqlcipher3`` is not installed (with a warning).
+    """
+    if encryption_key:
+        try:
+            from pysqlcipher3 import dbapi2 as sqlcipher  # type: ignore[import-untyped]
+
+            logger.info("SQLCipher driver loaded — database encryption enabled")
+            return sqlcipher
+        except ImportError:
+            logger.warning(
+                "DB_ENCRYPTION_KEY is set but pysqlcipher3 is not installed. "
+                "Install it with: pip install sec-semantic-search[encryption]. "
+                "Falling back to unencrypted sqlite3."
+            )
+    return sqlite3
 
 
 @dataclass
@@ -121,7 +150,11 @@ class MetadataRegistry:
         1
     """
 
-    def __init__(self, db_path: Optional[str] = None) -> None:
+    def __init__(
+        self,
+        db_path: Optional[str] = None,
+        encryption_key: Optional[str] = None,
+    ) -> None:
         """
         Initialise the metadata registry.
 
@@ -129,36 +162,75 @@ class MetadataRegistry:
         all method calls, protected by a threading lock.  WAL journal mode
         is enabled for better concurrent read/write performance.
 
+        When *encryption_key* is provided (or ``DB_ENCRYPTION_KEY`` is set),
+        the connection uses ``pysqlcipher3`` and issues ``PRAGMA key``
+        immediately after opening.
+
         Args:
             db_path: Path to SQLite database file. If None, uses
                      ``settings.database.metadata_db_path``.
+            encryption_key: SQLCipher encryption key. If None, reads from
+                            ``settings.database.encryption_key``.
         """
         settings = get_settings()
         self._db_path = db_path or settings.database.metadata_db_path
         self._max_filings = settings.database.max_filings
+        self._encryption_key = encryption_key if encryption_key is not None else settings.database.encryption_key
 
         # Ensure parent directory exists
         Path(self._db_path).parent.mkdir(parents=True, exist_ok=True)
 
+        # Select the appropriate SQLite driver (sqlcipher or sqlite3).
+        self._sqlite_module = _get_sqlite_module(self._encryption_key)
+
         # Persistent connection — shared across all method calls.
         # check_same_thread=False allows the API's background worker
         # threads to use the same connection; the lock serialises access.
-        self._conn = sqlite3.connect(
+        self._conn = self._sqlite_module.connect(
             self._db_path, check_same_thread=False,
         )
+
+        # When using SQLCipher, PRAGMA key MUST be the very first
+        # statement executed on the connection — before any other
+        # PRAGMA or query.  PRAGMA does not support parameter binding,
+        # so we hex-encode the key as a blob literal to avoid any
+        # SQL injection risk (defence in depth, even though the key
+        # comes from env vars).
+        if self._encryption_key and self._sqlite_module is not sqlite3:
+            hex_key = self._encryption_key.encode().hex()
+            self._conn.execute(f"PRAGMA key = \"x'{hex_key}'\"")
+            logger.debug("SQLCipher PRAGMA key applied")
+
         self._conn.row_factory = sqlite3.Row
         self._conn.execute("PRAGMA journal_mode=WAL")
         self._lock = threading.Lock()
 
+        self._encrypted = self._encryption_key is not None and self._sqlite_module is not sqlite3
+
+        # Cache the driver's exception classes.  When using pysqlcipher3,
+        # its Error/IntegrityError are distinct from sqlite3's, so we must
+        # catch the right ones.
+        self._db_error = self._sqlite_module.Error
+        self._db_integrity_error = self._sqlite_module.IntegrityError
+
         # Create table on init (idempotent)
         self._create_table()
 
-        logger.debug("MetadataRegistry initialised: %s", self._db_path)
+        logger.debug(
+            "MetadataRegistry initialised: %s (encrypted=%s)",
+            self._db_path,
+            self._encrypted,
+        )
 
     def close(self) -> None:
         """Close the persistent database connection."""
         self._conn.close()
         logger.debug("MetadataRegistry connection closed: %s", self._db_path)
+
+    @property
+    def encrypted(self) -> bool:
+        """Whether the database connection is using SQLCipher encryption."""
+        return self._encrypted
 
     def _create_table(self) -> None:
         """Create the filings and task_history tables if they do not exist."""
@@ -193,7 +265,7 @@ class MetadataRegistry:
             with self._lock, self._conn:
                 self._conn.execute(filings_sql)
                 self._conn.execute(task_history_sql)
-        except sqlite3.Error as e:
+        except self._db_error as e:
             raise DatabaseError(
                 "Failed to create metadata tables",
                 details=str(e),
@@ -236,7 +308,7 @@ class MetadataRegistry:
             with self._lock:
                 row = self._conn.execute(sql, (accession_number,)).fetchone()
             return row is not None
-        except sqlite3.Error as e:
+        except self._db_error as e:
             raise DatabaseError(
                 "Failed to check for duplicate filing",
                 details=str(e),
@@ -273,7 +345,7 @@ class MetadataRegistry:
             with self._lock:
                 rows = self._conn.execute(sql, accession_numbers).fetchall()
             return {row["accession_number"] for row in rows}
-        except sqlite3.Error as e:
+        except self._db_error as e:
             raise DatabaseError(
                 "Failed to check for existing accessions",
                 details=str(e),
@@ -325,12 +397,12 @@ class MetadataRegistry:
                 filing_id.date_str,
                 chunk_count,
             )
-        except sqlite3.IntegrityError as e:
+        except self._db_integrity_error as e:
             raise DatabaseError(
                 f"Filing already exists: {filing_id.accession_number}",
                 details=str(e),
             ) from e
-        except sqlite3.Error as e:
+        except self._db_error as e:
             raise DatabaseError(
                 "Failed to register filing",
                 details=str(e),
@@ -389,14 +461,14 @@ class MetadataRegistry:
                         ingested_at,
                     ),
                 )
-        except sqlite3.IntegrityError:
+        except self._db_integrity_error:
             # Defensive: UNIQUE constraint caught a race despite the check.
             logger.debug(
                 "Filing already registered (integrity constraint): %s",
                 filing_id.accession_number,
             )
             return False
-        except sqlite3.Error as e:
+        except self._db_error as e:
             raise DatabaseError(
                 "Failed to register filing atomically",
                 details=str(e),
@@ -438,7 +510,7 @@ class MetadataRegistry:
                     "Filing not found in registry: %s", accession_number
                 )
             return removed
-        except sqlite3.Error as e:
+        except self._db_error as e:
             raise DatabaseError(
                 "Failed to remove filing",
                 details=str(e),
@@ -468,7 +540,7 @@ class MetadataRegistry:
             if row is None:
                 return None
             return self._row_to_record(row)
-        except sqlite3.Error as e:
+        except self._db_error as e:
             raise DatabaseError(
                 "Failed to retrieve filing",
                 details=str(e),
@@ -508,7 +580,7 @@ class MetadataRegistry:
             with self._lock:
                 rows = self._conn.execute(sql, params).fetchall()
             return [self._row_to_record(row) for row in rows]
-        except sqlite3.Error as e:
+        except self._db_error as e:
             raise DatabaseError(
                 "Failed to list filings",
                 details=str(e),
@@ -546,7 +618,7 @@ class MetadataRegistry:
             with self._lock:
                 row = self._conn.execute(sql, params).fetchone()
             return row[0]
-        except sqlite3.Error as e:
+        except self._db_error as e:
             raise DatabaseError(
                 "Failed to count filings",
                 details=str(e),
@@ -581,7 +653,7 @@ class MetadataRegistry:
         try:
             with self._lock:
                 rows = self._conn.execute(sql).fetchall()
-        except sqlite3.Error as e:
+        except self._db_error as e:
             raise DatabaseError(
                 "Failed to retrieve database statistics",
                 details=str(e),
@@ -673,7 +745,7 @@ class MetadataRegistry:
                     filings_failed,
                 ))
             logger.debug("Persisted task history: %s", task_id[:8])
-        except sqlite3.Error as e:
+        except self._db_error as e:
             raise DatabaseError(
                 "Failed to save task history",
                 details=str(e),
@@ -704,7 +776,7 @@ class MetadataRegistry:
                 "filings_skipped": row["filings_skipped"],
                 "filings_failed": row["filings_failed"],
             }
-        except sqlite3.Error as e:
+        except self._db_error as e:
             raise DatabaseError(
                 "Failed to retrieve task history",
                 details=str(e),
@@ -726,7 +798,7 @@ class MetadataRegistry:
             with self._lock, self._conn:
                 cursor = self._conn.execute(sql, (cutoff, max_age_days))
                 return cursor.rowcount
-        except sqlite3.Error as e:
+        except self._db_error as e:
             raise DatabaseError(
                 "Failed to prune task history",
                 details=str(e),
@@ -737,7 +809,7 @@ class MetadataRegistry:
     # ------------------------------------------------------------------
 
     @staticmethod
-    def _row_to_record(row: sqlite3.Row) -> FilingRecord:
+    def _row_to_record(row: Any) -> FilingRecord:
         """Convert a SQLite Row to a FilingRecord dataclass."""
         return FilingRecord(
             id=row["id"],
