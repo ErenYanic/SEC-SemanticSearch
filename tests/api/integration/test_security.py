@@ -1376,7 +1376,8 @@ class TestTaskPersistence:
             assert result is not None
             assert result["task_id"] == "abc123"
             assert result["status"] == "completed"
-            assert result["tickers"] == ["AAPL"]
+            # Tickers stripped by default (TASK_HISTORY_PERSIST_TICKERS=false).
+            assert result["tickers"] == []
             assert len(result["results"]) == 1
             assert result["results"][0]["chunk_count"] == 100
             assert result["filings_done"] == 1
