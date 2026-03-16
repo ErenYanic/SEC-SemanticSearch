@@ -238,7 +238,8 @@ class TestEncryptedMode:
         task = registry.get_task_history("task-enc-1")
         assert task is not None
         assert task["status"] == "completed"
-        assert task["tickers"] == ["AAPL"]
+        # Tickers stripped by default (TASK_HISTORY_PERSIST_TICKERS=false).
+        assert task["tickers"] == []
 
     def test_thread_safety_encrypted(self, registry):
         """Concurrent writes from multiple threads work in encrypted mode."""

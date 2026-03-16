@@ -20,6 +20,7 @@ Usage:
 """
 
 import json
+import re
 import sqlite3
 import threading
 import types
@@ -59,6 +60,49 @@ def _get_sqlite_module(encryption_key: str | None) -> types.ModuleType:
                 "Falling back to unencrypted sqlite3."
             )
     return sqlite3
+
+
+# SEC accession number pattern: NNNNNNNNNN-NN-NNNNNN (with or without dashes).
+_ACCESSION_RE = re.compile(r"\b\d{10}-?\d{2}-?\d{6}\b")
+
+
+def _scrub_error_message(
+    error: str | None,
+    tickers: list[str],
+) -> str | None:
+    """Remove ticker symbols and accession numbers from an error message.
+
+    Replaces known ticker symbols (case-insensitive, word-boundary match)
+    with ``[TICKER]`` and SEC accession numbers with ``[ACCESSION]``.
+    This prevents research-target identifiers from leaking into persisted
+    task history even when the error itself is stored.
+
+    Args:
+        error: The raw error message (may be ``None``).
+        tickers: Ticker symbols associated with the task.
+
+    Returns:
+        The scrubbed message, or ``None`` if *error* was ``None``.
+    """
+    if not error:
+        return error
+
+    scrubbed = error
+
+    # Replace known ticker symbols (case-insensitive, whole word).
+    for ticker in tickers:
+        if ticker:
+            scrubbed = re.sub(
+                rf"\b{re.escape(ticker)}\b",
+                "[TICKER]",
+                scrubbed,
+                flags=re.IGNORECASE,
+            )
+
+    # Replace accession numbers (NNNNNNNNNN-NN-NNNNNN format).
+    scrubbed = _ACCESSION_RE.sub("[ACCESSION]", scrubbed)
+
+    return scrubbed
 
 
 @dataclass
@@ -250,7 +294,7 @@ class MetadataRegistry:
             CREATE TABLE IF NOT EXISTS task_history (
                 task_id TEXT PRIMARY KEY,
                 status TEXT NOT NULL,
-                tickers TEXT NOT NULL,
+                tickers TEXT,
                 form_types TEXT NOT NULL,
                 results TEXT NOT NULL,
                 error TEXT,
@@ -721,7 +765,27 @@ class MetadataRegistry:
 
         Called by ``TaskManager`` just before pruning the in-memory entry.
         Uses ``INSERT OR REPLACE`` so re-saving is idempotent.
+
+        Privacy controls applied here:
+
+        - **Ticker stripping:** When ``TASK_HISTORY_PERSIST_TICKERS`` is
+          ``false`` (the default), the ``tickers`` column stores ``null``
+          instead of the actual ticker list.  This prevents research-target
+          patterns from being persisted to disk.
+        - **Error scrubbing:** Ticker symbols and accession numbers are
+          removed from ``error`` text before storage, regardless of the
+          ticker-persist setting (error messages can leak identifiers even
+          when tickers are stripped).
         """
+        settings = get_settings()
+        persist_tickers = settings.database.task_history_persist_tickers
+
+        # Privacy: strip tickers when not explicitly opted in.
+        tickers_json = json.dumps(tickers) if persist_tickers else None
+
+        # Privacy: scrub error messages of ticker/accession references.
+        scrubbed_error = _scrub_error_message(error, tickers) if error else None
+
         sql = """
             INSERT OR REPLACE INTO task_history
                 (task_id, status, tickers, form_types, results, error,
@@ -734,10 +798,10 @@ class MetadataRegistry:
                 self._conn.execute(sql, (
                     task_id,
                     status,
-                    json.dumps(tickers),
+                    tickers_json,
                     json.dumps(form_types),
                     json.dumps(results),
-                    error,
+                    scrubbed_error,
                     started_at,
                     completed_at,
                     filings_done,
@@ -766,7 +830,7 @@ class MetadataRegistry:
             return {
                 "task_id": row["task_id"],
                 "status": row["status"],
-                "tickers": json.loads(row["tickers"]),
+                "tickers": json.loads(row["tickers"]) if row["tickers"] else [],
                 "form_types": json.loads(row["form_types"]),
                 "results": json.loads(row["results"]),
                 "error": row["error"],
@@ -782,11 +846,21 @@ class MetadataRegistry:
                 details=str(e),
             ) from e
 
-    def prune_task_history(self, max_age_days: int = 7) -> int:
+    def prune_task_history(self, max_age_days: int | None = None) -> int:
         """Remove task history entries older than *max_age_days*.
 
-        Returns the number of entries removed.
+        When *max_age_days* is ``None`` (the default), the value is read
+        from ``TASK_HISTORY_RETENTION_DAYS``.  When the effective value
+        is ``0``, pruning is skipped entirely (keep indefinitely).
+
+        Returns the number of entries removed (``0`` when skipped).
         """
+        if max_age_days is None:
+            max_age_days = get_settings().database.task_history_retention_days
+
+        if max_age_days <= 0:
+            return 0  # 0 = keep indefinitely
+
         cutoff = datetime.now(timezone.utc).isoformat()
         # SQLite date arithmetic: entries with completed_at older than cutoff
         sql = """
@@ -797,7 +871,14 @@ class MetadataRegistry:
         try:
             with self._lock, self._conn:
                 cursor = self._conn.execute(sql, (cutoff, max_age_days))
-                return cursor.rowcount
+                removed = cursor.rowcount
+            if removed:
+                logger.info(
+                    "Pruned %d task history entries older than %d days",
+                    removed,
+                    max_age_days,
+                )
+            return removed
         except self._db_error as e:
             raise DatabaseError(
                 "Failed to prune task history",

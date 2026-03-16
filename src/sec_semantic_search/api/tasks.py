@@ -911,7 +911,8 @@ class TaskManager:
                     del self._tasks[task_id]
             logger.info("Pruned %d stale task(s)", len(to_remove))
 
-            # Also prune old history entries (> 7 days).
+            # Prune old history entries based on TASK_HISTORY_RETENTION_DAYS.
+            # When 0 (the default), pruning is skipped (kept indefinitely).
             try:
                 self._registry.prune_task_history()
             except Exception:
