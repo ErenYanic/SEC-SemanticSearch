@@ -45,6 +45,10 @@ export interface StatusResponse {
   ticker_breakdown: TickerBreakdown[];
   /** True when frontend must show Welcome screen for EDGAR credentials. */
   edgar_session_required: boolean;
+  /** True when DEMO_MODE is enabled — frontend shows banner. */
+  demo_mode: boolean;
+  /** True when the request carries a valid admin key, or no admin key is configured. */
+  is_admin: boolean;
 }
 
 // ---------------------------------------------------------------------------

@@ -86,6 +86,17 @@ class StatusResponse(BaseModel):
             "EDGAR_SESSION_REQUIRED=true — frontend must show Welcome screen"
         ),
     )
+    demo_mode: bool = Field(
+        False,
+        description="True when DEMO_MODE is enabled — frontend shows banner",
+    )
+    is_admin: bool = Field(
+        False,
+        description=(
+            "True when the request carries a valid admin key, or when "
+            "ADMIN_API_KEY is not configured (Scenario A)"
+        ),
+    )
 
 
 # ---------------------------------------------------------------------------

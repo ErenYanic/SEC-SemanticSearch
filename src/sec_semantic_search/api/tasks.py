@@ -124,6 +124,10 @@ class TaskInfo:
     started_at: datetime | None = None
     completed_at: datetime | None = None
 
+    # GPU time limit timer — set by TaskManager when
+    # MAX_TASK_DURATION_MINUTES > 0.  Cancelled on normal completion.
+    _duration_timer: threading.Timer | None = field(default=None, repr=False)
+
     # Accession numbers stored so far in the *current* filing — used for
     # partial rollback on cancellation.
     _stored_accessions: list[str] = field(default_factory=list)
@@ -353,6 +357,26 @@ class TaskManager:
         self._loop = loop
 
     # ------------------------------------------------------------------
+    # GPU time limit
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _timeout_task(info: TaskInfo) -> None:
+        """Cancel a task that has exceeded ``MAX_TASK_DURATION_MINUTES``.
+
+        Called by ``threading.Timer`` from a daemon thread.  Sets the
+        cancel event — the worker thread checks this between pipeline
+        steps and performs a clean rollback, exactly like a user-initiated
+        cancel.
+        """
+        if info.state == TaskState.RUNNING:
+            info.cancel_event.set()
+            logger.warning(
+                "Task %s auto-cancelled: exceeded GPU time limit",
+                info.task_id[:8],
+            )
+
+    # ------------------------------------------------------------------
     # WebSocket message helpers
     # ------------------------------------------------------------------
 
@@ -401,6 +425,18 @@ class TaskManager:
             info.state = TaskState.RUNNING
             info.started_at = datetime.now(timezone.utc)
 
+            # Start GPU time limit timer if configured.
+            max_minutes = get_settings().api.max_task_duration_minutes
+            if max_minutes > 0:
+                timer = threading.Timer(
+                    max_minutes * 60,
+                    self._timeout_task,
+                    args=(info,),
+                )
+                timer.daemon = True
+                timer.start()
+                info._duration_timer = timer
+
             # Set per-session EDGAR identity if provided.
             if info.edgar_name and info.edgar_email:
                 self._fetcher.set_identity(info.edgar_name, info.edgar_email)
@@ -418,6 +454,10 @@ class TaskManager:
             })
             logger.exception("Task %s failed unexpectedly", info.task_id[:8])
         finally:
+            # Cancel the duration timer if it hasn't fired yet.
+            if info._duration_timer is not None:
+                info._duration_timer.cancel()
+                info._duration_timer = None
             self._gpu_semaphore.release()
 
     def _execute(self, info: TaskInfo) -> None:

@@ -16,20 +16,20 @@ load_dotenv()
 
 
 class EdgarSettings(BaseSettings):
-    """SEC EDGAR API credentials and rate limiting.
+    """SEC EDGAR API credentials.
 
     In web deployments (Scenarios B/C) where ``EDGAR_SESSION_REQUIRED=true``,
     ``identity_name`` and ``identity_email`` may be unset — each user provides
     their own credentials per session via HTTP headers.  The CLI still requires
     them.
+
+    EDGAR rate limiting is handled by edgartools internally (``pyrate_limiter``
+    token bucket at 9 req/s by default, configurable via the
+    ``EDGAR_RATE_LIMIT_PER_SEC`` env var that edgartools reads directly).
     """
 
     identity_name: Optional[str] = None
     identity_email: Optional[str] = None
-
-    # Global EDGAR rate limiter (requests per second).  SEC allows 10 req/s;
-    # default 8 provides a safe margin.
-    rate_limit_rps: int = 8
 
     model_config = SettingsConfigDict(env_prefix="EDGAR_")
 

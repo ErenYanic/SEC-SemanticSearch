@@ -8,8 +8,8 @@ model and free VRAM.
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 
-from sec_semantic_search.api.dependencies import get_embedder, get_task_manager
-from sec_semantic_search.api.schemas import GPUStatusResponse, GPUUnloadResponse
+from sec_semantic_search.api.dependencies import get_embedder, get_task_manager, verify_admin_key
+from sec_semantic_search.api.schemas import ErrorResponse, GPUStatusResponse, GPUUnloadResponse
 from sec_semantic_search.api.tasks import TaskManager
 from sec_semantic_search.core import audit_log, get_logger
 from sec_semantic_search.pipeline import EmbeddingGenerator
@@ -44,7 +44,9 @@ async def gpu_status(
 @router.delete(
     "/gpu",
     response_model=GPUUnloadResponse,
+    responses={403: {"model": ErrorResponse}},
     summary="Unload embedding model",
+    dependencies=[Depends(verify_admin_key)],
 )
 async def gpu_unload(
     request: Request,

@@ -249,6 +249,7 @@ function FilingsContent() {
           onDeleteSelected={handleDeleteSelected}
           onDeleteAll={handleDeleteAll}
           isDeleting={filing.isDeleting}
+          isAdmin={status?.is_admin ?? false}
         />
       </div>
 

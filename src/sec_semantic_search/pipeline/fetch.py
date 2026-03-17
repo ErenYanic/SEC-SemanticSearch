@@ -112,6 +112,7 @@ class FilingFetcher:
         """Initialise the fetcher and configure EDGAR identity (if available)."""
         self.settings = get_settings()
         self.max_filings = self.settings.database.max_filings
+
         self._configure_identity()
 
     def _configure_identity(self) -> None:

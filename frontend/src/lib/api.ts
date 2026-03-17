@@ -53,6 +53,9 @@ const client = axios.create({
     ...(process.env.NEXT_PUBLIC_API_KEY
       ? { "X-API-Key": process.env.NEXT_PUBLIC_API_KEY }
       : {}),
+    ...(process.env.NEXT_PUBLIC_ADMIN_KEY
+      ? { "X-Admin-Key": process.env.NEXT_PUBLIC_ADMIN_KEY }
+      : {}),
   },
 });
 
@@ -99,13 +102,19 @@ export function extractApiError(err: unknown): ApiError {
     if (typeof data === "object" && "message" in data) {
       return data as ApiError;
     }
-    // FastAPI validation errors (422) have a different shape.
+    // FastAPI HTTPException wraps our ErrorResponse in `detail`.
     if (typeof data === "object" && "detail" in data) {
+      const detail = data.detail;
+      // Our structured ErrorResponse inside `detail`.
+      if (typeof detail === "object" && detail !== null && "message" in detail) {
+        return detail as ApiError;
+      }
+      // FastAPI validation errors (422) have an array shape.
       return {
         error: "ValidationError",
-        message: Array.isArray(data.detail)
-          ? data.detail.map((d: { msg: string }) => d.msg).join("; ")
-          : String(data.detail),
+        message: Array.isArray(detail)
+          ? detail.map((d: { msg: string }) => d.msg).join("; ")
+          : String(detail),
       };
     }
   }

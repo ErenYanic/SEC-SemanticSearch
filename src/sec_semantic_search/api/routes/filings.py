@@ -13,7 +13,7 @@ from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request
 
-from sec_semantic_search.api.dependencies import get_chroma, get_registry
+from sec_semantic_search.api.dependencies import get_chroma, get_registry, verify_admin_key
 from sec_semantic_search.api.schemas import (
     BulkDeleteRequest,
     BulkDeleteResponse,
@@ -25,6 +25,7 @@ from sec_semantic_search.api.schemas import (
     FilingListResponse,
     FilingSchema,
 )
+from sec_semantic_search.config import get_settings
 from sec_semantic_search.core import DatabaseError, audit_log, get_logger
 from sec_semantic_search.database import ChromaDBClient, MetadataRegistry, delete_filings_batch
 from sec_semantic_search.database.metadata import FilingRecord
@@ -242,8 +243,13 @@ async def delete_by_ids(
 @router.post(
     "/bulk-delete",
     response_model=BulkDeleteResponse,
-    responses={400: {"model": ErrorResponse}, 500: {"model": ErrorResponse}},
+    responses={
+        400: {"model": ErrorResponse},
+        403: {"model": ErrorResponse},
+        500: {"model": ErrorResponse},
+    },
     summary="Bulk delete filings by filter",
+    dependencies=[Depends(verify_admin_key)],
 )
 async def bulk_delete(
     request: Request,
@@ -317,8 +323,13 @@ async def bulk_delete(
 @router.delete(
     "/",
     response_model=ClearAllResponse,
-    responses={400: {"model": ErrorResponse}, 500: {"model": ErrorResponse}},
+    responses={
+        400: {"model": ErrorResponse},
+        403: {"model": ErrorResponse},
+        500: {"model": ErrorResponse},
+    },
     summary="Clear all filings",
+    dependencies=[Depends(verify_admin_key)],
 )
 async def clear_all(
     request: Request,
@@ -332,8 +343,21 @@ async def clear_all(
     Delete every filing from both stores.
 
     Requires ``confirm=true`` as a safety measure to prevent accidental
-    data loss.
+    data loss.  Disabled entirely when ``DEMO_MODE=true`` — returns 403
+    for everyone, including admins.  The nightly reset script handles
+    full cleanup in demo deployments.
     """
+    if get_settings().api.demo_mode:
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "error": "demo_mode",
+                "message": "Clear all is disabled in demo mode.",
+                "details": None,
+                "hint": "Data resets nightly at midnight UTC.",
+            },
+        )
+
     if not confirm:
         raise HTTPException(
             status_code=400,
