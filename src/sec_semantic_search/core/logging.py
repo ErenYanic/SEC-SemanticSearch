@@ -8,6 +8,10 @@ Configuration:
     LOG_LEVEL environment variable controls the logging level.
     Valid values: DEBUG, INFO, WARNING, ERROR, CRITICAL (default: INFO)
 
+    LOG_FILE_PATH environment variable enables optional file logging via
+    RotatingFileHandler.  LOG_FILE_MAX_BYTES (default 10 MB) and
+    LOG_FILE_BACKUP_COUNT (default 3) control rotation.
+
 Usage:
     from sec_semantic_search.core.logging import get_logger
 
@@ -17,8 +21,10 @@ Usage:
 
 import hashlib
 import logging
+import logging.handlers
 import os
 import sys
+from pathlib import Path
 from typing import Optional
 
 from rich.console import Console
@@ -44,6 +50,36 @@ def _get_log_level() -> int:
     """
     level_name = os.environ.get("LOG_LEVEL", "INFO").upper()
     return getattr(logging, level_name, logging.INFO)
+
+
+def _add_file_handler(
+    logger: logging.Logger,
+    file_path: str,
+    log_level: int,
+) -> None:
+    """Attach a ``RotatingFileHandler`` to *logger*.
+
+    Creates parent directories if they do not exist.  Rotation is
+    controlled by ``LOG_FILE_MAX_BYTES`` (default 10 MB) and
+    ``LOG_FILE_BACKUP_COUNT`` (default 3).
+    """
+    max_bytes = int(os.environ.get("LOG_FILE_MAX_BYTES", 10_485_760))
+    backup_count = int(os.environ.get("LOG_FILE_BACKUP_COUNT", 3))
+
+    # Ensure the parent directory exists
+    Path(file_path).parent.mkdir(parents=True, exist_ok=True)
+
+    file_handler = logging.handlers.RotatingFileHandler(
+        filename=file_path,
+        maxBytes=max_bytes,
+        backupCount=backup_count,
+        encoding="utf-8",
+    )
+    file_handler.setLevel(log_level)
+    file_handler.setFormatter(
+        logging.Formatter(DEFAULT_FORMAT, datefmt=DEFAULT_DATE_FORMAT)
+    )
+    logger.addHandler(file_handler)
 
 
 def configure_logging(
@@ -99,6 +135,13 @@ def configure_logging(
 
     handler.setLevel(log_level)
     logger.addHandler(handler)
+
+    # Optional file logging via RotatingFileHandler.
+    # Reads from os.environ directly (same pattern as _get_log_level)
+    # to avoid circular imports with pydantic-settings.
+    log_file_path = os.environ.get("LOG_FILE_PATH")
+    if log_file_path:
+        _add_file_handler(logger, log_file_path, log_level)
 
     # Prevent propagation to root logger
     logger.propagate = False
