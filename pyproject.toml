@@ -24,7 +24,7 @@ classifiers = [
 
 dependencies = [
     # SEC filing retrieval
-    "edgartools==5.21.1",
+    "edgartools==5.24.0",
 
     # HTML parsing
     "doc2dict==0.6.9",
