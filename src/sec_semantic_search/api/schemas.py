@@ -63,7 +63,8 @@ class StatusResponse(BaseModel):
     """
     Response for ``GET /api/status/``.
 
-    Provides a full overview of database contents and capacity.
+    Provides a full overview of database contents and capacity, plus
+    deployment flags that the frontend needs to adapt its UI.
     """
 
     filing_count: int = Field(..., ge=0, description="Total ingested filings")
@@ -77,6 +78,13 @@ class StatusResponse(BaseModel):
     ticker_breakdown: list[TickerBreakdown] = Field(
         default_factory=list,
         description="Per-ticker filing and chunk statistics",
+    )
+    edgar_session_required: bool = Field(
+        False,
+        description=(
+            "True when server-side EDGAR credentials are unset and "
+            "EDGAR_SESSION_REQUIRED=true — frontend must show Welcome screen"
+        ),
     )
 
 

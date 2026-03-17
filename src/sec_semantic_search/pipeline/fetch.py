@@ -127,7 +127,7 @@ class FilingFetcher:
         if name and email:
             try:
                 set_identity(f"{name} {email}")
-                logger.debug("EDGAR identity configured: %s", email)
+                logger.debug("EDGAR identity configured from server-side env vars")
             except Exception as e:
                 raise FetchError(
                     "Failed to configure EDGAR identity",
@@ -144,9 +144,13 @@ class FilingFetcher:
 
         Called by the API layer when users supply credentials via HTTP
         headers (``X-Edgar-Name`` / ``X-Edgar-Email``).
+
+        **Privacy:** EDGAR credentials are never logged — not even at
+        DEBUG level.  They are personal identity data that must not
+        appear in any log output, database, or file.
         """
         set_identity(f"{name} {email}")
-        logger.debug("EDGAR identity set for session: %s", email)
+        logger.debug("EDGAR identity set via per-session credentials")
 
     def _validate_form_type(self, form_type: str) -> str:
         """

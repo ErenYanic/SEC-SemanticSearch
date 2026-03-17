@@ -45,6 +45,16 @@ async def status(
         for ts in stats.ticker_breakdown
     ]
 
+    # The frontend needs to know whether to show the Welcome screen.
+    # Session is required when the server has no EDGAR identity AND
+    # the setting explicitly mandates per-session credentials.
+    has_server_identity = bool(
+        settings.edgar.identity_name and settings.edgar.identity_email
+    )
+    edgar_session_required = (
+        settings.api.edgar_session_required and not has_server_identity
+    )
+
     return StatusResponse(
         filing_count=stats.filing_count,
         max_filings=settings.database.max_filings,
@@ -52,4 +62,5 @@ async def status(
         tickers=stats.tickers,
         form_breakdown=stats.form_breakdown,
         ticker_breakdown=ticker_breakdown,
+        edgar_session_required=edgar_session_required,
     )
