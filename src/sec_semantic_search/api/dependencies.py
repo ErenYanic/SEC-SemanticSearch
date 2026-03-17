@@ -23,6 +23,8 @@ from dataclasses import dataclass
 from fastapi import HTTPException, Request, Security
 from fastapi.security import APIKeyHeader
 
+from sec_semantic_search.core import audit_log
+
 from sec_semantic_search.config import get_settings
 from sec_semantic_search.database import ChromaDBClient, MetadataRegistry
 from sec_semantic_search.pipeline import EmbeddingGenerator, FilingFetcher
@@ -33,6 +35,7 @@ from sec_semantic_search.search import SearchEngine
 # ---------------------------------------------------------------------------
 
 _api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
+_admin_key_header = APIKeyHeader(name="X-Admin-Key", auto_error=False)
 
 
 async def verify_api_key(
@@ -57,6 +60,57 @@ async def verify_api_key(
                 "hint": "Provide a valid key via the X-API-Key header.",
             },
         )
+
+
+async def verify_admin_key(
+    request: Request,
+    admin_key: str | None = Security(_admin_key_header),
+) -> None:
+    """Validate the ``X-Admin-Key`` header for destructive operations.
+
+    Two-tier access control (see ``docs/DEPLOYMENT.md`` §4.8):
+        - If ``ADMIN_API_KEY`` is not configured → unrestricted (Scenario A).
+        - If configured → the caller must supply a matching ``X-Admin-Key``
+          header; mismatches return 403.
+
+    Applied via ``Depends()`` on: clear all filings, bulk delete, GPU unload.
+    """
+    settings = get_settings()
+    expected = settings.api.admin_key
+    if expected is None:
+        # No admin key configured — unrestricted (Scenario A).
+        return
+    if admin_key is None or admin_key != expected:
+        client_ip = request.client.host if request.client else "unknown"
+        audit_log(
+            "admin_denied",
+            client_ip=client_ip,
+            endpoint=f"{request.method} {request.url.path}",
+            detail="Missing or invalid admin key",
+        )
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "error": "admin_required",
+                "message": "Admin access required for this operation.",
+                "details": None,
+                "hint": "Provide a valid admin key via the X-Admin-Key header.",
+            },
+        )
+
+
+def is_admin_request(request: Request) -> bool:
+    """Check whether the current request carries a valid admin key.
+
+    Unlike ``verify_admin_key()`` this does **not** raise — it returns a
+    boolean.  Used by the status endpoint to include ``is_admin`` in the
+    response without blocking non-admin callers.
+    """
+    expected = get_settings().api.admin_key
+    if expected is None:
+        # No admin key configured — everyone is effectively admin.
+        return True
+    return request.headers.get("X-Admin-Key") == expected
 
 
 def get_registry(request: Request) -> MetadataRegistry:

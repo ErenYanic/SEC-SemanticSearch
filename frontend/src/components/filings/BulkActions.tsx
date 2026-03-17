@@ -31,6 +31,8 @@ interface BulkActionsProps {
   onDeleteAll: () => void;
   /** Disable buttons while a deletion is in progress. */
   isDeleting: boolean;
+  /** Whether the current user has admin access. Hides bulk/clear buttons when false. */
+  isAdmin: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -43,7 +45,12 @@ export function BulkActions({
   onDeleteSelected,
   onDeleteAll,
   isDeleting,
+  isAdmin,
 }: BulkActionsProps) {
+  if (!isAdmin) {
+    return null;
+  }
+
   return (
     <div className="flex items-center gap-3">
       {/* Delete Selected — filled red, disabled when nothing selected */}

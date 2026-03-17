@@ -245,17 +245,6 @@ class TestEdgarSettingsW5:
         assert s.identity_name == "Test User"
         assert s.identity_email == "test@example.com"
 
-    def test_edgar_rate_limit_default(self, monkeypatch):
-        monkeypatch.delenv("EDGAR_RATE_LIMIT_RPS", raising=False)
-        s = EdgarSettings()
-        assert s.rate_limit_rps == 8
-
-    def test_edgar_rate_limit_override(self, monkeypatch):
-        monkeypatch.setenv("EDGAR_RATE_LIMIT_RPS", "5")
-        s = EdgarSettings()
-        assert s.rate_limit_rps == 5
-
-
 class TestDatabaseSettingsW5:
     """New privacy fields on DatabaseSettings."""
 

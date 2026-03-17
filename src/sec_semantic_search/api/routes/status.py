@@ -6,9 +6,9 @@ per-ticker and per-form breakdowns.  Mirrors the CLI ``manage status``
 command output.
 """
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 
-from sec_semantic_search.api.dependencies import get_chroma, get_registry
+from sec_semantic_search.api.dependencies import get_chroma, get_registry, is_admin_request
 from sec_semantic_search.api.schemas import StatusResponse, TickerBreakdown
 from sec_semantic_search.config import get_settings
 from sec_semantic_search.database import ChromaDBClient, MetadataRegistry
@@ -22,6 +22,7 @@ router = APIRouter()
     summary="Database overview",
 )
 async def status(
+    request: Request,
     registry: MetadataRegistry = Depends(get_registry),
     chroma: ChromaDBClient = Depends(get_chroma),
 ) -> StatusResponse:
@@ -63,4 +64,6 @@ async def status(
         form_breakdown=stats.form_breakdown,
         ticker_breakdown=ticker_breakdown,
         edgar_session_required=edgar_session_required,
+        demo_mode=settings.api.demo_mode,
+        is_admin=is_admin_request(request),
     )

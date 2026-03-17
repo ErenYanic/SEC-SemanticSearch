@@ -15,9 +15,13 @@ converts internal dataclasses into Pydantic response schemas.
 
 from __future__ import annotations
 
+import threading
+import time
+
 from fastapi import APIRouter, Depends, HTTPException, Request
 
 from sec_semantic_search.api.dependencies import EdgarIdentity, get_edgar_identity, get_task_manager
+from sec_semantic_search.config import get_settings
 from sec_semantic_search.api.schemas import (
     ErrorResponse,
     IngestRequest,
@@ -33,6 +37,65 @@ from sec_semantic_search.core import audit_log, get_logger, redact_for_log
 logger = get_logger(__name__)
 
 router = APIRouter()
+
+# ---------------------------------------------------------------------------
+# Per-IP ingest cooldown tracking
+# ---------------------------------------------------------------------------
+
+# In-memory dict: IP → monotonic timestamp of last ingest request.
+_cooldown_lock = threading.Lock()
+_last_ingest: dict[str, float] = {}
+# How often to purge stale entries (seconds).
+_COOLDOWN_PRUNE_INTERVAL = 600
+_last_cooldown_prune: float = 0.0
+
+
+def _check_cooldown(client_ip: str) -> None:
+    """Enforce ``INGEST_COOLDOWN_SECONDS`` for the given client IP.
+
+    Raises ``HTTPException(429)`` if the client has ingested too recently.
+    When ``INGEST_COOLDOWN_SECONDS`` is ``0``, the check is skipped entirely.
+    """
+    global _last_cooldown_prune  # noqa: PLW0603
+
+    cooldown = get_settings().api.ingest_cooldown_seconds
+    if cooldown <= 0:
+        return
+
+    now = time.monotonic()
+
+    with _cooldown_lock:
+        # Lazy prune: remove entries older than 2× the cooldown window
+        # to prevent unbounded memory growth from stale IPs.
+        if now - _last_cooldown_prune > _COOLDOWN_PRUNE_INTERVAL:
+            cutoff = now - (cooldown * 2)
+            stale = [ip for ip, ts in _last_ingest.items() if ts < cutoff]
+            for ip in stale:
+                del _last_ingest[ip]
+            _last_cooldown_prune = now
+
+        last = _last_ingest.get(client_ip)
+        if last is not None:
+            elapsed = now - last
+            if elapsed < cooldown:
+                remaining = int(cooldown - elapsed) + 1
+                raise HTTPException(
+                    status_code=429,
+                    detail={
+                        "error": "cooldown",
+                        "message": (
+                            f"Please wait {remaining}s before submitting "
+                            "another ingest request."
+                        ),
+                        "details": None,
+                        "hint": (
+                            f"Ingest cooldown is {cooldown}s between requests."
+                        ),
+                    },
+                )
+
+        # Record this request timestamp.
+        _last_ingest[client_ip] = now
 
 
 # ---------------------------------------------------------------------------
@@ -80,6 +143,43 @@ def _create_task(
     body: IngestRequest, manager: TaskManager, identity: EdgarIdentity,
 ) -> TaskResponse:
     """Shared logic for both add and batch endpoints."""
+    settings = get_settings()
+
+    # --- Abuse prevention: request caps --------------------------------
+    max_tickers = settings.api.max_tickers_per_request
+    if max_tickers > 0 and len(body.tickers) > max_tickers:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": "request_cap_exceeded",
+                "message": (
+                    f"Too many tickers: {len(body.tickers)} "
+                    f"(maximum {max_tickers} per request)."
+                ),
+                "details": None,
+                "hint": f"Submit at most {max_tickers} tickers per request.",
+            },
+        )
+
+    max_filings = settings.api.max_filings_per_request
+    if (
+        max_filings > 0
+        and body.count is not None
+        and body.count > max_filings
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": "request_cap_exceeded",
+                "message": (
+                    f"Too many filings requested: {body.count} "
+                    f"(maximum {max_filings} per request)."
+                ),
+                "details": None,
+                "hint": f"Request at most {max_filings} filings per request.",
+            },
+        )
+
     try:
         task_id = manager.create_task(
             tickers=body.tickers,
@@ -131,6 +231,7 @@ def _create_task(
     summary="Ingest filings for a single ticker",
 )
 async def ingest_add(
+    request: Request,
     body: IngestRequest,
     manager: TaskManager = Depends(get_task_manager),
     identity: EdgarIdentity = Depends(get_edgar_identity),
@@ -156,6 +257,8 @@ async def ingest_add(
             },
         )
 
+    client_ip = request.client.host if request.client else "unknown"
+    _check_cooldown(client_ip)
     return _create_task(body, manager, identity)
 
 
@@ -167,6 +270,7 @@ async def ingest_add(
     summary="Ingest filings for multiple tickers",
 )
 async def ingest_batch(
+    request: Request,
     body: IngestRequest,
     manager: TaskManager = Depends(get_task_manager),
     identity: EdgarIdentity = Depends(get_edgar_identity),
@@ -177,6 +281,8 @@ async def ingest_batch(
     Equivalent to ``sec-search ingest batch``.  The task runs in the
     background; poll status or connect via WebSocket.
     """
+    client_ip = request.client.host if request.client else "unknown"
+    _check_cooldown(client_ip)
     return _create_task(body, manager, identity)
 
 
