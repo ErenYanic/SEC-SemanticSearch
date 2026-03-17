@@ -13,8 +13,9 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Github, Linkedin, LayoutDashboard, Search, Upload, FileText, Sun, Moon, Loader2 } from "lucide-react";
+import { Github, Linkedin, LayoutDashboard, Search, Upload, FileText, Sun, Moon, Loader2, LogOut } from "lucide-react";
 import { useTheme } from "./ThemeProvider";
+import { useEdgarSession } from "@/hooks/useEdgarSession";
 
 // ---------------------------------------------------------------------------
 // Navigation items
@@ -52,6 +53,7 @@ export function Navbar({ isTaskActive = false }: NavbarProps) {
   // We use it to determine which nav link should be highlighted.
   const pathname = usePathname();
   const { theme, toggleTheme } = useTheme();
+  const { isAuthenticated, logout } = useEdgarSession();
 
   return (
     <nav className="border-b border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-950">
@@ -137,6 +139,18 @@ export function Navbar({ isTaskActive = false }: NavbarProps) {
               <Sun className="h-5 w-5" />
             )}
           </button>
+
+          {/* Logout button — visible only when per-session EDGAR credentials are active */}
+          {isAuthenticated && (
+            <button
+              onClick={logout}
+              className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100"
+              aria-label="Clear EDGAR credentials and return to Welcome screen"
+            >
+              <LogOut className="h-4 w-4" />
+              <span className="hidden sm:inline">Logout</span>
+            </button>
+          )}
         </div>
       </div>
     </nav>

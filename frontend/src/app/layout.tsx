@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Providers } from "@/components/Providers";
-import { Navbar, Footer } from "@/components/layout";
+import { Navbar, Footer, WelcomeGate } from "@/components/layout";
 import "./globals.css";
 
 /**
@@ -69,24 +69,26 @@ export default function RootLayout({
           bg-gray-50 text-gray-900 dark:bg-gray-900 dark:text-gray-100`}
       >
         <Providers>
-          {/* Skip-to-content — first focusable element on the page.
-              Hidden until focused (sr-only → not-sr-only on focus). */}
-          <a
-            href="#main-content"
-            className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:bg-blue-600 focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-white focus:outline-none"
-          >
-            Skip to content
-          </a>
-          <div className="flex min-h-screen flex-col">
-            <Navbar />
-            <main
-              id="main-content"
-              className="mx-auto w-full max-w-7xl flex-1 px-4 py-8 sm:px-6 lg:px-8"
+          <WelcomeGate>
+            {/* Skip-to-content — first focusable element on the page.
+                Hidden until focused (sr-only → not-sr-only on focus). */}
+            <a
+              href="#main-content"
+              className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:bg-blue-600 focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-white focus:outline-none"
             >
-              {children}
-            </main>
-            <Footer />
-          </div>
+              Skip to content
+            </a>
+            <div className="flex min-h-screen flex-col">
+              <Navbar />
+              <main
+                id="main-content"
+                className="mx-auto w-full max-w-7xl flex-1 px-4 py-8 sm:px-6 lg:px-8"
+              >
+                {children}
+              </main>
+              <Footer />
+            </div>
+          </WelcomeGate>
         </Providers>
       </body>
     </html>

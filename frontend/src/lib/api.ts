@@ -57,6 +57,31 @@ const client = axios.create({
 });
 
 // ---------------------------------------------------------------------------
+// EDGAR session credential interceptor
+// ---------------------------------------------------------------------------
+
+/**
+ * Attach `X-Edgar-Name` and `X-Edgar-Email` headers from sessionStorage
+ * to every outgoing request.  The backend uses these for EDGAR API calls
+ * (ingest routes only), but attaching them globally is harmless — the
+ * backend ignores them on non-ingest endpoints.
+ *
+ * Reading from `sessionStorage` directly (rather than importing the hook)
+ * keeps this module free of React dependencies.
+ */
+client.interceptors.request.use((config) => {
+  if (typeof window !== "undefined") {
+    const name = sessionStorage.getItem("edgar_name");
+    const email = sessionStorage.getItem("edgar_email");
+    if (name && email) {
+      config.headers["X-Edgar-Name"] = name;
+      config.headers["X-Edgar-Email"] = email;
+    }
+  }
+  return config;
+});
+
+// ---------------------------------------------------------------------------
 // Error interceptor
 // ---------------------------------------------------------------------------
 

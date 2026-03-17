@@ -17,7 +17,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 
-from sec_semantic_search.api.dependencies import get_task_manager
+from sec_semantic_search.api.dependencies import EdgarIdentity, get_edgar_identity, get_task_manager
 from sec_semantic_search.api.schemas import (
     ErrorResponse,
     IngestRequest,
@@ -76,7 +76,9 @@ def _task_info_to_status(info: TaskInfo) -> TaskStatus:
     )
 
 
-def _create_task(body: IngestRequest, manager: TaskManager) -> TaskResponse:
+def _create_task(
+    body: IngestRequest, manager: TaskManager, identity: EdgarIdentity,
+) -> TaskResponse:
     """Shared logic for both add and batch endpoints."""
     try:
         task_id = manager.create_task(
@@ -87,6 +89,8 @@ def _create_task(body: IngestRequest, manager: TaskManager) -> TaskResponse:
             year=body.year,
             start_date=body.start_date,
             end_date=body.end_date,
+            edgar_name=identity.name,
+            edgar_email=identity.email,
         )
     except TaskQueueFullError as exc:
         raise HTTPException(
@@ -129,6 +133,7 @@ def _create_task(body: IngestRequest, manager: TaskManager) -> TaskResponse:
 async def ingest_add(
     body: IngestRequest,
     manager: TaskManager = Depends(get_task_manager),
+    identity: EdgarIdentity = Depends(get_edgar_identity),
 ) -> TaskResponse:
     """
     Start an ingestion task for a single ticker symbol.
@@ -151,7 +156,7 @@ async def ingest_add(
             },
         )
 
-    return _create_task(body, manager)
+    return _create_task(body, manager, identity)
 
 
 @router.post(
@@ -164,6 +169,7 @@ async def ingest_add(
 async def ingest_batch(
     body: IngestRequest,
     manager: TaskManager = Depends(get_task_manager),
+    identity: EdgarIdentity = Depends(get_edgar_identity),
 ) -> TaskResponse:
     """
     Start an ingestion task for one or more ticker symbols.
@@ -171,7 +177,7 @@ async def ingest_batch(
     Equivalent to ``sec-search ingest batch``.  The task runs in the
     background; poll status or connect via WebSocket.
     """
-    return _create_task(body, manager)
+    return _create_task(body, manager, identity)
 
 
 @router.get(

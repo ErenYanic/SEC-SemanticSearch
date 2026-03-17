@@ -166,7 +166,13 @@ def create_app() -> FastAPI:
         allow_origins=settings.api.cors_origins,
         allow_credentials=True,
         allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
-        allow_headers=["Content-Type", "Authorization"],
+        allow_headers=[
+            "Content-Type",
+            "Authorization",
+            "X-API-Key",
+            "X-Edgar-Name",
+            "X-Edgar-Email",
+        ],
     )
 
     # -- Routers (uncommented as implemented in W1.2–W1.8) ------------------

@@ -43,6 +43,8 @@ export interface StatusResponse {
   tickers: string[];
   form_breakdown: Record<string, number>;
   ticker_breakdown: TickerBreakdown[];
+  /** True when frontend must show Welcome screen for EDGAR credentials. */
+  edgar_session_required: boolean;
 }
 
 // ---------------------------------------------------------------------------

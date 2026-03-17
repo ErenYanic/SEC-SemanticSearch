@@ -113,6 +113,12 @@ class TaskInfo:
     results: list[FilingResult] = field(default_factory=list)
     error: str | None = None
 
+    # Per-session EDGAR credentials (name, email) — set by the route
+    # handler when the user provides credentials via HTTP headers.
+    # Never logged or persisted.
+    edgar_name: str | None = None
+    edgar_email: str | None = None
+
     cancel_event: threading.Event = field(default_factory=threading.Event)
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     started_at: datetime | None = None
@@ -187,6 +193,8 @@ class TaskManager:
         year: int | None = None,
         start_date: str | None = None,
         end_date: str | None = None,
+        edgar_name: str | None = None,
+        edgar_email: str | None = None,
     ) -> str:
         """
         Create a new ingestion task and start it in a background thread.
@@ -219,6 +227,8 @@ class TaskManager:
             year=year,
             start_date=start_date,
             end_date=end_date,
+            edgar_name=edgar_name,
+            edgar_email=edgar_email,
         )
 
         with self._lock:
@@ -390,6 +400,10 @@ class TaskManager:
 
             info.state = TaskState.RUNNING
             info.started_at = datetime.now(timezone.utc)
+
+            # Set per-session EDGAR identity if provided.
+            if info.edgar_name and info.edgar_email:
+                self._fetcher.set_identity(info.edgar_name, info.edgar_email)
 
             self._execute(info)
 
