@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import threading
 import time
-from collections import defaultdict
+from collections import defaultdict, deque
 
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
@@ -42,7 +42,7 @@ class _SlidingWindow:
     def __init__(self, requests_per_minute: int) -> None:
         self._limit = requests_per_minute
         self._window = 60.0
-        self._requests: dict[str, list[float]] = defaultdict(list)
+        self._requests: dict[str, deque[float]] = defaultdict(deque)
         self._lock = threading.Lock()
         self._last_cleanup = time.monotonic()
 
@@ -65,9 +65,9 @@ class _SlidingWindow:
 
             cutoff = now - self._window
             timestamps = self._requests[key]
-            # Remove timestamps outside the window.
-            self._requests[key] = [t for t in timestamps if t > cutoff]
-            timestamps = self._requests[key]
+            # Pop expired timestamps from the front (deque is ordered).
+            while timestamps and timestamps[0] <= cutoff:
+                timestamps.popleft()
 
             if len(timestamps) >= self._limit:
                 retry_after = int(self._window - (now - timestamps[0])) + 1
