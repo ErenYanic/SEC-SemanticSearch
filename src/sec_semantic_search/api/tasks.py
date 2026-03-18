@@ -35,7 +35,7 @@ from sec_semantic_search.core import (
     SECSemanticSearchError,
     get_logger,
 )
-from sec_semantic_search.database import ChromaDBClient, MetadataRegistry
+from sec_semantic_search.database import ChromaDBClient, MetadataRegistry, delete_filings_batch
 from sec_semantic_search.pipeline import PipelineOrchestrator
 from sec_semantic_search.pipeline.fetch import FilingFetcher, FilingInfo
 
@@ -484,6 +484,17 @@ class TaskManager:
         all_accessions = [fi.accession_number for fi in work]
         existing = self._registry.get_existing_accessions(all_accessions)
 
+        # --- FIFO eviction (demo mode only) ------------------------------
+        # When DEMO_MODE is enabled and the incoming batch would exceed the
+        # filing limit, automatically evict the oldest filings to make room
+        # instead of failing with FilingLimitExceededError.
+        settings = get_settings()
+        if settings.api.demo_mode:
+            new_count = sum(
+                1 for fi in work if fi.accession_number not in existing
+            )
+            self._maybe_evict(info, new_count)
+
         for filing_info in work:
             filing_id = filing_info.to_identifier()
 
@@ -526,15 +537,32 @@ class TaskManager:
             try:
                 self._registry.check_filing_limit()
             except FilingLimitExceededError as exc:
-                info.state = TaskState.FAILED
-                info.error = exc.message
-                info.completed_at = datetime.now(timezone.utc)
-                self._push(info, {
-                    "type": "failed",
-                    "error": exc.message,
-                    "details": exc.details,
-                })
-                return
+                # In demo mode, attempt FIFO eviction instead of failing.
+                if settings.api.demo_mode:
+                    self._maybe_evict(info, 1)
+                    # Re-check after eviction — if still full, fail.
+                    try:
+                        self._registry.check_filing_limit()
+                    except FilingLimitExceededError as exc2:
+                        info.state = TaskState.FAILED
+                        info.error = exc2.message
+                        info.completed_at = datetime.now(timezone.utc)
+                        self._push(info, {
+                            "type": "failed",
+                            "error": exc2.message,
+                            "details": exc2.details,
+                        })
+                        return
+                else:
+                    info.state = TaskState.FAILED
+                    info.error = exc.message
+                    info.completed_at = datetime.now(timezone.utc)
+                    self._push(info, {
+                        "type": "failed",
+                        "error": exc.message,
+                        "details": exc.details,
+                    })
+                    return
 
             # --- Fetch HTML content (on demand) --------------------------
             info.progress.step_label = "Fetching"
@@ -880,6 +908,66 @@ class TaskManager:
                 )
 
         info._stored_accessions.clear()
+
+    # ------------------------------------------------------------------
+    # FIFO eviction (demo mode)
+    # ------------------------------------------------------------------
+
+    def _maybe_evict(self, info: TaskInfo, new_filings: int) -> None:
+        """
+        Evict the oldest filings when demo mode is active and the
+        database would exceed its capacity with the incoming batch.
+
+        Uses ``list_oldest_filings()`` + ``delete_filings_batch()`` to
+        remove the oldest ``slots_needed + DEMO_EVICTION_BUFFER`` filings
+        from both stores.  Sends a WebSocket ``eviction`` message so the
+        frontend can display a toast notification.
+
+        No-op when there is enough space or when the eviction count
+        computes to zero.
+        """
+        settings = get_settings()
+        max_filings = settings.database.max_filings
+        current_count = self._registry.count()
+        available = max_filings - current_count
+
+        if new_filings <= available:
+            return  # enough room — no eviction needed
+
+        slots_needed = new_filings - available
+        eviction_count = slots_needed + settings.api.demo_eviction_buffer
+
+        # Don't try to evict more than what's stored.
+        eviction_count = min(eviction_count, current_count)
+
+        if eviction_count <= 0:
+            return
+
+        oldest = self._registry.list_oldest_filings(eviction_count)
+        if not oldest:
+            return
+
+        evicted_tickers = sorted({f.ticker for f in oldest})
+        chunks_deleted = delete_filings_batch(
+            oldest, chroma=self._chroma, registry=self._registry,
+        )
+
+        logger.info(
+            "Task %s: FIFO eviction — deleted %d filing(s) (%d chunks) "
+            "to make room for %d new filing(s)",
+            info.task_id[:8],
+            len(oldest),
+            chunks_deleted,
+            new_filings,
+        )
+
+        # Notify WebSocket clients of the eviction.
+        self._push(info, {
+            "type": "eviction",
+            "filings_evicted": len(oldest),
+            "chunks_evicted": chunks_deleted,
+            "tickers_affected": evicted_tickers,
+        })
 
     # ------------------------------------------------------------------
     # Cleanup

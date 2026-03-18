@@ -131,6 +131,12 @@ export function useFilings(params: FilingQueryParams): UseFilingsReturn {
       // Dashboard counts should update too.
       queryClient.invalidateQueries({ queryKey: ["status"] });
     },
+    onError: () => {
+      // Filing may have been evicted (demo mode FIFO) — refetch the
+      // list so the stale row disappears from the table.
+      queryClient.invalidateQueries({ queryKey });
+      queryClient.invalidateQueries({ queryKey: ["status"] });
+    },
   });
 
   // ---- Mutation: clear all filings ----
@@ -149,7 +155,7 @@ export function useFilings(params: FilingQueryParams): UseFilingsReturn {
   // Multi-select delete: single batch request via POST /api/filings/delete-by-ids.
   const batchDelete = useMutation<DeleteByIdsResponse, Error, string[]>({
     mutationFn: deleteFilingsByIds,
-    onSuccess: (result, accessionNumbers) => {
+    onSuccess: (_result, accessionNumbers) => {
       // Optimistic removal: splice all deleted filings from the cache
       // in a single update for instant visual feedback.
       const deletedSet = new Set(accessionNumbers);
