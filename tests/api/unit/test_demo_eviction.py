@@ -308,12 +308,12 @@ class TestDemoModeFilingLimitFallback:
 
         manager._build_work_list = MagicMock(return_value=[mock_filing_info])
         manager._registry.get_existing_accessions.return_value = set()
-        manager._registry.check_filing_limit.side_effect = FilingLimitExceededError(
-            current_count=500, max_filings=500,
-        )
+        # Cached count check: count >= max_filings triggers limit error.
+        manager._registry.count.return_value = 500
 
         with patch("sec_semantic_search.api.tasks.get_settings") as mock_settings:
             mock_settings.return_value.api.demo_mode = False
+            mock_settings.return_value.database.max_filings = 500
             manager._execute(info)
 
         assert info.state == TaskState.FAILED
@@ -362,7 +362,8 @@ class TestDemoModeFilingLimitFallback:
             mock_settings.return_value.api.demo_mode = True
             mock_settings.return_value.database.max_filings = 500
             mock_settings.return_value.api.demo_eviction_buffer = 10
-            manager._registry.count.return_value = 500
+            # Initial count at limit; after eviction re-read returns below limit.
+            manager._registry.count.side_effect = [500, 499]
             manager._registry.list_oldest_filings.return_value = _make_oldest_filings(5)
 
             manager._execute(info)
@@ -397,8 +398,8 @@ class TestPreLoopEviction:
         manager._registry.get_existing_accessions.return_value = {"ACC-1"}
         manager._maybe_evict = MagicMock()
 
-        # Make check_filing_limit pass
-        manager._registry.check_filing_limit.return_value = None
+        # Cached count below limit so per-filing check passes.
+        manager._registry.count.return_value = 50
 
         # Make fetch/process fail to stop the loop early
         manager._fetcher.fetch_by_accession.side_effect = Exception("stop")
@@ -429,11 +430,13 @@ class TestPreLoopEviction:
         manager._build_work_list = MagicMock(return_value=filings)
         manager._registry.get_existing_accessions.return_value = set()
         manager._maybe_evict = MagicMock()
-        manager._registry.check_filing_limit.return_value = None
+        # Cached count below limit so per-filing check passes.
+        manager._registry.count.return_value = 50
         manager._fetcher.fetch_by_accession.side_effect = Exception("stop")
 
         with patch("sec_semantic_search.api.tasks.get_settings") as mock_settings:
             mock_settings.return_value.api.demo_mode = False
+            mock_settings.return_value.database.max_filings = 100
 
             try:
                 manager._execute(info)

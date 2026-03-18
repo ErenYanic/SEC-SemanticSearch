@@ -87,6 +87,30 @@ class FilingResult:
     chunk_count: int
     duration_seconds: float
 
+    def to_dict(self) -> dict:
+        """Serialise to a dict for WebSocket messages."""
+        return {
+            "ticker": self.ticker,
+            "form_type": self.form_type,
+            "filing_date": self.filing_date,
+            "accession_number": self.accession_number,
+            "segments": self.segment_count,
+            "chunks": self.chunk_count,
+            "time": round(self.duration_seconds, 1),
+        }
+
+    def to_history_dict(self) -> dict:
+        """Serialise to a dict for task history persistence."""
+        return {
+            "ticker": self.ticker,
+            "form_type": self.form_type,
+            "filing_date": self.filing_date,
+            "accession_number": self.accession_number,
+            "segment_count": self.segment_count,
+            "chunk_count": self.chunk_count,
+            "duration_seconds": self.duration_seconds,
+        }
+
 
 @dataclass
 class TaskInfo:
@@ -495,6 +519,12 @@ class TaskManager:
             )
             self._maybe_evict(info, new_count)
 
+        # Cache the filing count to avoid N separate COUNT(*) queries.
+        # The GPU semaphore ensures single-task execution, so the count
+        # only changes when *this* task stores a filing or evicts.
+        cached_count = self._registry.count()
+        max_filings = settings.database.max_filings
+
         for filing_info in work:
             filing_id = filing_info.to_identifier()
 
@@ -533,27 +563,25 @@ class TaskManager:
                 )
                 continue
 
-            # --- Filing limit check --------------------------------------
-            try:
-                self._registry.check_filing_limit()
-            except FilingLimitExceededError as exc:
-                # In demo mode, attempt FIFO eviction instead of failing.
+            # --- Filing limit check (cached) ---------------------------------
+            if cached_count >= max_filings:
                 if settings.api.demo_mode:
                     self._maybe_evict(info, 1)
-                    # Re-check after eviction — if still full, fail.
-                    try:
-                        self._registry.check_filing_limit()
-                    except FilingLimitExceededError as exc2:
+                    # Re-read count after eviction.
+                    cached_count = self._registry.count()
+                    if cached_count >= max_filings:
+                        exc = FilingLimitExceededError(cached_count, max_filings)
                         info.state = TaskState.FAILED
-                        info.error = exc2.message
+                        info.error = exc.message
                         info.completed_at = datetime.now(timezone.utc)
                         self._push(info, {
                             "type": "failed",
-                            "error": exc2.message,
-                            "details": exc2.details,
+                            "error": exc.message,
+                            "details": exc.details,
                         })
                         return
                 else:
+                    exc = FilingLimitExceededError(cached_count, max_filings)
                     info.state = TaskState.FAILED
                     info.error = exc.message
                     info.completed_at = datetime.now(timezone.utc)
@@ -720,7 +748,8 @@ class TaskManager:
                 )
                 continue
 
-            # Record success.
+            # Record success and update the cached filing count.
+            cached_count += 1
             info._stored_accessions.append(filing_id.accession_number)
             info.results.append(
                 FilingResult(
@@ -763,18 +792,7 @@ class TaskManager:
             info.progress.step_label = "Complete"
             self._push(info, {
                 "type": "completed",
-                "results": [
-                    {
-                        "ticker": r.ticker,
-                        "form_type": r.form_type,
-                        "filing_date": r.filing_date,
-                        "accession_number": r.accession_number,
-                        "segments": r.segment_count,
-                        "chunks": r.chunk_count,
-                        "time": round(r.duration_seconds, 1),
-                    }
-                    for r in info.results
-                ],
+                "results": [r.to_dict() for r in info.results],
                 "summary": {
                     "ingested": len(info.results),
                     "skipped": info.progress.filings_skipped,
@@ -1018,18 +1036,7 @@ class TaskManager:
                         status=info.state.value,
                         tickers=info.tickers,
                         form_types=info.form_types,
-                        results=[
-                            {
-                                "ticker": r.ticker,
-                                "form_type": r.form_type,
-                                "filing_date": r.filing_date,
-                                "accession_number": r.accession_number,
-                                "segment_count": r.segment_count,
-                                "chunk_count": r.chunk_count,
-                                "duration_seconds": r.duration_seconds,
-                            }
-                            for r in info.results
-                        ],
+                        results=[r.to_history_dict() for r in info.results],
                         error=info.error,
                         started_at=(
                             info.started_at.isoformat()
