@@ -1,0 +1,138 @@
+# ──────────────────────────────────────────────────────────────────────
+# docker-compose.yml — SEC Semantic Search
+#
+# Usage:
+#   docker compose up --build         # build and start all services
+#   docker compose up -d              # detached mode
+#   docker compose down -v            # stop and remove volumes (reset)
+#
+# GPU support (NVIDIA):
+#   Uncomment the `deploy` section under the `api` service.
+#   Requires: nvidia-container-toolkit installed on the host.
+#
+# TLS:
+#   Mount certificates in the nginx service and uncomment the TLS
+#   server block in nginx.conf.  See docs/DEPLOYMENT.md for details.
+# ──────────────────────────────────────────────────────────────────────
+
+services:
+  # ── FastAPI backend ────────────────────────────────────────────────
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    container_name: sec-search-api
+    restart: unless-stopped
+    volumes:
+      - chroma_data:/app/data/chroma_db
+      - sqlite_data:/app/data
+    environment:
+      # Database paths (match volume mounts)
+      - DB_CHROMA_PATH=/app/data/chroma_db
+      - DB_METADATA_DB_PATH=/app/data/metadata.sqlite
+      # Server binding
+      - API_HOST=0.0.0.0
+      - API_PORT=8000
+      # CORS — allow the nginx proxy origin
+      - API_CORS_ORIGINS=["http://localhost", "http://localhost:80", "https://localhost"]
+      # ── Pass through from host .env (set these in .env or shell) ──
+      # EDGAR credentials (Scenario A: set these; Scenario B/C: leave unset)
+      - EDGAR_IDENTITY_NAME=${EDGAR_IDENTITY_NAME:-}
+      - EDGAR_IDENTITY_EMAIL=${EDGAR_IDENTITY_EMAIL:-}
+      # Hugging Face token (optional, speeds up model download)
+      - HUGGING_FACE_TOKEN=${HUGGING_FACE_TOKEN:-}
+      # Embedding config
+      - EMBEDDING_MODEL_NAME=${EMBEDDING_MODEL_NAME:-google/embeddinggemma-300m}
+      - EMBEDDING_DEVICE=${EMBEDDING_DEVICE:-cpu}
+      - EMBEDDING_BATCH_SIZE=${EMBEDDING_BATCH_SIZE:-32}
+      - EMBEDDING_IDLE_TIMEOUT_MINUTES=${EMBEDDING_IDLE_TIMEOUT_MINUTES:-0}
+      # Database config
+      - DB_MAX_FILINGS=${DB_MAX_FILINGS:-500}
+      - DB_ENCRYPTION_KEY=${DB_ENCRYPTION_KEY:-}
+      - DB_TASK_HISTORY_RETENTION_DAYS=${DB_TASK_HISTORY_RETENTION_DAYS:-0}
+      - DB_TASK_HISTORY_PERSIST_TICKERS=${DB_TASK_HISTORY_PERSIST_TICKERS:-false}
+      # Search defaults
+      - SEARCH_TOP_K=${SEARCH_TOP_K:-5}
+      - SEARCH_MIN_SIMILARITY=${SEARCH_MIN_SIMILARITY:-0.0}
+      # Logging
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - LOG_REDACT_QUERIES=${LOG_REDACT_QUERIES:-}
+      # API keys
+      - API_KEY=${API_KEY:-}
+      - API_ADMIN_KEY=${API_ADMIN_KEY:-}
+      # Session / demo
+      - API_EDGAR_SESSION_REQUIRED=${API_EDGAR_SESSION_REQUIRED:-false}
+      - API_DEMO_MODE=${API_DEMO_MODE:-false}
+      - API_DEMO_EVICTION_BUFFER=${API_DEMO_EVICTION_BUFFER:-500}
+      - API_MAX_TASK_QUEUE_SIZE=${API_MAX_TASK_QUEUE_SIZE:-5}
+      # Abuse prevention
+      - API_MAX_TICKERS_PER_REQUEST=${API_MAX_TICKERS_PER_REQUEST:-0}
+      - API_MAX_FILINGS_PER_REQUEST=${API_MAX_FILINGS_PER_REQUEST:-0}
+      - API_INGEST_COOLDOWN_SECONDS=${API_INGEST_COOLDOWN_SECONDS:-0}
+      - API_MAX_TASK_DURATION_MINUTES=${API_MAX_TASK_DURATION_MINUTES:-0}
+    # Uncomment for NVIDIA GPU support:
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"]
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
+
+  # ── Next.js frontend ───────────────────────────────────────────────
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    container_name: sec-search-frontend
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - HOSTNAME=0.0.0.0
+      - PORT=3000
+      # Admin key for frontend (optional — enables bulk actions in UI)
+      - NEXT_PUBLIC_ADMIN_KEY=${NEXT_PUBLIC_ADMIN_KEY:-}
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+
+  # ── Nginx reverse proxy ────────────────────────────────────────────
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: sec-search-nginx
+    restart: unless-stopped
+    ports:
+      - "${NGINX_PORT:-80}:80"
+      # Uncomment for TLS:
+      # - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      # Uncomment for TLS — mount certificates:
+      # - ./certs:/etc/nginx/certs:ro
+    depends_on:
+      api:
+        condition: service_healthy
+      frontend:
+        condition: service_healthy
+
+# ── Volumes ──────────────────────────────────────────────────────────
+# ChromaDB data is stored on a named volume.  For encryption at the
+# filesystem level, use Docker's encrypted volume drivers or place the
+# Docker data root on an encrypted partition.
+#
+# SQLite is encrypted at the application level via SQLCipher when
+# DB_ENCRYPTION_KEY is set — independent of volume-level encryption.
+volumes:
+  chroma_data:
+    driver: local
+  sqlite_data:
+    driver: local

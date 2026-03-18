@@ -1,0 +1,88 @@
+# ──────────────────────────────────────────────────────────────────────
+# Dockerfile.api — SEC Semantic Search API
+#
+# Multi-stage build:
+#   1. builder  — compiles Python deps (including pysqlcipher3)
+#   2. runtime  — slim image with only runtime libraries
+#
+# GPU note: This image ships CPU-only PyTorch by default to keep the
+# image small (~2 GB vs ~8 GB with CUDA).  For GPU acceleration, mount
+# the NVIDIA runtime via `docker compose` (see docker-compose.yml) or
+# build with --build-arg TORCH_INDEX_URL for a CUDA wheel.
+# ──────────────────────────────────────────────────────────────────────
+
+# ── Stage 1: Builder ─────────────────────────────────────────────────
+FROM python:3.13-slim AS builder
+
+# Build-time argument for PyTorch index (CPU by default)
+ARG TORCH_INDEX_URL=https://download.pytorch.org/whl/cpu
+
+# Install build dependencies:
+#   - gcc/g++ + python3-dev: compile C extensions
+#   - libsqlcipher-dev: SQLCipher headers for pysqlcipher3
+#   - pkg-config: locate sqlcipher during build
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        gcc g++ python3-dev \
+        libsqlcipher-dev pkg-config \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /build
+
+# Install Python dependencies into a virtual environment so we can
+# copy only the venv to the runtime stage.
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+# Install PyTorch first (largest dependency, cached separately)
+COPY pyproject.toml ./
+RUN pip install --no-cache-dir --extra-index-url "$TORCH_INDEX_URL" \
+        torch>=2.10.0
+
+# Install the project with all deps + encryption extra
+COPY src/ ./src/
+COPY README.md ./
+RUN pip install --no-cache-dir --extra-index-url "$TORCH_INDEX_URL" \
+        ".[encryption]"
+
+
+# ── Stage 2: Runtime ─────────────────────────────────────────────────
+FROM python:3.13-slim AS runtime
+
+# Runtime dependency: libsqlcipher (shared lib, no -dev headers)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        libsqlcipher0 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy the pre-built virtual environment from the builder
+COPY --from=builder /opt/venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+# Create non-root user
+RUN groupadd --system app && useradd --system --gid app --create-home app
+
+# Application directories — owned by app user
+RUN mkdir -p /app/data /app/logs && chown -R app:app /app
+WORKDIR /app
+
+# Default data paths (overridable via env vars)
+ENV DB_CHROMA_PATH=/app/data/chroma_db \
+    DB_METADATA_DB_PATH=/app/data/metadata.sqlite \
+    LOG_FILE_PATH="" \
+    API_HOST=0.0.0.0 \
+    API_PORT=8000 \
+    PYTHONUNBUFFERED=1
+
+# Switch to non-root user
+USER app
+
+# Health check — uses the /api/health endpoint
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')" || exit 1
+
+EXPOSE 8000
+
+# Launch uvicorn directly (not via the sec-search-api wrapper, which
+# parses CLI args we don't need in Docker)
+CMD ["uvicorn", "sec_semantic_search.api.app:app", \
+     "--host", "0.0.0.0", "--port", "8000", \
+     "--workers", "1", "--log-level", "info"]

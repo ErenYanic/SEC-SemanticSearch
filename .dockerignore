@@ -1,0 +1,69 @@
+# Git
+.git
+.gitignore
+
+# Runtime data (volumes mounted at runtime)
+data/
+logs/
+
+# Virtual environments
+.venv
+venv/
+env/
+uv_*
+
+# IDE / editor
+.vscode/
+.idea/
+*.code-workspace
+.cursorignore
+.cursorindexingignore
+
+# Python artefacts
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+htmlcov/
+.coverage
+*.egg
+
+# Node / frontend (built separately in Dockerfile.frontend)
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+
+# Notebooks and deprecated code
+notebooks/
+src/sec_semantic_search/web_deprecated/
+
+# Documentation (not needed at runtime)
+docs/
+*.md
+!README.md
+
+# Environment files (injected via Docker env/secrets)
+.env
+.env.*
+!.env.example
+
+# Certificates and keys
+*.pem
+*.key
+*.crt
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Test files (not needed in production image)
+tests/
+frontend/src/test/
+frontend/vitest.config.ts
+
+# Lock files and tooling
+uv.lock
