@@ -89,15 +89,15 @@ def _scrub_error_message(
 
     scrubbed = error
 
-    # Replace known ticker symbols (case-insensitive, whole word).
-    for ticker in tickers:
-        if ticker:
-            scrubbed = re.sub(
-                rf"\b{re.escape(ticker)}\b",
-                "[TICKER]",
-                scrubbed,
-                flags=re.IGNORECASE,
-            )
+    # Build a single alternation regex for all tickers and apply once,
+    # instead of recompiling a separate pattern per ticker.
+    valid_tickers = [t for t in tickers if t]
+    if valid_tickers:
+        alternatives = "|".join(re.escape(t) for t in valid_tickers)
+        ticker_pattern = re.compile(
+            rf"\b(?:{alternatives})\b", re.IGNORECASE,
+        )
+        scrubbed = ticker_pattern.sub("[TICKER]", scrubbed)
 
     # Replace accession numbers (NNNNNNNNNN-NN-NNNNNN format).
     scrubbed = _ACCESSION_RE.sub("[ACCESSION]", scrubbed)
@@ -305,9 +305,14 @@ class MetadataRegistry:
                 filings_failed INTEGER NOT NULL DEFAULT 0
             )
         """
+        index_sql = """
+            CREATE INDEX IF NOT EXISTS idx_filings_ingested_at
+            ON filings (ingested_at)
+        """
         try:
             with self._lock, self._conn:
                 self._conn.execute(filings_sql)
+                self._conn.execute(index_sql)
                 self._conn.execute(task_history_sql)
         except self._db_error as e:
             raise DatabaseError(
