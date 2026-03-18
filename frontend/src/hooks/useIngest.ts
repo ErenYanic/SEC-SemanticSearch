@@ -57,7 +57,7 @@ import type {
  * render each event with the appropriate icon and detail fields.
  */
 export interface FilingEvent {
-  type: "done" | "skipped" | "failed";
+  type: "done" | "skipped" | "failed" | "eviction";
   ticker: string;
   form_type: string;
   filing_date?: string;
@@ -70,6 +70,10 @@ export interface FilingEvent {
   reason?: string;
   // failed-only
   error?: string;
+  // eviction-only fields
+  filings_evicted?: number;
+  chunks_evicted?: number;
+  tickers_affected?: string[];
 }
 
 // ---------------------------------------------------------------------------
@@ -121,6 +125,7 @@ type IngestAction =
   | { type: "FILING_DONE"; ticker: string; form_type: string; filing_date: string; accession_number: string; segments: number; chunks: number; time: number }
   | { type: "FILING_SKIPPED"; ticker: string; form_type: string; reason: string; accession_number?: string }
   | { type: "FILING_FAILED"; ticker: string; form_type: string; error: string; accession_number?: string }
+  | { type: "EVICTION"; filings_evicted: number; chunks_evicted: number; tickers_affected: string[] }
   | { type: "COMPLETED"; results: WsFilingResult[]; summary: { total: number; succeeded: number; skipped: number; failed: number } }
   | { type: "FAILED"; error: string; details?: string }
   | { type: "CANCELLED" }
@@ -210,6 +215,17 @@ export const reducer = produce(
           form_type: action.form_type,
           accession_number: action.accession_number,
           error: action.error,
+        });
+        break;
+
+      case "EVICTION":
+        draft.filingEvents.push({
+          type: "eviction",
+          ticker: action.tickers_affected.join(", ") || "—",
+          form_type: "",
+          filings_evicted: action.filings_evicted,
+          chunks_evicted: action.chunks_evicted,
+          tickers_affected: action.tickers_affected,
         });
         break;
 
@@ -357,6 +373,17 @@ export function useIngest(): UseIngestReturn {
             form_type: msg.form_type,
             error: msg.error,
           });
+          break;
+
+        case "eviction":
+          dispatch({
+            type: "EVICTION",
+            filings_evicted: msg.filings_evicted,
+            chunks_evicted: msg.chunks_evicted,
+            tickers_affected: msg.tickers_affected,
+          });
+          // Invalidate status cache — filing counts have changed.
+          queryClient.invalidateQueries({ queryKey: ["status"] });
           break;
 
         case "completed":

@@ -11,6 +11,7 @@ Message types (server → client):
     - ``filing_done``    — filing successfully ingested
     - ``filing_skipped`` — duplicate detected
     - ``filing_failed``  — processing or storage error
+    - ``eviction``       — FIFO eviction occurred (demo mode only)
     - ``completed``      — task finished
     - ``failed``         — task failed
     - ``cancelled``      — task cancelled

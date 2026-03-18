@@ -69,16 +69,18 @@ function formatDuration(startedAt: Date | null, completedAt: Date | null): strin
 }
 
 // Static class maps for Badge variants per event type.
-const EVENT_BADGE_VARIANT: Record<FilingEvent["type"], "green" | "amber" | "red"> = {
+const EVENT_BADGE_VARIANT: Record<FilingEvent["type"], "green" | "amber" | "red" | "blue"> = {
   done: "green",
   skipped: "amber",
   failed: "red",
+  eviction: "blue",
 };
 
 const EVENT_BADGE_LABEL: Record<FilingEvent["type"], string> = {
   done: "Success",
   skipped: "Skipped",
   failed: "Failed",
+  eviction: "Eviction",
 };
 
 // Summary card colour classes — static maps, never interpolated.
@@ -205,7 +207,7 @@ export function IngestSummary({
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200 dark:divide-gray-800">
-              {filingEvents.map((event, index) => (
+              {filingEvents.filter((e) => e.type !== "eviction").map((event, index) => (
                 <tr
                   key={index}
                   className="bg-white dark:bg-gray-950"

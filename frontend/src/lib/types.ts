@@ -308,6 +308,14 @@ export interface WsCancelled {
   type: "cancelled";
 }
 
+/** FIFO eviction occurred during demo mode ingest. */
+export interface WsEviction {
+  type: "eviction";
+  filings_evicted: number;
+  chunks_evicted: number;
+  tickers_affected: string[];
+}
+
 /** WebSocket error (e.g., task not found). */
 export interface WsError {
   type: "error";
@@ -332,6 +340,7 @@ export type WsMessage =
   | WsFilingDone
   | WsFilingSkipped
   | WsFilingFailed
+  | WsEviction
   | WsCompleted
   | WsFailed
   | WsCancelled

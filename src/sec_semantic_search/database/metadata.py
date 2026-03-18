@@ -630,6 +630,33 @@ class MetadataRegistry:
                 details=str(e),
             ) from e
 
+    def list_oldest_filings(self, limit: int) -> list[FilingRecord]:
+        """
+        Return the oldest filings ordered by ingestion time (ascending).
+
+        Used by FIFO eviction in demo mode to identify which filings
+        to delete when the database approaches its capacity limit.
+
+        Args:
+            limit: Maximum number of filings to return.
+
+        Returns:
+            List of FilingRecord objects, ordered by ``ingested_at`` ASC.
+
+        Raises:
+            DatabaseError: If the query fails.
+        """
+        sql = "SELECT * FROM filings ORDER BY ingested_at ASC LIMIT ?"
+        try:
+            with self._lock:
+                rows = self._conn.execute(sql, (limit,)).fetchall()
+            return [self._row_to_record(row) for row in rows]
+        except self._db_error as e:
+            raise DatabaseError(
+                "Failed to list oldest filings",
+                details=str(e),
+            ) from e
+
     def count(
         self,
         ticker: Optional[str] = None,

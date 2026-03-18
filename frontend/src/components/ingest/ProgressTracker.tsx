@@ -29,6 +29,7 @@ import {
   SkipForward,
   XCircle,
   Loader2,
+  Trash2,
 } from "lucide-react";
 import { Button, Modal } from "@/components/ui";
 import type { TaskProgress } from "@/lib/types";
@@ -77,6 +78,7 @@ const EVENT_CLASSES: Record<FilingEvent["type"], string> = {
   done: "text-green-600 dark:text-green-400",
   skipped: "text-amber-600 dark:text-amber-400",
   failed: "text-red-600 dark:text-red-400",
+  eviction: "text-orange-600 dark:text-orange-400",
 };
 
 // ---------------------------------------------------------------------------
@@ -100,10 +102,17 @@ function EventIcon({ type }: { type: FilingEvent["type"] }) {
       return <SkipForward className="h-4 w-4 shrink-0" />;
     case "failed":
       return <XCircle className="h-4 w-4 shrink-0" />;
+    case "eviction":
+      return <Trash2 className="h-4 w-4 shrink-0" />;
   }
 }
 
 function formatEventText(event: FilingEvent): string {
+  if (event.type === "eviction") {
+    const count = event.filings_evicted ?? 0;
+    const tickers = event.tickers_affected?.join(", ") ?? "";
+    return `Evicted ${count} old filing${count === 1 ? "" : "s"} to make room${tickers ? ` (${tickers})` : ""}`;
+  }
   const prefix = `${event.ticker} ${event.form_type}`;
   switch (event.type) {
     case "done":
