@@ -62,18 +62,7 @@ def _build_snapshot(info: TaskInfo) -> dict:
             "filings_skipped": info.progress.filings_skipped,
             "filings_failed": info.progress.filings_failed,
         },
-        "results": [
-            {
-                "ticker": r.ticker,
-                "form_type": r.form_type,
-                "filing_date": r.filing_date,
-                "accession_number": r.accession_number,
-                "segments": r.segment_count,
-                "chunks": r.chunk_count,
-                "time": round(r.duration_seconds, 1),
-            }
-            for r in info.results
-        ],
+        "results": [r.to_dict() for r in info.results],
     }
 
 
@@ -240,18 +229,7 @@ def _build_terminal_from_state(info: TaskInfo) -> dict:
     if info.state == TaskState.COMPLETED:
         return {
             "type": "completed",
-            "results": [
-                {
-                    "ticker": r.ticker,
-                    "form_type": r.form_type,
-                    "filing_date": r.filing_date,
-                    "accession_number": r.accession_number,
-                    "segments": r.segment_count,
-                    "chunks": r.chunk_count,
-                    "time": round(r.duration_seconds, 1),
-                }
-                for r in info.results
-            ],
+            "results": [r.to_dict() for r in info.results],
             "summary": {
                 "ingested": len(info.results),
                 "skipped": info.progress.filings_skipped,
