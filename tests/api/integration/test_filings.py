@@ -149,7 +149,7 @@ class TestDeleteByIds:
         rec1 = make_filing_record(id=1, accession_number="0000000001-24-000001", chunk_count=50)
         rec2 = make_filing_record(id=2, accession_number="0000000002-24-000002", filing_date="2024-06-01", chunk_count=30)
         client, registry, _ = _make_client()
-        registry.get_filing.side_effect = lambda acc: {"0000000001-24-000001": rec1, "0000000002-24-000002": rec2}.get(acc)
+        registry.get_filings_by_accessions.return_value = [rec1, rec2]
         resp = client.post(
             "/api/filings/delete-by-ids",
             json={"accession_numbers": ["0000000001-24-000001", "0000000002-24-000002"]},
@@ -163,7 +163,7 @@ class TestDeleteByIds:
     def test_some_not_found(self):
         rec1 = make_filing_record(id=1, accession_number="0000000001-24-000001", chunk_count=40)
         client, registry, _ = _make_client()
-        registry.get_filing.side_effect = lambda acc: rec1 if acc == "0000000001-24-000001" else None
+        registry.get_filings_by_accessions.return_value = [rec1]
         resp = client.post(
             "/api/filings/delete-by-ids",
             json={"accession_numbers": ["0000000001-24-000001", "9999999999-99-999999"]},
@@ -176,7 +176,7 @@ class TestDeleteByIds:
 
     def test_all_not_found(self):
         client, registry, _ = _make_client()
-        registry.get_filing.return_value = None
+        registry.get_filings_by_accessions.return_value = []
         resp = client.post(
             "/api/filings/delete-by-ids",
             json={"accession_numbers": ["9999999991-99-999991", "9999999992-99-999992"]},
@@ -198,8 +198,8 @@ class TestDeleteByIds:
     def test_database_error(self):
         rec = make_filing_record(accession_number="0000000001-24-000001")
         client, registry, chroma = _make_client()
-        registry.get_filing.return_value = rec
-        chroma.delete_filing.side_effect = DatabaseError("disk full", details="ENOSPC")
+        registry.get_filings_by_accessions.return_value = [rec]
+        chroma.delete_filings_batch.side_effect = DatabaseError("disk full", details="ENOSPC")
         resp = client.post(
             "/api/filings/delete-by-ids",
             json={"accession_numbers": ["0000000001-24-000001"]},
@@ -246,7 +246,7 @@ class TestBulkDelete:
         filings = [make_filing_record()]
         client, registry, chroma = _make_client()
         registry.list_filings.return_value = filings
-        chroma.delete_filing.side_effect = DatabaseError("fail")
+        chroma.delete_filings_batch.side_effect = DatabaseError("fail")
         resp = client.post("/api/filings/bulk-delete", json={"ticker": "AAPL"})
         assert resp.status_code == 500
 
@@ -291,6 +291,6 @@ class TestClearAll:
         filings = [make_filing_record()]
         client, registry, chroma = _make_client()
         registry.list_filings.return_value = filings
-        chroma.delete_filing.side_effect = DatabaseError("fail")
+        chroma.delete_filings_batch.side_effect = DatabaseError("fail")
         resp = client.delete("/api/filings/?confirm=true")
         assert resp.status_code == 500
