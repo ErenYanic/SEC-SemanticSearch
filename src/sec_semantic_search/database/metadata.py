@@ -847,6 +847,9 @@ class MetadataRegistry:
             ticker_data[ticker]["chunks"] += chunks
             ticker_data[ticker]["forms"].append(form_type)
 
+        # ticker_data is already sorted by ticker because the SQL
+        # query uses ORDER BY ticker, form_type and Python 3.7+ dicts
+        # preserve insertion order.  No need to re-sort.
         ticker_breakdown = [
             TickerStatistics(
                 ticker=ticker,
@@ -854,12 +857,12 @@ class MetadataRegistry:
                 chunks=data["chunks"],
                 forms=sorted(data["forms"]),
             )
-            for ticker, data in sorted(ticker_data.items())
+            for ticker, data in ticker_data.items()
         ]
 
         return DatabaseStatistics(
             filing_count=filing_count,
-            tickers=sorted(ticker_data.keys()),
+            tickers=list(ticker_data.keys()),
             form_breakdown=dict(sorted(form_breakdown.items())),
             ticker_breakdown=ticker_breakdown,
         )
