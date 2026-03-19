@@ -319,8 +319,12 @@ class TestDeleteFilingsBatch:
         total = delete_filings_batch(records, registry=mock_registry, chroma=mock_chroma)
 
         assert total == 100  # 50 + 50 from FilingRecord.chunk_count
-        assert mock_chroma.delete_filing.call_count == 2
-        assert mock_registry.remove_filing.call_count == 2
+        mock_chroma.delete_filings_batch.assert_called_once_with(
+            ["ACC-001", "ACC-002"],
+        )
+        mock_registry.remove_filings_batch.assert_called_once_with(
+            ["ACC-001", "ACC-002"],
+        )
 
     def test_chromadb_called_before_sqlite(self):
         """Deletion order must be ChromaDB first, then SQLite."""
@@ -328,19 +332,19 @@ class TestDeleteFilingsBatch:
         call_order = []
 
         mock_chroma = MagicMock()
-        mock_chroma.delete_filing.side_effect = lambda acc: (
-            call_order.append(("chroma", acc))
+        mock_chroma.delete_filings_batch.side_effect = lambda accs: (
+            call_order.append(("chroma", accs))
         )
         mock_registry = MagicMock()
-        mock_registry.remove_filing.side_effect = lambda acc: (
-            call_order.append(("registry", acc))
+        mock_registry.remove_filings_batch.side_effect = lambda accs: (
+            call_order.append(("registry", accs))
         )
 
         delete_filings_batch([record], registry=mock_registry, chroma=mock_chroma)
 
         assert call_order == [
-            ("chroma", "ACC-001"),
-            ("registry", "ACC-001"),
+            ("chroma", ["ACC-001"]),
+            ("registry", ["ACC-001"]),
         ]
 
     def test_empty_list_returns_zero(self):
@@ -350,8 +354,8 @@ class TestDeleteFilingsBatch:
         total = delete_filings_batch([], registry=mock_registry, chroma=mock_chroma)
 
         assert total == 0
-        mock_chroma.delete_filing.assert_not_called()
-        mock_registry.remove_filing.assert_not_called()
+        mock_chroma.delete_filings_batch.assert_not_called()
+        mock_registry.remove_filings_batch.assert_not_called()
 
 
 # -----------------------------------------------------------------------

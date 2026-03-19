@@ -154,6 +154,40 @@ class ChromaDBClient:
                 details=str(e),
             ) from e
 
+    def delete_filings_batch(self, accession_numbers: list[str]) -> None:
+        """
+        Delete all chunks belonging to multiple filings in one call.
+
+        Uses ChromaDB's ``$in`` operator to match all accession numbers
+        in a single ``delete(where=...)`` call, reducing round-trips
+        from O(N) to O(1).
+
+        Args:
+            accession_numbers: Accession numbers whose chunks to remove.
+
+        Raises:
+            DatabaseError: If the deletion fails.
+        """
+        if not accession_numbers:
+            return
+
+        try:
+            self._collection.delete(
+                where={
+                    "accession_number": {"$in": accession_numbers},
+                },
+            )
+            logger.info(
+                "Batch-deleted chunks from ChromaDB for %d filing(s)",
+                len(accession_numbers),
+            )
+        except Exception as e:
+            raise DatabaseError(
+                f"Failed to batch-delete {len(accession_numbers)} "
+                f"filing(s) from ChromaDB",
+                details=str(e),
+            ) from e
+
     # ------------------------------------------------------------------
     # Read operations
     # ------------------------------------------------------------------
