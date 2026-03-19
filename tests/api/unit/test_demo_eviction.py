@@ -345,7 +345,7 @@ class TestDemoModeFilingLimitFallback:
         manager._maybe_evict = MagicMock()
 
         # Mock the fetch to avoid actual EDGAR calls
-        manager._fetcher.fetch_by_accession.return_value = (mock_id, "<html></html>")
+        manager._fetcher.fetch_filing_content.return_value = (mock_id, "<html></html>")
 
         # Mock the orchestrator to return a processed filing
         mock_result = MagicMock()
@@ -402,7 +402,7 @@ class TestPreLoopEviction:
         manager._registry.count.return_value = 50
 
         # Make fetch/process fail to stop the loop early
-        manager._fetcher.fetch_by_accession.side_effect = Exception("stop")
+        manager._fetcher.fetch_filing_content.side_effect = Exception("stop")
 
         with patch("sec_semantic_search.api.tasks.get_settings") as mock_settings:
             mock_settings.return_value.api.demo_mode = True
@@ -432,7 +432,7 @@ class TestPreLoopEviction:
         manager._maybe_evict = MagicMock()
         # Cached count below limit so per-filing check passes.
         manager._registry.count.return_value = 50
-        manager._fetcher.fetch_by_accession.side_effect = Exception("stop")
+        manager._fetcher.fetch_filing_content.side_effect = Exception("stop")
 
         with patch("sec_semantic_search.api.tasks.get_settings") as mock_settings:
             mock_settings.return_value.api.demo_mode = False

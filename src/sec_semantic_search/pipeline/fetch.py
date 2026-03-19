@@ -33,9 +33,9 @@ Usage:
         process(filing_id, html)
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date, datetime
-from typing import Iterator
+from typing import Any, Iterator
 
 from edgar import Company, set_identity
 
@@ -59,6 +59,10 @@ class FilingInfo:
         filing_date: Date filed with SEC
         accession_number: SEC-assigned unique identifier
         company_name: Full company name
+        _filing_obj: Cached edgartools Filing object for direct content
+            fetch (avoids redundant EDGAR API round-trips).  Not part
+            of the public API — callers should use
+            ``FilingFetcher.fetch_filing_content()`` instead.
     """
 
     ticker: str
@@ -66,6 +70,7 @@ class FilingInfo:
     filing_date: date
     accession_number: str
     company_name: str
+    _filing_obj: Any = field(default=None, repr=False, compare=False)
 
     def to_identifier(self) -> FilingIdentifier:
         """Convert to FilingIdentifier for pipeline use."""
@@ -364,7 +369,67 @@ class FilingFetcher:
             ) from e
 
     # =========================================================================
-    # Public Methods
+    # Public Methods (Content Fetch)
+    # =========================================================================
+
+    def fetch_filing_content(
+        self,
+        filing_info: FilingInfo,
+    ) -> tuple[FilingIdentifier, str]:
+        """
+        Fetch HTML content for a filing using its cached edgartools object.
+
+        When ``FilingInfo`` was created by ``list_available()``, the
+        original edgartools ``Filing`` object is stored on
+        ``_filing_obj``.  This method uses it directly to fetch HTML,
+        avoiding the redundant EDGAR API round-trip that
+        ``fetch_by_accession()`` would perform (which re-fetches ALL
+        filings for the ticker and linear-scans for the accession
+        number).
+
+        Falls back to ``fetch_by_accession()`` when ``_filing_obj`` is
+        ``None`` (e.g. when ``FilingInfo`` was constructed manually in
+        tests).
+
+        Args:
+            filing_info: Filing metadata with optional cached filing object.
+
+        Returns:
+            Tuple of (FilingIdentifier, html_content).
+
+        Raises:
+            FetchError: If content fetch fails.
+        """
+        if filing_info._filing_obj is not None:
+            logger.info(
+                "Fetching %s %s content directly (accession: %s)",
+                filing_info.ticker,
+                filing_info.form_type,
+                filing_info.accession_number,
+            )
+            filing_id, html_content = self._fetch_filing_content(
+                filing_info._filing_obj,
+                filing_info.ticker,
+                filing_info.form_type,
+            )
+            logger.info(
+                "Fetched %s %s (%s): %s characters",
+                filing_info.ticker,
+                filing_info.form_type,
+                filing_id.date_str,
+                f"{len(html_content):,}",
+            )
+            return filing_id, html_content
+
+        # Fallback: no cached object — use the original linear scan.
+        return self.fetch_by_accession(
+            filing_info.ticker,
+            filing_info.form_type,
+            filing_info.accession_number,
+        )
+
+    # =========================================================================
+    # Public Methods (Listing)
     # =========================================================================
 
     def list_available(
@@ -427,6 +492,7 @@ class FilingFetcher:
                     filing_date=self._parse_filing_date(filing.filing_date),
                     accession_number=filing.accession_no,
                     company_name=getattr(filing, "company", ticker),
+                    _filing_obj=filing,
                 )
             )
 
