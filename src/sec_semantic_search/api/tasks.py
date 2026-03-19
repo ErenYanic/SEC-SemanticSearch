@@ -597,8 +597,8 @@ class TaskManager:
             info.progress.step_index = 0
 
             try:
-                _, html_content = self._fetcher.fetch_by_accession(
-                    ticker, form_type, filing_info.accession_number,
+                _, html_content = self._fetcher.fetch_filing_content(
+                    filing_info,
                 )
             except FetchError as exc:
                 info.progress.filings_failed += 1
