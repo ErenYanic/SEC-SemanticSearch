@@ -49,7 +49,8 @@ def delete_filings_batch(
     Delete a list of filings from both stores (ChromaDB first, then SQLite).
 
     This is the single source of truth for dual-store deletion logic,
-    used by both the CLI and API layers.
+    used by both the CLI and API layers.  Uses batched operations on
+    both stores to reduce round-trips from O(N) to O(1).
 
     Args:
         filings: Filing records to delete.
@@ -60,14 +61,20 @@ def delete_filings_batch(
         Total number of chunks deleted across all filings.
 
     Raises:
-        DatabaseError: If any individual deletion fails (propagated
+        DatabaseError: If any deletion fails (propagated
             from ChromaDBClient or MetadataRegistry).
     """
-    total_chunks = 0
+    if not filings:
+        return 0
+
+    accession_numbers = [f.accession_number for f in filings]
+    total_chunks = sum(f.chunk_count for f in filings)
+
+    # ChromaDB first (store order convention), then SQLite.
+    chroma.delete_filings_batch(accession_numbers)
+    registry.remove_filings_batch(accession_numbers)
+
     for filing in filings:
-        chroma.delete_filing(filing.accession_number)
-        registry.remove_filing(filing.accession_number)
-        total_chunks += filing.chunk_count
         logger.info(
             "Deleted %s %s (%s) — %d chunks",
             filing.ticker,
@@ -75,6 +82,7 @@ def delete_filings_batch(
             filing.filing_date,
             filing.chunk_count,
         )
+
     return total_chunks
 
 
