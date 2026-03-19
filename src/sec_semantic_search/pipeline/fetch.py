@@ -35,6 +35,7 @@ Usage:
 
 from dataclasses import dataclass, field
 from datetime import date, datetime
+from itertools import islice
 from typing import Any, Iterator
 
 from edgar import Company, set_identity
@@ -480,11 +481,10 @@ class FilingFetcher:
             company, form_type, year=year, start_date=start_date, end_date=end_date
         )
 
-        # Limit results
-        filings_list = list(filings)[:count]
-
+        # Limit results — islice stops iteration after count items,
+        # avoiding materialising the entire filing list from EDGAR.
         result = []
-        for filing in filings_list:
+        for filing in islice(filings, count):
             result.append(
                 FilingInfo(
                     ticker=ticker,
