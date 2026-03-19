@@ -565,6 +565,51 @@ class MetadataRegistry:
                 details=str(e),
             ) from e
 
+    def remove_filings_batch(self, accession_numbers: list[str]) -> int:
+        """
+        Remove multiple filings in batched SQL statements.
+
+        Uses ``DELETE ... WHERE accession_number IN (...)`` to remove
+        filings in bulk, reducing SQLite round-trips from O(N) to O(1)
+        (or O(N/999) for very large batches due to SQLite's parameter
+        limit).
+
+        Args:
+            accession_numbers: Accession numbers to delete.
+
+        Returns:
+            Total number of rows removed.
+
+        Raises:
+            DatabaseError: If any batch delete fails.
+        """
+        if not accession_numbers:
+            return 0
+
+        removed = 0
+        # SQLite supports at most 999 bound parameters per statement.
+        chunk_size = 999
+        for i in range(0, len(accession_numbers), chunk_size):
+            batch = accession_numbers[i : i + chunk_size]
+            placeholders = ", ".join("?" for _ in batch)
+            sql = (
+                f"DELETE FROM filings "
+                f"WHERE accession_number IN ({placeholders})"
+            )
+            try:
+                with self._lock, self._conn:
+                    cursor = self._conn.execute(sql, batch)
+                    removed += cursor.rowcount
+            except self._db_error as e:
+                raise DatabaseError(
+                    "Failed to remove filings batch",
+                    details=str(e),
+                ) from e
+
+        if removed:
+            logger.info("Batch-removed %d filing(s) from registry", removed)
+        return removed
+
     # ------------------------------------------------------------------
     # Read operations
     # ------------------------------------------------------------------
@@ -594,6 +639,51 @@ class MetadataRegistry:
                 "Failed to retrieve filing",
                 details=str(e),
             ) from e
+
+    def get_filings_by_accessions(
+        self,
+        accession_numbers: list[str],
+    ) -> list[FilingRecord]:
+        """
+        Retrieve multiple filing records in a single query.
+
+        Uses ``SELECT ... WHERE accession_number IN (...)`` to fetch
+        all matching records in one round-trip instead of N individual
+        ``get_filing()`` calls.
+
+        Args:
+            accession_numbers: Accession numbers to look up.
+
+        Returns:
+            List of FilingRecord objects for accession numbers that
+            exist.  Order is not guaranteed.  Accession numbers not
+            found are silently omitted.
+
+        Raises:
+            DatabaseError: If the query fails.
+        """
+        if not accession_numbers:
+            return []
+
+        records: list[FilingRecord] = []
+        chunk_size = 999
+        for i in range(0, len(accession_numbers), chunk_size):
+            batch = accession_numbers[i : i + chunk_size]
+            placeholders = ", ".join("?" for _ in batch)
+            sql = (
+                f"SELECT * FROM filings "
+                f"WHERE accession_number IN ({placeholders})"
+            )
+            try:
+                with self._lock:
+                    rows = self._conn.execute(sql, batch).fetchall()
+                records.extend(self._row_to_record(row) for row in rows)
+            except self._db_error as e:
+                raise DatabaseError(
+                    "Failed to retrieve filings batch",
+                    details=str(e),
+                ) from e
+        return records
 
     def list_filings(
         self,

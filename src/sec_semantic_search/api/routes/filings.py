@@ -193,15 +193,12 @@ async def delete_by_ids(
     efficient than making N sequential ``DELETE /api/filings/{accession}``
     calls from the frontend.
     """
-    found: list[FilingRecord] = []
-    not_found: list[str] = []
-
-    for accession in body.accession_numbers:
-        record = registry.get_filing(accession)
-        if record is None:
-            not_found.append(accession)
-        else:
-            found.append(record)
+    # Batch lookup: single SQL query instead of N individual get_filing() calls.
+    found = registry.get_filings_by_accessions(body.accession_numbers)
+    found_accessions = {r.accession_number for r in found}
+    not_found = [
+        a for a in body.accession_numbers if a not in found_accessions
+    ]
 
     if not found:
         return DeleteByIdsResponse(
