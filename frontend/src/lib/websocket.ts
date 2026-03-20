@@ -31,6 +31,9 @@ const MAX_RETRY_MS = 30_000;
 /** Multiplier for exponential backoff (delay doubles each attempt). */
 const BACKOFF_FACTOR = 2;
 
+/** WebSocket close codes that should not trigger reconnection. */
+const FATAL_CLOSE_CODES = new Set([4001, 4003, 4404]);
+
 /** Message types that indicate the task has finished. */
 const TERMINAL_TYPES = new Set(["completed", "failed", "cancelled"]);
 
@@ -73,12 +76,14 @@ export class IngestWebSocket {
     // the current page location so it works in both dev and production.
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
     const apiKey = process.env.NEXT_PUBLIC_API_KEY;
-    const query = apiKey ? `?api_key=${encodeURIComponent(apiKey)}` : "";
-    const url = `${protocol}//${window.location.host}/ws/ingest/${this.taskId}${query}`;
+    const url = `${protocol}//${window.location.host}/ws/ingest/${this.taskId}`;
 
     this.ws = new WebSocket(url);
 
     this.ws.onopen = () => {
+      if (apiKey) {
+        this.ws?.send(JSON.stringify({ type: "auth", api_key: apiKey }));
+      }
       // Reset retry counter on successful connection.
       this.retryCount = 0;
     };
@@ -100,7 +105,14 @@ export class IngestWebSocket {
       }
     };
 
-    this.ws.onclose = () => {
+    this.ws.onclose = (event: CloseEvent) => {
+      if (FATAL_CLOSE_CODES.has(event.code)) {
+        this.closed = true;
+        this.cleanup();
+        this.onClose?.();
+        return;
+      }
+
       if (!this.closed) {
         this.scheduleReconnect();
       }

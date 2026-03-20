@@ -25,6 +25,7 @@ can catch up.
 from __future__ import annotations
 
 import asyncio
+import hmac
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
@@ -38,6 +39,7 @@ router = APIRouter()
 
 # Terminal message types — close the WebSocket after sending one of these.
 _TERMINAL_TYPES = frozenset({"completed", "failed", "cancelled"})
+_AUTH_TIMEOUT_SECONDS = 5.0
 
 
 def _build_snapshot(info: TaskInfo) -> dict:
@@ -72,10 +74,14 @@ async def ingest_progress(websocket: WebSocket, task_id: str) -> None:
     Stream real-time ingestion progress for a specific task.
 
     On connect, validates the ``Origin`` header against allowed CORS
-    origins (WebSocket upgrades are not protected by CORS).  Then sends
-    a ``snapshot`` message with the current state and continuously
-    forwards messages from the task's internal queue until the task
-    reaches a terminal state or the client disconnects.
+    origins (WebSocket upgrades are not protected by CORS). When API
+    key auth is enabled, the client must authenticate immediately after
+    the handshake with an ``{"type": "auth", "api_key": "..."}``
+    message unless it already supplied ``X-API-Key`` during the upgrade.
+    Once authenticated, the server sends a ``snapshot`` message with the
+    current state and continuously forwards messages from the task's
+    internal queue until the task reaches a terminal state or the client
+    disconnects.
     """
     # --- Origin validation (WebSocket is not protected by CORS) ----------
     origin = websocket.headers.get("origin")
@@ -84,20 +90,11 @@ async def ingest_progress(websocket: WebSocket, task_id: str) -> None:
         await websocket.close(code=4003, reason="Origin not allowed")
         return
 
-    # --- API key validation ------------------------------------------------
-    # Browser WebSocket API does not support custom headers, so the key
-    # is accepted via query parameter (?api_key=...) or X-API-Key header.
-    settings = get_settings()
-    if settings.api.key is not None:
-        ws_key = (
-            websocket.query_params.get("api_key")
-            or websocket.headers.get("x-api-key")
-        )
-        if ws_key != settings.api.key:
-            await websocket.close(code=4001, reason="Invalid or missing API key")
-            return
-
     await websocket.accept()
+
+    # --- API key validation ------------------------------------------------
+    if not await _authenticate_websocket(websocket):
+        return
 
     # Retrieve the TaskManager from app state.
     task_manager = websocket.app.state.task_manager
@@ -183,6 +180,41 @@ async def ingest_progress(websocket: WebSocket, task_id: str) -> None:
             await websocket.close()
         except Exception:  # noqa: BLE001 — already closing
             pass
+
+
+async def _authenticate_websocket(websocket: WebSocket) -> bool:
+    """Authenticate a WebSocket without exposing the API key in the URL."""
+    expected = get_settings().api.key
+    if expected is None:
+        return True
+
+    header_key = websocket.headers.get("x-api-key")
+    if header_key is not None and hmac.compare_digest(header_key, expected):
+        return True
+
+    try:
+        message = await asyncio.wait_for(
+            websocket.receive_json(), timeout=_AUTH_TIMEOUT_SECONDS,
+        )
+    except TimeoutError:
+        await websocket.close(code=4001, reason="Authentication timed out")
+        return False
+    except WebSocketDisconnect:
+        return False
+    except Exception:  # noqa: BLE001 — malformed or unexpected payload
+        await websocket.close(code=4001, reason="Invalid or missing API key")
+        return False
+
+    if not isinstance(message, dict) or message.get("type") != "auth":
+        await websocket.close(code=4001, reason="Invalid or missing API key")
+        return False
+
+    provided = message.get("api_key")
+    if not isinstance(provided, str) or not hmac.compare_digest(provided, expected):
+        await websocket.close(code=4001, reason="Invalid or missing API key")
+        return False
+
+    return True
 
 
 # ---------------------------------------------------------------------------
