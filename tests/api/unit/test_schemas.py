@@ -165,6 +165,11 @@ class TestDeleteByIdsRequest:
         req = DeleteByIdsRequest(accession_numbers=["0000320193-24-000001"])
         assert req.accession_numbers == ["0000320193-24-000001"]
 
+    def test_too_many_items_raises(self):
+        accession_numbers = [f"{i:010d}-24-000001" for i in range(51)]
+        with pytest.raises(ValidationError, match="At most 50 accession numbers"):
+            DeleteByIdsRequest(accession_numbers=accession_numbers)
+
 
 class TestDeleteByIdsResponse:
     """Delete-by-IDs response."""

@@ -195,6 +195,16 @@ class TestDeleteByIds:
         )
         assert resp.status_code == 422  # Pydantic min_length=1
 
+    def test_too_many_ids_returns_422(self):
+        client, *_ = _make_client()
+        accession_numbers = [f"{i:010d}-24-000001" for i in range(51)]
+        resp = client.post(
+            "/api/filings/delete-by-ids",
+            json={"accession_numbers": accession_numbers},
+        )
+        assert resp.status_code == 422
+        assert "At most 50 accession numbers" in str(resp.json())
+
     def test_database_error(self):
         rec = make_filing_record(accession_number="0000000001-24-000001")
         client, registry, chroma = _make_client()
