@@ -13,6 +13,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
+from starlette.websockets import WebSocketDisconnect
 
 from sec_semantic_search.api.app import app
 from sec_semantic_search.api.dependencies import (
@@ -35,6 +36,8 @@ from sec_semantic_search.api.tasks import (
 )
 from sec_semantic_search.core.exceptions import DatabaseError, SearchError
 from tests.helpers import make_filing_record, make_task_info
+
+_WS_HEADERS = {"origin": "http://localhost:3000"}
 
 # -----------------------------------------------------------------------
 # Finding #1: .env not tracked by git
@@ -75,18 +78,53 @@ class TestWebSocketOriginValidation:
             msg = ws.receive_json()
             assert msg["type"] == "snapshot"
 
-    def test_no_origin_header_connects(self):
-        """Connection without Origin header should be allowed (non-browser clients)."""
+    def test_missing_origin_header_is_rejected(self):
+        """Connection without Origin header should be rejected."""
         info = make_task_info(state=TaskState.COMPLETED)
         manager = MagicMock()
         manager.get_task.return_value = info
         app.state.task_manager = manager
 
         client = TestClient(app)
-        # TestClient does not send Origin by default — this tests non-browser use.
-        with client.websocket_connect(f"/ws/ingest/{info.task_id}") as ws:
-            msg = ws.receive_json()
-            assert msg["type"] == "snapshot"
+        with pytest.raises(WebSocketDisconnect) as exc_info:
+            with client.websocket_connect(f"/ws/ingest/{info.task_id}"):
+                pass
+
+        assert exc_info.value.code == 4003
+
+    def test_disallowed_origin_is_rejected(self):
+        """Connection from an untrusted origin should be rejected."""
+        info = make_task_info(state=TaskState.COMPLETED)
+        manager = MagicMock()
+        manager.get_task.return_value = info
+        app.state.task_manager = manager
+
+        client = TestClient(app)
+        with pytest.raises(WebSocketDisconnect) as exc_info:
+            with client.websocket_connect(
+                f"/ws/ingest/{info.task_id}",
+                headers={"origin": "https://evil.example"},
+            ):
+                pass
+
+        assert exc_info.value.code == 4003
+
+
+# -----------------------------------------------------------------------
+# Finding #4: demo-reset restart strategy hardening
+# -----------------------------------------------------------------------
+
+
+class TestDemoResetScript:
+    """The demo reset script must not execute arbitrary shell code."""
+
+    def test_demo_reset_script_rejects_eval_based_restart(self):
+        script = Path(__file__).parents[3] / "scripts" / "demo-reset.sh"
+        content = script.read_text()
+
+        assert 'eval "$RESTART_CMD"' not in content
+        assert 'case "$RESTART_STRATEGY" in' in content
+        assert 'RESTART_CMD is deprecated and rejected for safety' in content
 
 
 # -----------------------------------------------------------------------
@@ -705,6 +743,7 @@ class TestApiKeyAuthentication:
         with pytest.raises(Exception):
             with client.websocket_connect(
                 f"/ws/ingest/{info.task_id}",
+                headers=_WS_HEADERS,
             ) as ws:
                 ws.send_json({"type": "auth", "api_key": "wrong-key"})
                 ws.receive_json()
@@ -725,6 +764,7 @@ class TestApiKeyAuthentication:
         client = TestClient(app)
         with client.websocket_connect(
             f"/ws/ingest/{info.task_id}",
+            headers=_WS_HEADERS,
         ) as ws:
             ws.send_json({"type": "auth", "api_key": self.TEST_KEY})
             msg = ws.receive_json()
@@ -747,6 +787,7 @@ class TestApiKeyAuthentication:
         with pytest.raises(Exception):
             with client.websocket_connect(
                 f"/ws/ingest/{info.task_id}?api_key={self.TEST_KEY}",
+                headers=_WS_HEADERS,
             ) as ws:
                 ws.receive_json()
 
@@ -760,6 +801,7 @@ class TestApiKeyAuthentication:
         client = TestClient(app)
         with client.websocket_connect(
             f"/ws/ingest/{info.task_id}",
+            headers=_WS_HEADERS,
         ) as ws:
             msg = ws.receive_json()
             assert msg["type"] == "snapshot"
@@ -947,6 +989,7 @@ class TestWebSocketTerminalFallback:
         client = TestClient(app)
         with client.websocket_connect(
             f"/ws/ingest/{info.task_id}",
+            headers=_WS_HEADERS,
         ) as ws:
             snapshot = ws.receive_json()
             assert snapshot["type"] == "snapshot"
@@ -967,6 +1010,7 @@ class TestWebSocketTerminalFallback:
         client = TestClient(app)
         with client.websocket_connect(
             f"/ws/ingest/{info.task_id}",
+            headers=_WS_HEADERS,
         ) as ws:
             snapshot = ws.receive_json()
             assert snapshot["type"] == "snapshot"
@@ -985,6 +1029,7 @@ class TestWebSocketTerminalFallback:
         client = TestClient(app)
         with client.websocket_connect(
             f"/ws/ingest/{info.task_id}",
+            headers=_WS_HEADERS,
         ) as ws:
             snapshot = ws.receive_json()
             assert snapshot["type"] == "snapshot"
