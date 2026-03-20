@@ -96,8 +96,9 @@ services:
       - NODE_ENV=production
       - HOSTNAME=0.0.0.0
       - PORT=3000
-      # Admin key for frontend (optional — enables bulk actions in UI)
-      - NEXT_PUBLIC_ADMIN_KEY=${NEXT_PUBLIC_ADMIN_KEY:-}
+      - INTERNAL_API_BASE_URL=http://api:8000
+      # Server-only admin key for Next.js route handlers and admin session login
+      - ADMIN_API_KEY=${ADMIN_API_KEY:-}
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/"]
       interval: 30s
