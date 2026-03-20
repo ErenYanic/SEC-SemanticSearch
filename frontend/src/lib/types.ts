@@ -108,6 +108,12 @@ export interface ClearAllResponse {
   chunks_deleted: number;
 }
 
+/** GET /api/admin/session */
+export interface AdminSessionResponse {
+  admin_required: boolean;
+  is_admin: boolean;
+}
+
 // ---------------------------------------------------------------------------
 // Search
 // ---------------------------------------------------------------------------

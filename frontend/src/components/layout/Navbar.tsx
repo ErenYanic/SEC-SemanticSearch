@@ -13,9 +13,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Github, Linkedin, LayoutDashboard, Search, Upload, FileText, Sun, Moon, Loader2, LogOut } from "lucide-react";
+import { FormEvent, useState } from "react";
+import { Github, Linkedin, LayoutDashboard, Search, Upload, FileText, Sun, Moon, Loader2, LogOut, Shield, ShieldCheck } from "lucide-react";
 import { useTheme } from "./ThemeProvider";
 import { useEdgarSession } from "@/hooks/useEdgarSession";
+import { useAdminSession } from "@/hooks/useAdminSession";
+import { Modal, useToast } from "@/components/ui";
 
 // ---------------------------------------------------------------------------
 // Navigation items
@@ -54,6 +57,31 @@ export function Navbar({ isTaskActive = false }: NavbarProps) {
   const pathname = usePathname();
   const { theme, toggleTheme } = useTheme();
   const { isAuthenticated, logout } = useEdgarSession();
+  const { adminRequired, isAdmin, login, logout: logoutAdmin, isPending } = useAdminSession();
+  const { addToast } = useToast();
+  const [showAdminModal, setShowAdminModal] = useState(false);
+  const [adminKey, setAdminKey] = useState("");
+
+  async function submitAdminLogin() {
+    try {
+      await login(adminKey);
+      setAdminKey("");
+      setShowAdminModal(false);
+      addToast("success", "Admin session enabled");
+    } catch {
+      addToast("error", "Invalid admin key");
+    }
+  }
+
+  async function handleAdminLogin(event: FormEvent) {
+    event.preventDefault();
+    await submitAdminLogin();
+  }
+
+  async function handleAdminLogout() {
+    await logoutAdmin();
+    addToast("info", "Admin session cleared");
+  }
 
   return (
     <nav className="border-b border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-950">
@@ -127,6 +155,28 @@ export function Navbar({ isTaskActive = false }: NavbarProps) {
             </div>
           )}
 
+          {adminRequired && !isAdmin && (
+            <button
+              onClick={() => setShowAdminModal(true)}
+              className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100"
+              aria-label="Open admin access dialog"
+            >
+              <Shield className="h-4 w-4" />
+              <span className="hidden sm:inline">Admin Access</span>
+            </button>
+          )}
+
+          {adminRequired && isAdmin && (
+            <button
+              onClick={handleAdminLogout}
+              className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm text-emerald-700 transition-colors hover:bg-emerald-50 hover:text-emerald-800 dark:text-emerald-300 dark:hover:bg-emerald-950 dark:hover:text-emerald-200"
+              aria-label="Clear admin session"
+            >
+              <ShieldCheck className="h-4 w-4" />
+              <span className="hidden sm:inline">Admin Active</span>
+            </button>
+          )}
+
           {/* Theme toggle button */}
           <button
             onClick={toggleTheme}
@@ -153,6 +203,35 @@ export function Navbar({ isTaskActive = false }: NavbarProps) {
           )}
         </div>
       </div>
+
+      <Modal
+        open={showAdminModal}
+        onClose={() => {
+          setShowAdminModal(false);
+          setAdminKey("");
+        }}
+        onConfirm={() => {
+          void submitAdminLogin();
+        }}
+        title="Admin Access"
+        confirmLabel="Unlock"
+        confirmDisabled={adminKey.trim().length === 0}
+        confirmLoading={isPending}
+      >
+        <form onSubmit={handleAdminLogin} className="space-y-3">
+          <p>Enter the admin key to enable destructive operations in this browser session.</p>
+          <label className="block space-y-1">
+            <span className="text-sm font-medium text-gray-900 dark:text-gray-100">Admin key</span>
+            <input
+              type="password"
+              value={adminKey}
+              onChange={(event) => setAdminKey(event.target.value)}
+              className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-xs outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
+              autoComplete="current-password"
+            />
+          </label>
+        </form>
+      </Modal>
     </nav>
   );
 }

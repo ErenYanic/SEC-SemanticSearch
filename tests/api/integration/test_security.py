@@ -766,6 +766,33 @@ class TestApiKeyAuthentication:
 
 
 # -----------------------------------------------------------------------
+# Finding #3: frontend admin key exposure
+# -----------------------------------------------------------------------
+
+
+class TestFrontendAdminKeyExposure:
+    """Frontend should keep the admin key out of public browser code."""
+
+    def test_frontend_api_source_does_not_reference_next_public_admin_key(self):
+        api_source = Path("frontend/src/lib/api.ts").read_text(encoding="utf-8")
+
+        assert "NEXT_PUBLIC_ADMIN_KEY" not in api_source
+        assert "/api/admin/filings/bulk-delete" in api_source
+        assert "/api/admin/resources/gpu" in api_source
+
+    def test_frontend_uses_server_side_admin_routes(self):
+        assert Path("frontend/src/app/api/admin/session/route.ts").exists()
+        assert Path("frontend/src/app/api/admin/filings/bulk-delete/route.ts").exists()
+        assert Path("frontend/src/app/api/admin/resources/gpu/route.ts").exists()
+
+    def test_docker_compose_uses_server_only_admin_key_for_frontend(self):
+        compose_source = Path("docker-compose.yml").read_text(encoding="utf-8")
+
+        assert "NEXT_PUBLIC_ADMIN_KEY" not in compose_source
+        assert "ADMIN_API_KEY=${ADMIN_API_KEY:-}" in compose_source
+
+
+# -----------------------------------------------------------------------
 # Finding #10: Rate limiting
 # -----------------------------------------------------------------------
 

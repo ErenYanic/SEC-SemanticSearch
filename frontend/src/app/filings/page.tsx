@@ -44,6 +44,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Database, FileText, Upload } from "lucide-react";
 import { useStatus } from "@/hooks/useStatus";
+import { useAdminSession } from "@/hooks/useAdminSession";
 import {
   useFilings,
   DEFAULT_QUERY_PARAMS,
@@ -93,6 +94,7 @@ function FilingsContent() {
     isLoading: isStatusLoading,
     isError: isStatusError,
   } = useStatus();
+  const { isAdmin } = useAdminSession();
 
   const filing = useFilings(params);
 
@@ -249,7 +251,7 @@ function FilingsContent() {
           onDeleteSelected={handleDeleteSelected}
           onDeleteAll={handleDeleteAll}
           isDeleting={filing.isDeleting}
-          isAdmin={status?.is_admin ?? false}
+          isAdmin={isAdmin}
         />
       </div>
 

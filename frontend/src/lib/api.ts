@@ -15,6 +15,7 @@
 
 import axios, { AxiosError } from "axios";
 import type {
+  AdminSessionResponse,
   ApiError,
   BulkDeleteRequest,
   BulkDeleteResponse,
@@ -52,9 +53,6 @@ const client = axios.create({
     "Content-Type": "application/json",
     ...(process.env.NEXT_PUBLIC_API_KEY
       ? { "X-API-Key": process.env.NEXT_PUBLIC_API_KEY }
-      : {}),
-    ...(process.env.NEXT_PUBLIC_ADMIN_KEY
-      ? { "X-Admin-Key": process.env.NEXT_PUBLIC_ADMIN_KEY }
       : {}),
   },
 });
@@ -190,7 +188,7 @@ export async function bulkDeleteFilings(
   body: BulkDeleteRequest,
 ): Promise<BulkDeleteResponse> {
   const { data } = await client.post<BulkDeleteResponse>(
-    "/api/filings/bulk-delete",
+    "/api/admin/filings/bulk-delete",
     body,
   );
   return data;
@@ -198,10 +196,30 @@ export async function bulkDeleteFilings(
 
 /** Clear all filings (requires confirm=true). */
 export async function clearAllFilings(): Promise<ClearAllResponse> {
-  const { data } = await client.delete<ClearAllResponse>("/api/filings/", {
+  const { data } = await client.delete<ClearAllResponse>("/api/admin/filings", {
     params: { confirm: true },
   });
   return data;
+}
+
+// ---------------------------------------------------------------------------
+// Admin session
+// ---------------------------------------------------------------------------
+
+/** Check whether the current browser has an active admin session. */
+export async function getAdminSession(): Promise<AdminSessionResponse> {
+  const { data } = await client.get<AdminSessionResponse>("/api/admin/session");
+  return data;
+}
+
+/** Start an admin session using the server-side admin key validator. */
+export async function loginAdminSession(adminKey: string): Promise<void> {
+  await client.post("/api/admin/session", { admin_key: adminKey });
+}
+
+/** Clear the current admin session cookie. */
+export async function logoutAdminSession(): Promise<void> {
+  await client.delete("/api/admin/session");
 }
 
 // ---------------------------------------------------------------------------
@@ -261,7 +279,7 @@ export async function getGPUStatus(): Promise<GPUStatusResponse> {
 
 /** Unload the embedding model to free VRAM. */
 export async function unloadGPU(): Promise<GPUUnloadResponse> {
-  const { data } = await client.delete<GPUUnloadResponse>("/api/resources/gpu");
+  const { data } = await client.delete<GPUUnloadResponse>("/api/admin/resources/gpu");
   return data;
 }
 
