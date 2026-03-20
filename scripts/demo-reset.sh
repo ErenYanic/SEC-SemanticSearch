@@ -15,10 +15,12 @@
 #   Docker:          Add to container entrypoint with crond
 #
 # Environment variables (all optional — defaults match .env.example):
-#   CHROMA_PATH      — ChromaDB data directory (default: ./data/chroma_db)
-#   SQLITE_PATH      — SQLite database file  (default: ./data/metadata.sqlite)
-#   API_URL          — API base URL for health check (default: http://localhost:8000)
-#   RESTART_CMD      — Command to restart the API (default: none — assumes auto-restart)
+#   CHROMA_PATH        — ChromaDB data directory (default: ./data/chroma_db)
+#   SQLITE_PATH        — SQLite database file  (default: ./data/metadata.sqlite)
+#   API_URL            — API base URL for health check (default: http://localhost:8000)
+#   RESTART_STRATEGY   — Restart strategy: none, docker-compose, systemd
+#   RESTART_TARGET     — Service/unit name for the chosen strategy
+#   RESTART_CMD        — Deprecated and rejected for safety
 
 set -euo pipefail
 
@@ -26,9 +28,31 @@ CHROMA_PATH="${CHROMA_PATH:-./data/chroma_db}"
 SQLITE_PATH="${SQLITE_PATH:-./data/metadata.sqlite}"
 API_URL="${API_URL:-http://localhost:8000}"
 RESTART_CMD="${RESTART_CMD:-}"
+RESTART_STRATEGY="${RESTART_STRATEGY:-none}"
+RESTART_TARGET="${RESTART_TARGET:-api}"
 
 timestamp() {
     date -u +"%Y-%m-%dT%H:%M:%SZ"
+}
+
+restart_api() {
+    case "$RESTART_STRATEGY" in
+        none|"")
+            echo "[$(timestamp)] No restart strategy configured; assuming the API auto-restarts"
+            ;;
+        docker-compose)
+            echo "[$(timestamp)] Restarting Docker Compose service: $RESTART_TARGET"
+            docker compose restart "$RESTART_TARGET"
+            ;;
+        systemd)
+            echo "[$(timestamp)] Restarting systemd unit: $RESTART_TARGET"
+            systemctl restart "$RESTART_TARGET"
+            ;;
+        *)
+            echo "[$(timestamp)] ERROR: Unsupported RESTART_STRATEGY: $RESTART_STRATEGY" >&2
+            exit 1
+            ;;
+    esac
 }
 
 echo "[$(timestamp)] Demo reset starting..."
@@ -51,9 +75,11 @@ fi
 
 # --- Restart API if configured ---
 if [ -n "$RESTART_CMD" ]; then
-    echo "[$(timestamp)] Restarting API: $RESTART_CMD"
-    eval "$RESTART_CMD"
+    echo "[$(timestamp)] ERROR: RESTART_CMD is deprecated and rejected for safety. Use RESTART_STRATEGY and RESTART_TARGET instead." >&2
+    exit 1
 fi
+
+restart_api
 
 # --- Health check (best-effort) ---
 echo "[$(timestamp)] Waiting for API to become healthy..."
