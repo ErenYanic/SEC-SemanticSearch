@@ -61,6 +61,46 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         return response
 
 
+class InsecureTransportWarningMiddleware(BaseHTTPMiddleware):
+    """Log a one-time warning when protected traffic arrives over HTTP."""
+
+    def __init__(self, app) -> None:
+        super().__init__(app)
+        self._warned = False
+
+    async def dispatch(
+        self, request: Request, call_next: RequestResponseEndpoint,
+    ) -> Response:
+        if not self._warned:
+            self._maybe_warn(request)
+        return await call_next(request)
+
+    def _maybe_warn(self, request: Request) -> None:
+        settings = get_settings()
+        if not (
+            settings.api.key
+            or settings.api.admin_key
+            or settings.api.edgar_session_required
+        ):
+            return
+
+        forwarded_proto = request.headers.get("x-forwarded-proto")
+        if forwarded_proto is None:
+            return
+
+        proto = forwarded_proto.split(",", 1)[0].strip().lower()
+        if proto != "http":
+            return
+
+        self._warned = True
+        logger.warning(
+            "Insecure transport detected (X-Forwarded-Proto=http) while "
+            "authentication or per-session EDGAR credentials are enabled. "
+            "Scenarios B and C require TLS; enable HTTPS at the reverse proxy "
+            "or launch the API with --ssl-certfile/--ssl-keyfile.",
+        )
+
+
 # ---------------------------------------------------------------------------
 # Lifespan — initialise singletons, store on app.state
 # ---------------------------------------------------------------------------
@@ -171,6 +211,9 @@ def create_app() -> FastAPI:
 
     # -- Security headers ---------------------------------------------------
     application.add_middleware(SecurityHeadersMiddleware)
+
+    # -- Transport security warning -----------------------------------------
+    application.add_middleware(InsecureTransportWarningMiddleware)
 
     # -- CORS ---------------------------------------------------------------
     application.add_middleware(

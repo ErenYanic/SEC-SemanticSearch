@@ -508,6 +508,48 @@ class TestSecurityHeaders:
         assert resp.headers.get("Content-Security-Policy") is not None
         app.dependency_overrides.clear()
 
+    def test_docs_has_csp_header(self):
+        """Swagger docs should inherit the API CSP header."""
+        client = TestClient(app)
+        resp = client.get("/docs")
+        assert resp.status_code == 200
+        assert resp.headers.get("Content-Security-Policy") is not None
+        assert "script-src" in resp.headers["Content-Security-Policy"]
+
+
+class TestTransportSecurityHardening:
+    """Deployment-facing CSP and TLS warning regressions."""
+
+    def test_nginx_sets_csp_header(self):
+        nginx_conf = Path(__file__).parents[3] / "nginx.conf"
+        content = nginx_conf.read_text()
+        assert 'Content-Security-Policy' in content
+
+    def test_http_proxy_warning_emitted_once(self, monkeypatch):
+        monkeypatch.setattr(
+            "sec_semantic_search.api.app.get_settings",
+            lambda: MagicMock(
+                api=MagicMock(
+                    key="shared-key",
+                    admin_key=None,
+                    edgar_session_required=False,
+                ),
+            ),
+        )
+
+        with patch("sec_semantic_search.api.app.logger.warning") as mock_warning:
+            client = TestClient(app, raise_server_exceptions=False)
+            client.get("/api/health", headers={"X-Forwarded-Proto": "http"})
+            client.get("/api/health", headers={"X-Forwarded-Proto": "http"})
+
+        assert mock_warning.call_count == 1
+        assert "Scenarios B and C require TLS" in mock_warning.call_args.args[0]
+
+    def test_deployment_docs_warn_scenarios_b_c_need_tls(self):
+        deployment = Path(__file__).parents[3] / "docs" / "DEPLOYMENT.md"
+        content = deployment.read_text()
+        assert "Scenarios B and C are insecure without TLS" in content
+
 
 # -----------------------------------------------------------------------
 # Finding #7: Database path validation
