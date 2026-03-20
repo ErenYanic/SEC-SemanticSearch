@@ -25,6 +25,7 @@ _TICKER_RE = re.compile(r"^[A-Z][A-Z.]{0,4}$")
 
 # SEC accession number format: NNNNNNNNNN-YY-NNNNNN
 _ACCESSION_RE = re.compile(r"^[0-9]{10}-[0-9]{2}-[0-9]{6}$")
+_DELETE_BY_IDS_MAX = 50
 
 
 # ---------------------------------------------------------------------------
@@ -176,13 +177,24 @@ class DeleteByIdsRequest(BaseModel):
     """Request body for ``POST /api/filings/delete-by-ids``."""
 
     accession_numbers: list[str] = Field(
-        ..., min_length=1, max_length=500, description="Accession numbers to delete"
+        ...,
+        min_length=1,
+        description=(
+            "Accession numbers to delete. Limited to 50 per request; "
+            "use admin bulk-delete or clear-all for larger operations"
+        ),
     )
 
     @field_validator("accession_numbers")
     @classmethod
     def validate_accession_numbers(cls, v: list[str]) -> list[str]:
         """Validate all accession numbers match SEC format."""
+        if len(v) > _DELETE_BY_IDS_MAX:
+            msg = (
+                f"At most {_DELETE_BY_IDS_MAX} accession numbers are allowed per request. "
+                "Use bulk-delete or clear-all for larger admin operations."
+            )
+            raise ValueError(msg)
         invalid = [a for a in v if not _ACCESSION_RE.match(a)]
         if invalid:
             msg = f"Invalid accession number format: {invalid[:3]}. Expected NNNNNNNNNN-YY-NNNNNN"
