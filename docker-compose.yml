@@ -12,7 +12,9 @@
 #
 # TLS:
 #   Mount certificates in the nginx service and uncomment the TLS
-#   server block in nginx.conf.  See docs/DEPLOYMENT.md for details.
+#   server block in nginx.conf. Scenario B/C deployments are not safe
+#   without HTTPS because credentials and queries would traverse the
+#   network in plaintext. See docs/DEPLOYMENT.md for details.
 # ──────────────────────────────────────────────────────────────────────
 
 services:
