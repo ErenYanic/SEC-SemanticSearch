@@ -154,9 +154,11 @@ class TestGetEdgarIdentity:
 
     @pytest.mark.anyio
     async def test_partial_headers_fall_through(self):
-        """Only name header without email should fall through to env vars."""
+        """Supplying only one EDGAR header should be rejected."""
         request = MagicMock()
         request.headers = {"X-Edgar-Name": "Only Name"}
+
+        from fastapi import HTTPException
 
         with patch(
             "sec_semantic_search.api.dependencies.get_settings"
@@ -166,9 +168,10 @@ class TestGetEdgarIdentity:
             s.edgar.identity_email = "env@example.com"
             s.api.edgar_session_required = True
 
-            result = await get_edgar_identity(request)
-            assert result.name == "Env Name"
-            assert result.email == "env@example.com"
+            with pytest.raises(HTTPException) as exc_info:
+                await get_edgar_identity(request)
+            assert exc_info.value.status_code == 400
+            assert exc_info.value.detail["error"] == "edgar_credentials_incomplete"
 
     @pytest.mark.anyio
     async def test_header_values_are_stripped(self):
@@ -190,6 +193,75 @@ class TestGetEdgarIdentity:
             result = await get_edgar_identity(request)
             assert result.name == "Jane Smith"
             assert result.email == "jane@example.com"
+
+    @pytest.mark.anyio
+    async def test_invalid_header_name_rejected(self):
+        """Header-supplied EDGAR names must be plausibly valid."""
+        from fastapi import HTTPException
+
+        request = MagicMock()
+        request.headers = {
+            "X-Edgar-Name": "X",
+            "X-Edgar-Email": "valid@example.com",
+        }
+
+        with patch(
+            "sec_semantic_search.api.dependencies.get_settings"
+        ) as mock_settings:
+            s = mock_settings.return_value
+            s.edgar.identity_name = None
+            s.edgar.identity_email = None
+            s.api.edgar_session_required = True
+
+            with pytest.raises(HTTPException) as exc_info:
+                await get_edgar_identity(request)
+            assert exc_info.value.status_code == 400
+            assert exc_info.value.detail["error"] == "invalid_name"
+
+    @pytest.mark.anyio
+    async def test_invalid_header_email_rejected(self):
+        """Header-supplied EDGAR emails must match a basic email shape."""
+        from fastapi import HTTPException
+
+        request = MagicMock()
+        request.headers = {
+            "X-Edgar-Name": "Valid Name",
+            "X-Edgar-Email": "not-an-email",
+        }
+
+        with patch(
+            "sec_semantic_search.api.dependencies.get_settings"
+        ) as mock_settings:
+            s = mock_settings.return_value
+            s.edgar.identity_name = None
+            s.edgar.identity_email = None
+            s.api.edgar_session_required = True
+
+            with pytest.raises(HTTPException) as exc_info:
+                await get_edgar_identity(request)
+            assert exc_info.value.status_code == 400
+            assert exc_info.value.detail["error"] == "invalid_email"
+
+    @pytest.mark.anyio
+    async def test_invalid_env_credentials_raise_server_error(self):
+        """Misconfigured server-side EDGAR credentials should fail closed."""
+        from fastapi import HTTPException
+
+        request = MagicMock()
+        request.headers = {}
+
+        with patch(
+            "sec_semantic_search.api.dependencies.get_settings"
+        ) as mock_settings:
+            s = mock_settings.return_value
+            s.edgar.identity_name = "Server Name"
+            s.edgar.identity_email = "invalid"
+            s.api.edgar_session_required = False
+
+            with pytest.raises(HTTPException) as exc_info:
+                await get_edgar_identity(request)
+            assert exc_info.value.status_code == 500
+            assert exc_info.value.detail["error"] == "server_edgar_credentials_invalid"
 
 
 # -----------------------------------------------------------------------
