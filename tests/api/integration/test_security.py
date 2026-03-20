@@ -704,8 +704,9 @@ class TestApiKeyAuthentication:
         # Connection with wrong key should fail.
         with pytest.raises(Exception):
             with client.websocket_connect(
-                f"/ws/ingest/{info.task_id}?api_key=wrong-key",
+                f"/ws/ingest/{info.task_id}",
             ) as ws:
+                ws.send_json({"type": "auth", "api_key": "wrong-key"})
                 ws.receive_json()
 
     def test_websocket_accepts_correct_key(self, monkeypatch):
@@ -723,10 +724,31 @@ class TestApiKeyAuthentication:
 
         client = TestClient(app)
         with client.websocket_connect(
-            f"/ws/ingest/{info.task_id}?api_key={self.TEST_KEY}",
+            f"/ws/ingest/{info.task_id}",
         ) as ws:
+            ws.send_json({"type": "auth", "api_key": self.TEST_KEY})
             msg = ws.receive_json()
             assert msg["type"] == "snapshot"
+
+    def test_websocket_rejects_query_param_auth(self, monkeypatch):
+        """WebSocket should not accept the API key via query string."""
+        monkeypatch.setattr(
+            "sec_semantic_search.api.websocket.get_settings",
+            lambda: MagicMock(
+                api=MagicMock(key=self.TEST_KEY, cors_origins=["http://localhost:3000"]),
+            ),
+        )
+        info = make_task_info(state=TaskState.COMPLETED)
+        manager = MagicMock()
+        manager.get_task.return_value = info
+        app.state.task_manager = manager
+
+        client = TestClient(app)
+        with pytest.raises(Exception):
+            with client.websocket_connect(
+                f"/ws/ingest/{info.task_id}?api_key={self.TEST_KEY}",
+            ) as ws:
+                ws.receive_json()
 
     def test_websocket_accepts_no_key_when_auth_disabled(self):
         """WebSocket should work without key when auth is disabled."""
