@@ -19,6 +19,7 @@ Usage in route modules::
 """
 
 import hmac
+import re
 from dataclasses import dataclass
 
 from fastapi import HTTPException, Request, Security
@@ -37,6 +38,10 @@ from sec_semantic_search.search import SearchEngine
 
 _api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 _admin_key_header = APIKeyHeader(name="X-Admin-Key", auto_error=False)
+_EDGAR_EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+_CONTROL_CHAR_RE = re.compile(r"[\r\n]")
+_MAX_EDGAR_NAME_LENGTH = 200
+_MAX_EDGAR_EMAIL_LENGTH = 254
 
 
 def _secrets_match(provided: str | None, expected: str) -> bool:
@@ -44,6 +49,67 @@ def _secrets_match(provided: str | None, expected: str) -> bool:
     if provided is None:
         return False
     return hmac.compare_digest(provided, expected)
+
+
+def _raise_invalid_edgar_identity(*, source: str, error: str, message: str, hint: str) -> None:
+    """Raise a client or server error for invalid EDGAR identity data."""
+    if source == "header":
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": error,
+                "message": message,
+                "details": None,
+                "hint": hint,
+            },
+        )
+
+    raise HTTPException(
+        status_code=500,
+        detail={
+            "error": "server_edgar_credentials_invalid",
+            "message": "Server-side EDGAR credentials are misconfigured.",
+            "details": None,
+            "hint": "Fix EDGAR_IDENTITY_NAME and EDGAR_IDENTITY_EMAIL server-side.",
+        },
+    )
+
+
+def _normalise_edgar_name(name: str, *, source: str) -> str:
+    """Validate and normalise an EDGAR display name."""
+    normalised = name.strip()
+    if len(normalised) < 2:
+        _raise_invalid_edgar_identity(
+            source=source,
+            error="invalid_name",
+            message="EDGAR name must be at least 2 characters.",
+            hint="Provide a real name in X-Edgar-Name.",
+        )
+    if len(normalised) > _MAX_EDGAR_NAME_LENGTH or _CONTROL_CHAR_RE.search(normalised):
+        _raise_invalid_edgar_identity(
+            source=source,
+            error="invalid_name",
+            message="EDGAR name contains unsupported characters.",
+            hint="Remove line breaks and keep X-Edgar-Name under 200 characters.",
+        )
+    return normalised
+
+
+def _normalise_edgar_email(email: str, *, source: str) -> str:
+    """Validate and normalise an EDGAR email address."""
+    normalised = email.strip()
+    if (
+        len(normalised) > _MAX_EDGAR_EMAIL_LENGTH
+        or _CONTROL_CHAR_RE.search(normalised)
+        or not _EDGAR_EMAIL_RE.match(normalised)
+    ):
+        _raise_invalid_edgar_identity(
+            source=source,
+            error="invalid_email",
+            message="EDGAR email must be a valid email address.",
+            hint="Provide a valid email address in X-Edgar-Email.",
+        )
+    return normalised
 
 
 async def verify_api_key(
@@ -187,14 +253,37 @@ async def get_edgar_identity(request: Request) -> EdgarIdentity:
     # 1. Try request headers (per-session credentials from frontend).
     header_name = request.headers.get("X-Edgar-Name")
     header_email = request.headers.get("X-Edgar-Email")
-    if header_name and header_email:
-        return EdgarIdentity(name=header_name.strip(), email=header_email.strip())
+    if header_name is not None or header_email is not None:
+        if not header_name or not header_email:
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "error": "edgar_credentials_incomplete",
+                    "message": "Both EDGAR name and email headers are required together.",
+                    "details": None,
+                    "hint": "Provide both X-Edgar-Name and X-Edgar-Email headers.",
+                },
+            )
+        return EdgarIdentity(
+            name=_normalise_edgar_name(header_name, source="header"),
+            email=_normalise_edgar_email(header_email, source="header"),
+        )
 
     # 2. Fall back to server-side env vars.
     env_name = settings.edgar.identity_name
     env_email = settings.edgar.identity_email
-    if env_name and env_email:
-        return EdgarIdentity(name=env_name, email=env_email)
+    if env_name is not None or env_email is not None:
+        if not env_name or not env_email:
+            _raise_invalid_edgar_identity(
+                source="env",
+                error="server_edgar_credentials_invalid",
+                message="Server-side EDGAR credentials are incomplete.",
+                hint="Fix EDGAR_IDENTITY_NAME and EDGAR_IDENTITY_EMAIL server-side.",
+            )
+        return EdgarIdentity(
+            name=_normalise_edgar_name(env_name, source="env"),
+            email=_normalise_edgar_email(env_email, source="env"),
+        )
 
     # 3. Neither available — reject if session credentials are required.
     if settings.api.edgar_session_required:
