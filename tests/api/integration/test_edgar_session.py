@@ -22,7 +22,9 @@ from sec_semantic_search.api.dependencies import (
     get_registry,
     get_task_manager,
 )
+from sec_semantic_search.api.tasks import TaskManager
 from sec_semantic_search.database.metadata import DatabaseStatistics
+from tests.helpers import make_task_info
 
 
 def _make_ingest_client(task_manager=None, override_identity=None):
@@ -352,3 +354,66 @@ class TestEdgarCredentialsNeverLogged:
                 call_str = str(call)
                 assert "Secret Name" not in call_str
                 assert "secret@email.com" not in call_str
+
+
+class TestTaskManagerEdgarIdentityIsolation:
+    """EDGAR identity must be re-applied safely for each EDGAR-bound call."""
+
+    def test_run_with_edgar_identity_applies_session_credentials_first(self):
+        registry = MagicMock()
+        chroma = MagicMock()
+        fetcher = MagicMock()
+        orchestrator = MagicMock()
+        manager = TaskManager(
+            registry=registry,
+            chroma=chroma,
+            fetcher=fetcher,
+            orchestrator=orchestrator,
+        )
+        info = make_task_info()
+        info.edgar_name = "Session User"
+        info.edgar_email = "session@example.com"
+
+        calls: list[object] = []
+        fetcher.apply_identity.side_effect = lambda name, email: calls.append(
+            ("identity", name, email)
+        )
+
+        result = manager._run_with_edgar_identity(
+            info,
+            lambda: calls.append("operation") or "ok",
+        )
+
+        assert result == "ok"
+        assert calls == [
+            ("identity", "Session User", "session@example.com"),
+            "operation",
+        ]
+        manager.shutdown()
+
+    def test_run_with_edgar_identity_restores_server_defaults(self):
+        registry = MagicMock()
+        chroma = MagicMock()
+        fetcher = MagicMock()
+        orchestrator = MagicMock()
+        manager = TaskManager(
+            registry=registry,
+            chroma=chroma,
+            fetcher=fetcher,
+            orchestrator=orchestrator,
+        )
+        info = make_task_info()
+
+        manager._run_with_edgar_identity(info, lambda: None)
+
+        fetcher.apply_identity.assert_called_once_with(None, None)
+        manager.shutdown()
+
+    def test_execute_routes_edgar_calls_through_identity_guard(self):
+        import inspect
+
+        source = inspect.getsource(TaskManager._execute)
+
+        assert "_run_with_edgar_identity(info, self._build_work_list, info)" in source
+        assert "self._fetcher.fetch_filing_content" in source
+        assert "_run_with_edgar_identity(" in source

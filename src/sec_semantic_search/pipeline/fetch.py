@@ -121,6 +121,20 @@ class FilingFetcher:
 
         self._configure_identity()
 
+    def apply_identity(self, name: str | None = None, email: str | None = None) -> None:
+        """Apply the effective EDGAR identity for the current operation.
+
+        ``edgar.set_identity()`` mutates process-global state, so callers must
+        re-apply the intended identity before every EDGAR-bound operation.
+        When per-session credentials are provided, they take precedence.
+        Otherwise, the server-side defaults from settings are restored.
+        """
+        if name and email:
+            self.set_identity(name, email)
+            return
+
+        self._configure_identity()
+
     def _configure_identity(self) -> None:
         """Configure SEC EDGAR identity from settings (if both fields are set).
 

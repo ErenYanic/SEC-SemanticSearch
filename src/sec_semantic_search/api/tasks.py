@@ -23,9 +23,11 @@ import asyncio
 import threading
 import time
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
+from typing import TypeVar
 
 from sec_semantic_search.config import get_settings
 from sec_semantic_search.core import (
@@ -40,6 +42,8 @@ from sec_semantic_search.pipeline import PipelineOrchestrator
 from sec_semantic_search.pipeline.fetch import FilingFetcher, FilingInfo
 
 logger = get_logger(__name__)
+
+_T = TypeVar("_T")
 
 # In-memory TTL — tasks are persisted to SQLite before pruning.
 _TASK_TTL_SECONDS = 86_400  # 24 hours
@@ -194,6 +198,7 @@ class TaskManager:
 
         self._tasks: dict[str, TaskInfo] = {}
         self._gpu_semaphore = threading.Semaphore(1)
+        self._edgar_lock = threading.Lock()
         self._lock = threading.Lock()  # protects _tasks dict mutations
 
         # Event loop reference — set via set_event_loop() during lifespan
@@ -426,6 +431,24 @@ class TaskManager:
     # Worker
     # ------------------------------------------------------------------
 
+    def _run_with_edgar_identity(
+        self,
+        info: TaskInfo,
+        operation: Callable[..., _T],
+        *args,
+        **kwargs,
+    ) -> _T:
+        """Run an EDGAR-bound operation under the correct effective identity.
+
+        ``edgar.set_identity()`` mutates process-global state, so the identity
+        must be re-applied immediately before every EDGAR request cluster.
+        A dedicated lock keeps this invariant correct even if task concurrency
+        changes in the future.
+        """
+        with self._edgar_lock:
+            self._fetcher.apply_identity(info.edgar_name, info.edgar_email)
+            return operation(*args, **kwargs)
+
     def _run_task(self, info: TaskInfo) -> None:
         """
         Execute the ingestion task.  Runs in a background thread.
@@ -461,10 +484,6 @@ class TaskManager:
                 timer.start()
                 info._duration_timer = timer
 
-            # Set per-session EDGAR identity if provided.
-            if info.edgar_name and info.edgar_email:
-                self._fetcher.set_identity(info.edgar_name, info.edgar_email)
-
             self._execute(info)
 
         except Exception as exc:
@@ -499,7 +518,7 @@ class TaskManager:
         filing's HTML is in memory at a time.
         """
         # Build the flat work list of filings to ingest (metadata only).
-        work = self._build_work_list(info)
+        work = self._run_with_edgar_identity(info, self._build_work_list, info)
 
         info.progress.filings_total = len(work)
 
@@ -597,7 +616,9 @@ class TaskManager:
             info.progress.step_index = 0
 
             try:
-                _, html_content = self._fetcher.fetch_filing_content(
+                _, html_content = self._run_with_edgar_identity(
+                    info,
+                    self._fetcher.fetch_filing_content,
                     filing_info,
                 )
             except FetchError as exc:
