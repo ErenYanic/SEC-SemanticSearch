@@ -492,6 +492,8 @@ class TestSecurityHeaders:
         assert resp.headers.get("X-Frame-Options") == "DENY"
         assert resp.headers.get("X-XSS-Protection") == "1; mode=block"
         assert resp.headers.get("Referrer-Policy") == "strict-origin-when-cross-origin"
+        assert resp.headers.get("Content-Security-Policy") is not None
+        assert "frame-ancestors 'none'" in resp.headers["Content-Security-Policy"]
 
     def test_error_response_has_security_headers(self):
         """404 responses from valid routes should still include security headers."""
@@ -503,6 +505,7 @@ class TestSecurityHeaders:
         resp = client.get("/api/filings/0000320193-24-000001")
         assert resp.status_code == 404
         assert resp.headers.get("X-Content-Type-Options") == "nosniff"
+        assert resp.headers.get("Content-Security-Policy") is not None
         app.dependency_overrides.clear()
 
 
