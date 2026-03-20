@@ -526,6 +526,7 @@ class TestIngestCooldown:
         from sec_semantic_search.api.routes import ingest as ingest_mod
         with ingest_mod._cooldown_lock:
             ingest_mod._last_ingest.clear()
+            ingest_mod._last_cooldown_prune = 0.0
 
     def _make_ingest_client(self):
         from sec_semantic_search.api.dependencies import get_edgar_identity, EdgarIdentity
@@ -579,6 +580,31 @@ class TestIngestCooldown:
 
         resp2 = client.post("/api/ingest/add", json=body)
         assert resp2.status_code == 202
+
+    @patch("sec_semantic_search.api.routes.ingest.get_settings")
+    def test_cooldown_tracker_prunes_when_hard_cap_hit(self, mock_route_settings, monkeypatch):
+        """Emergency pruning should cap memory growth under spoofed IP churn."""
+        from sec_semantic_search.api.routes import ingest as ingest_mod
+
+        mock_route_settings.return_value.api.ingest_cooldown_seconds = 60
+        monkeypatch.setattr(ingest_mod, "_MAX_COOLDOWN_ENTRIES", 4)
+
+        with patch("sec_semantic_search.api.routes.ingest.time.monotonic", return_value=1000.0):
+            with ingest_mod._cooldown_lock:
+                ingest_mod._last_ingest.clear()
+                ingest_mod._last_ingest.update({
+                    "1.1.1.1": 10.0,
+                    "2.2.2.2": 20.0,
+                    "3.3.3.3": 30.0,
+                    "4.4.4.4": 40.0,
+                })
+                ingest_mod._last_cooldown_prune = 1000.0
+
+            ingest_mod._check_cooldown("5.5.5.5")
+
+            with ingest_mod._cooldown_lock:
+                assert set(ingest_mod._last_ingest) == {"3.3.3.3", "4.4.4.4", "5.5.5.5"}
+                assert ingest_mod._last_ingest["5.5.5.5"] == 1000.0
 
 
 # -----------------------------------------------------------------------

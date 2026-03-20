@@ -47,6 +47,7 @@ _cooldown_lock = threading.Lock()
 _last_ingest: dict[str, float] = {}
 # How often to purge stale entries (seconds).
 _COOLDOWN_PRUNE_INTERVAL = 600
+_MAX_COOLDOWN_ENTRIES = 100_000
 _last_cooldown_prune: float = 0.0
 
 
@@ -73,6 +74,21 @@ def _check_cooldown(client_ip: str) -> None:
             for ip in stale:
                 del _last_ingest[ip]
             _last_cooldown_prune = now
+
+        # Emergency prune: if the map still reaches the configured hard cap,
+        # evict the oldest half before recording the next request.
+        if len(_last_ingest) >= _MAX_COOLDOWN_ENTRIES:
+            oldest_entries = sorted(
+                _last_ingest.items(), key=lambda item: item[1],
+            )
+            prune_count = max(len(oldest_entries) // 2, 1)
+            for ip, _ in oldest_entries[:prune_count]:
+                del _last_ingest[ip]
+            logger.warning(
+                "Cooldown tracker reached %s entries; pruned %s oldest records.",
+                len(oldest_entries),
+                prune_count,
+            )
 
         last = _last_ingest.get(client_ip)
         if last is not None:
