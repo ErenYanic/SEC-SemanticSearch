@@ -18,6 +18,7 @@ Usage in route modules::
         return registry.list_filings()
 """
 
+import hmac
 from dataclasses import dataclass
 
 from fastapi import HTTPException, Request, Security
@@ -38,6 +39,13 @@ _api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 _admin_key_header = APIKeyHeader(name="X-Admin-Key", auto_error=False)
 
 
+def _secrets_match(provided: str | None, expected: str) -> bool:
+    """Compare secrets in constant time when a value was provided."""
+    if provided is None:
+        return False
+    return hmac.compare_digest(provided, expected)
+
+
 async def verify_api_key(
     api_key: str | None = Security(_api_key_header),
 ) -> None:
@@ -51,7 +59,7 @@ async def verify_api_key(
     if expected is None:
         # Auth disabled — allow all requests.
         return
-    if api_key is None or api_key != expected:
+    if not _secrets_match(api_key, expected):
         raise HTTPException(
             status_code=401,
             detail={
@@ -80,7 +88,7 @@ async def verify_admin_key(
     if expected is None:
         # No admin key configured — unrestricted (Scenario A).
         return
-    if admin_key is None or admin_key != expected:
+    if not _secrets_match(admin_key, expected):
         client_ip = request.client.host if request.client else "unknown"
         audit_log(
             "admin_denied",
@@ -110,7 +118,7 @@ def is_admin_request(request: Request) -> bool:
     if expected is None:
         # No admin key configured — everyone is effectively admin.
         return True
-    return request.headers.get("X-Admin-Key") == expected
+    return _secrets_match(request.headers.get("X-Admin-Key"), expected)
 
 
 def get_registry(request: Request) -> MetadataRegistry:
