@@ -24,6 +24,7 @@ from sec_semantic_search.api.dependencies import (
     get_registry,
     get_task_manager,
     is_admin_request,
+    verify_api_key,
     verify_admin_key,
 )
 from sec_semantic_search.api.tasks import TaskInfo, TaskState
@@ -344,6 +345,67 @@ class TestIsAdminRequest:
         request = MagicMock()
         request.headers.get.return_value = None
         assert is_admin_request(request) is False
+
+
+# -----------------------------------------------------------------------
+# Constant-time secret comparison
+# -----------------------------------------------------------------------
+
+
+class TestConstantTimeSecretComparison:
+    """Verify auth helpers use constant-time secret comparison."""
+
+    @pytest.mark.anyio
+    @patch("sec_semantic_search.api.dependencies.hmac.compare_digest")
+    @patch("sec_semantic_search.api.dependencies.get_settings")
+    async def test_verify_api_key_uses_compare_digest(
+        self, mock_settings, mock_compare_digest,
+    ):
+        """API key validation should use constant-time comparison."""
+        mock_settings.return_value.api.key = "secret-api-key"
+        mock_compare_digest.return_value = True
+
+        await verify_api_key(api_key="secret-api-key")
+
+        mock_compare_digest.assert_called_once_with(
+            "secret-api-key", "secret-api-key",
+        )
+
+    @pytest.mark.anyio
+    @patch("sec_semantic_search.api.dependencies.hmac.compare_digest")
+    @patch("sec_semantic_search.api.dependencies.get_settings")
+    async def test_verify_admin_key_uses_compare_digest(
+        self, mock_settings, mock_compare_digest,
+    ):
+        """Admin key validation should use constant-time comparison."""
+        mock_settings.return_value.api.admin_key = "secret-admin-key"
+        mock_compare_digest.return_value = True
+        request = MagicMock()
+        request.client.host = "127.0.0.1"
+        request.method = "POST"
+        request.url.path = "/api/filings/bulk-delete"
+
+        await verify_admin_key(request, admin_key="secret-admin-key")
+
+        mock_compare_digest.assert_called_once_with(
+            "secret-admin-key", "secret-admin-key",
+        )
+
+    @patch("sec_semantic_search.api.dependencies.hmac.compare_digest")
+    @patch("sec_semantic_search.api.dependencies.get_settings")
+    def test_is_admin_request_uses_compare_digest(
+        self, mock_settings, mock_compare_digest,
+    ):
+        """Status admin detection should use constant-time comparison."""
+        mock_settings.return_value.api.admin_key = "secret-admin-key"
+        mock_compare_digest.return_value = True
+        request = MagicMock()
+        request.headers.get.return_value = "secret-admin-key"
+
+        assert is_admin_request(request) is True
+        mock_compare_digest.assert_called_once_with(
+            "secret-admin-key", "secret-admin-key",
+        )
 
 
 # -----------------------------------------------------------------------
