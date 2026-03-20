@@ -83,10 +83,10 @@ async def ingest_progress(websocket: WebSocket, task_id: str) -> None:
     internal queue until the task reaches a terminal state or the client
     disconnects.
     """
-    # --- Origin validation (WebSocket is not protected by CORS) ----------
+    # --- Origin validation (browser-only endpoint; reject missing Origin) --
     origin = websocket.headers.get("origin")
     allowed_origins = get_settings().api.cors_origins
-    if origin is not None and origin not in allowed_origins:
+    if origin is None or origin not in allowed_origins:
         await websocket.close(code=4003, reason="Origin not allowed")
         return
 

@@ -13,6 +13,8 @@ from sec_semantic_search.api.app import app
 from sec_semantic_search.api.tasks import TaskState
 from tests.helpers import make_task_info
 
+_WS_HEADERS = {"origin": "http://localhost:3000"}
+
 
 def _make_client_with_task(task_info=None):
     """Build a TestClient with a task manager that returns the given task."""
@@ -38,7 +40,7 @@ class TestWebSocketConnect:
 
     def test_nonexistent_task(self):
         client = _make_client_with_task(task_info=None)
-        with client.websocket_connect("/ws/ingest/nonexistent") as ws:
+        with client.websocket_connect("/ws/ingest/nonexistent", headers=_WS_HEADERS) as ws:
             msg = ws.receive_json()
             assert msg["type"] == "error"
             assert "not found" in msg["error"].lower()
@@ -54,7 +56,7 @@ class TestWebSocketSnapshot:
         # Put a cancelled message to terminate the loop.
         info._message_queue.put_nowait({"type": "cancelled"})
 
-        with client.websocket_connect(f"/ws/ingest/{info.task_id}") as ws:
+        with client.websocket_connect(f"/ws/ingest/{info.task_id}", headers=_WS_HEADERS) as ws:
             snapshot = ws.receive_json()
             assert snapshot["type"] == "snapshot"
             assert snapshot["task_id"] == info.task_id
@@ -75,7 +77,7 @@ class TestWebSocketCompleted:
         })
 
         client = _make_client_with_task(task_info=info)
-        with client.websocket_connect(f"/ws/ingest/{info.task_id}") as ws:
+        with client.websocket_connect(f"/ws/ingest/{info.task_id}", headers=_WS_HEADERS) as ws:
             snapshot = ws.receive_json()
             assert snapshot["type"] == "snapshot"
 
@@ -103,7 +105,7 @@ class TestWebSocketStreaming:
         })
 
         client = _make_client_with_task(task_info=info)
-        with client.websocket_connect(f"/ws/ingest/{info.task_id}") as ws:
+        with client.websocket_connect(f"/ws/ingest/{info.task_id}", headers=_WS_HEADERS) as ws:
             snapshot = ws.receive_json()
             assert snapshot["type"] == "snapshot"
 
@@ -129,7 +131,7 @@ class TestWebSocketStreaming:
         info._message_queue.put_nowait({"type": "completed", "results": [], "summary": {}})
 
         client = _make_client_with_task(task_info=info)
-        with client.websocket_connect(f"/ws/ingest/{info.task_id}") as ws:
+        with client.websocket_connect(f"/ws/ingest/{info.task_id}", headers=_WS_HEADERS) as ws:
             ws.receive_json()  # snapshot
             filing_done = ws.receive_json()
             assert filing_done["type"] == "filing_done"
@@ -141,7 +143,7 @@ class TestWebSocketStreaming:
         info._message_queue.put_nowait({"type": "cancelled"})
 
         client = _make_client_with_task(task_info=info)
-        with client.websocket_connect(f"/ws/ingest/{info.task_id}") as ws:
+        with client.websocket_connect(f"/ws/ingest/{info.task_id}", headers=_WS_HEADERS) as ws:
             ws.receive_json()  # snapshot
             msg = ws.receive_json()
             assert msg["type"] == "cancelled"
