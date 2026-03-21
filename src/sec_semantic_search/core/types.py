@@ -16,7 +16,6 @@ Design notes:
 from dataclasses import dataclass, field
 from datetime import date
 from enum import Enum
-from typing import Optional
 
 
 class ContentType(Enum):
@@ -190,9 +189,9 @@ class SearchResult:
     ticker: str
     form_type: str
     similarity: float
-    filing_date: Optional[str] = None
-    accession_number: Optional[str] = None
-    chunk_id: Optional[str] = None
+    filing_date: str | None = None
+    accession_number: str | None = None
+    chunk_id: str | None = None
 
     @classmethod
     def from_chromadb_result(
@@ -200,7 +199,7 @@ class SearchResult:
         document: str,
         metadata: dict,
         distance: float,
-        chunk_id: Optional[str] = None,
+        chunk_id: str | None = None,
     ) -> "SearchResult":
         """
         Create SearchResult from ChromaDB query output.

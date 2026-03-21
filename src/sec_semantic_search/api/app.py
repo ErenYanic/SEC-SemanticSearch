@@ -14,8 +14,8 @@ Architecture:
 """
 
 import asyncio
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from typing import AsyncIterator
 
 from fastapi import Depends, FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
@@ -234,10 +234,10 @@ def create_app() -> FastAPI:
     # -- Routers (uncommented as implemented in W1.2–W1.8) ------------------
     from sec_semantic_search.api.routes.filings import router as filings_router
     from sec_semantic_search.api.routes.ingest import router as ingest_router
+    from sec_semantic_search.api.routes.resources import router as resources_router
     from sec_semantic_search.api.routes.search import router as search_router
     from sec_semantic_search.api.routes.status import router as status_router
     from sec_semantic_search.api.websocket import router as ws_router
-    from sec_semantic_search.api.routes.resources import router as resources_router
 
     auth = [Depends(verify_api_key)]
     application.include_router(status_router, prefix="/api/status", tags=["status"], dependencies=auth)

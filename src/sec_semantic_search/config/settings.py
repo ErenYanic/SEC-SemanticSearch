@@ -1,10 +1,9 @@
 """Configuration management using Pydantic Settings v2."""
 
 from pathlib import Path
-from typing import Optional
 
 from dotenv import load_dotenv
-from pydantic import model_validator
+from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Load .env into os.environ BEFORE nested BaseSettings classes are
@@ -28,8 +27,8 @@ class EdgarSettings(BaseSettings):
     ``EDGAR_RATE_LIMIT_PER_SEC`` env var that edgartools reads directly).
     """
 
-    identity_name: Optional[str] = None
-    identity_email: Optional[str] = None
+    identity_name: str | None = None
+    identity_email: str | None = None
 
     model_config = SettingsConfigDict(env_prefix="EDGAR_")
 
@@ -62,7 +61,7 @@ class DatabaseSettings(BaseSettings):
     max_filings: int = 500
 
     # SQLCipher encryption key; unset = plain sqlite3 (local dev).
-    encryption_key: Optional[str] = None
+    encryption_key: str | None = None
 
     # Task history privacy settings.
     task_history_retention_days: int = 0  # 0 = keep indefinitely
@@ -125,7 +124,7 @@ class LoggingSettings(BaseSettings):
 
     # Optional file logging (in addition to stdout).
     # Env vars: LOG_FILE_PATH, LOG_FILE_MAX_BYTES, LOG_FILE_BACKUP_COUNT
-    path: Optional[str] = None  # unset = stdout only
+    path: str | None = None  # unset = stdout only
     max_bytes: int = 10_485_760  # 10 MB
     backup_count: int = 3
 
@@ -135,7 +134,7 @@ class LoggingSettings(BaseSettings):
 class HuggingFaceSettings(BaseSettings):
     """Hugging Face configuration."""
 
-    token: Optional[str] = None
+    token: str | None = None
 
     model_config = SettingsConfigDict(env_prefix="HUGGING_FACE_")
 
@@ -146,7 +145,7 @@ class ApiSettings(BaseSettings):
     host: str = "127.0.0.1"
     port: int = 8000
     cors_origins: list[str] = ["http://localhost:3000"]
-    key: Optional[str] = None  # API key; None = auth disabled (local dev)
+    key: str | None = None  # API key; None = auth disabled (local dev)
 
     # Rate limiting (requests per minute; 0 = disabled)
     rate_limit_search: int = 60
@@ -155,7 +154,7 @@ class ApiSettings(BaseSettings):
     rate_limit_general: int = 120
 
     # Admin key for destructive operations; unset = unrestricted (Scenario A).
-    admin_key: Optional[str] = None
+    admin_key: str | None = None
 
     # Per-session EDGAR credentials requirement.
     edgar_session_required: bool = False
@@ -172,6 +171,11 @@ class ApiSettings(BaseSettings):
     max_filings_per_request: int = 0
     ingest_cooldown_seconds: int = 0
     max_task_duration_minutes: int = 0
+
+    @field_validator("key", "admin_key", mode="before")
+    @classmethod
+    def _empty_str_to_none(cls, v: str | None) -> str | None:
+        return v or None
 
     model_config = SettingsConfigDict(env_prefix="API_")
 
@@ -196,7 +200,7 @@ class Settings(BaseSettings):
     )
 
 
-_settings_instance: Optional[Settings] = None
+_settings_instance: Settings | None = None
 
 
 def get_settings() -> Settings:

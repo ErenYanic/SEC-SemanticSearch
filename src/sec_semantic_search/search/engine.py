@@ -12,7 +12,6 @@ Usage:
     results = engine.search("revenue and financial performance")
 """
 
-from typing import Optional
 
 from sec_semantic_search.config import get_settings
 from sec_semantic_search.core import SearchError, SearchResult, get_logger
@@ -45,8 +44,8 @@ class SearchEngine:
 
     def __init__(
         self,
-        embedder: Optional[EmbeddingGenerator] = None,
-        chroma_client: Optional[ChromaDBClient] = None,
+        embedder: EmbeddingGenerator | None = None,
+        chroma_client: ChromaDBClient | None = None,
     ) -> None:
         """
         Initialise the search engine.
@@ -73,11 +72,11 @@ class SearchEngine:
     def search(
         self,
         query: str,
-        top_k: Optional[int] = None,
-        ticker: Optional[str] = None,
-        form_type: Optional[str] = None,
-        min_similarity: Optional[float] = None,
-        accession_number: Optional[str] = None,
+        top_k: int | None = None,
+        ticker: str | None = None,
+        form_type: str | None = None,
+        min_similarity: float | None = None,
+        accession_number: str | None = None,
     ) -> list[SearchResult]:
         """
         Search ingested filings for chunks relevant to the query.

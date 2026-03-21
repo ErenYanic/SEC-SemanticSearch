@@ -25,7 +25,6 @@ import logging.handlers
 import os
 import sys
 from pathlib import Path
-from typing import Optional
 
 from rich.console import Console
 from rich.logging import RichHandler
@@ -83,7 +82,7 @@ def _add_file_handler(
 
 
 def configure_logging(
-    level: Optional[int] = None,
+    level: int | None = None,
     use_rich: bool = True,
 ) -> None:
     """

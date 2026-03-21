@@ -25,9 +25,8 @@ from dataclasses import dataclass
 from fastapi import HTTPException, Request, Security
 from fastapi.security import APIKeyHeader
 
-from sec_semantic_search.core import audit_log
-
 from sec_semantic_search.config import get_settings
+from sec_semantic_search.core import audit_log
 from sec_semantic_search.database import ChromaDBClient, MetadataRegistry
 from sec_semantic_search.pipeline import EmbeddingGenerator, FilingFetcher
 from sec_semantic_search.search import SearchEngine

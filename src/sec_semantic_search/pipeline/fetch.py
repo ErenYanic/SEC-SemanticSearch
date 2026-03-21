@@ -33,10 +33,11 @@ Usage:
         process(filing_id, html)
 """
 
+from collections.abc import Iterator
 from dataclasses import dataclass, field
 from datetime import date, datetime
 from itertools import islice
-from typing import Any, Iterator
+from typing import Any
 
 from edgar import Company, set_identity
 
@@ -333,7 +334,7 @@ class FilingFetcher:
             raise
         except Exception as e:
             raise FetchError(
-                f"Failed to retrieve filings",
+                "Failed to retrieve filings",
                 details=str(e),
             ) from e
 

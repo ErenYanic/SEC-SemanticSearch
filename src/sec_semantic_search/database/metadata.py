@@ -25,9 +25,9 @@ import sqlite3
 import threading
 import types
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 from sec_semantic_search.config import get_settings
 from sec_semantic_search.core import (
@@ -196,8 +196,8 @@ class MetadataRegistry:
 
     def __init__(
         self,
-        db_path: Optional[str] = None,
-        encryption_key: Optional[str] = None,
+        db_path: str | None = None,
+        encryption_key: str | None = None,
     ) -> None:
         """
         Initialise the metadata registry.
@@ -245,7 +245,7 @@ class MetadataRegistry:
             self._conn.execute(f"PRAGMA key = \"x'{hex_key}'\"")
             logger.debug("SQLCipher PRAGMA key applied")
 
-        self._conn.row_factory = sqlite3.Row
+        self._conn.row_factory = self._sqlite_module.Row
         self._conn.execute("PRAGMA journal_mode=WAL")
         self._lock = threading.Lock()
 
@@ -424,7 +424,7 @@ class MetadataRegistry:
                                  accession_number, chunk_count, ingested_at)
             VALUES (?, ?, ?, ?, ?, ?)
         """
-        ingested_at = datetime.now(timezone.utc).isoformat()
+        ingested_at = datetime.now(UTC).isoformat()
 
         try:
             with self._lock, self._conn:
@@ -485,7 +485,7 @@ class MetadataRegistry:
                                  accession_number, chunk_count, ingested_at)
             VALUES (?, ?, ?, ?, ?, ?)
         """
-        ingested_at = datetime.now(timezone.utc).isoformat()
+        ingested_at = datetime.now(UTC).isoformat()
 
         try:
             with self._lock, self._conn:
@@ -614,7 +614,7 @@ class MetadataRegistry:
     # Read operations
     # ------------------------------------------------------------------
 
-    def get_filing(self, accession_number: str) -> Optional[FilingRecord]:
+    def get_filing(self, accession_number: str) -> FilingRecord | None:
         """
         Retrieve a single filing record by accession number.
 
@@ -687,8 +687,8 @@ class MetadataRegistry:
 
     def list_filings(
         self,
-        ticker: Optional[str] = None,
-        form_type: Optional[str] = None,
+        ticker: str | None = None,
+        form_type: str | None = None,
     ) -> list[FilingRecord]:
         """
         List ingested filings with optional filters.
@@ -754,8 +754,8 @@ class MetadataRegistry:
 
     def count(
         self,
-        ticker: Optional[str] = None,
-        form_type: Optional[str] = None,
+        ticker: str | None = None,
+        form_type: str | None = None,
     ) -> int:
         """
         Count ingested filings with optional filters.
@@ -986,7 +986,7 @@ class MetadataRegistry:
         if max_age_days <= 0:
             return 0  # 0 = keep indefinitely
 
-        cutoff = datetime.now(timezone.utc).isoformat()
+        cutoff = datetime.now(UTC).isoformat()
         # SQLite date arithmetic: entries with completed_at older than cutoff
         sql = """
             DELETE FROM task_history

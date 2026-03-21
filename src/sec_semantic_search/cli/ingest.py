@@ -241,11 +241,13 @@ def _ingest_one_form(
             continue
 
         # --- Process: parse → chunk → embed ----------------------------------
-        def _on_progress(step: str, _current: int, _total: int) -> None:
+        def _on_progress(
+            step: str, _current: int, _total: int, _fnum: str = filing_num,
+        ) -> None:
             if step != "Complete":
                 progress.update(
                     step_task_id,
-                    description=f"{step} {ticker} {form_type}{form_label}{filing_num}...",
+                    description=f"{step} {ticker} {form_type}{form_label}{_fnum}...",
                 )
                 progress.advance(step_task_id)
 
