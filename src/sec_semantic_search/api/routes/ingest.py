@@ -21,17 +21,19 @@ import time
 from fastapi import APIRouter, Depends, HTTPException, Request
 
 from sec_semantic_search.api.dependencies import EdgarIdentity, get_edgar_identity, get_task_manager
-from sec_semantic_search.config import get_settings
 from sec_semantic_search.api.schemas import (
     ErrorResponse,
     IngestRequest,
     IngestResultSchema,
     TaskListResponse,
-    TaskProgress as TaskProgressSchema,
     TaskResponse,
     TaskStatus,
 )
+from sec_semantic_search.api.schemas import (
+    TaskProgress as TaskProgressSchema,
+)
 from sec_semantic_search.api.tasks import TaskInfo, TaskManager, TaskQueueFullError
+from sec_semantic_search.config import get_settings
 from sec_semantic_search.core import audit_log, get_logger, redact_for_log
 
 logger = get_logger(__name__)

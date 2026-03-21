@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "A semantic search system for SEC filings (10-K, 10-Q)"
 readme = "README.md"
 license = "MIT"
-requires-python = ">=3.13"
+requires-python = ">=3.12"
 authors = [
     { name = "Eren Yanic" },
 ]
@@ -18,13 +18,13 @@ classifiers = [
     "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.12",
     "Topic :: Text Processing :: Indexing",
 ]
 
 dependencies = [
     # SEC filing retrieval
-    "edgartools==5.24.0",
+    "edgartools==5.25.1",
 
     # HTML parsing
     "doc2dict==0.7.1",
@@ -52,7 +52,7 @@ dependencies = [
 
 [project.optional-dependencies]
 encryption = [
-    "pysqlcipher3==1.2.1",
+    "pysqlcipher3==1.2.0",
 ]
 dev = [
     "pytest==9.0.2",
@@ -75,7 +75,7 @@ Repository = "https://github.com/ErenYanic/SEC-SemanticSearch"
 packages = ["src/sec_semantic_search"]
 
 [tool.ruff]
-target-version = "py313"
+target-version = "py312"
 line-length = 100
 src = ["src"]
 
@@ -91,6 +91,7 @@ select = [
 ]
 ignore = [
     "E501",   # line too long (handled by formatter)
+    "B008",   # Depends() in defaults — idiomatic FastAPI pattern
 ]
 
 [tool.ruff.lint.isort]
@@ -99,9 +100,12 @@ known-first-party = ["sec_semantic_search"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
+filterwarnings = [
+    "ignore::DeprecationWarning:edgar",
+]
 
 [tool.mypy]
-python_version = "3.13"
+python_version = "3.12"
 strict = true
 warn_return_any = true
 warn_unused_ignores = true

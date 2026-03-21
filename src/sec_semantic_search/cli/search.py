@@ -1,6 +1,6 @@
 """Search command for querying ingested SEC filings."""
 
-from typing import Annotated, Optional
+from typing import Annotated
 
 import typer
 from rich.console import Console
@@ -36,15 +36,15 @@ def _similarity_text(similarity: float) -> Text:
 def search(
     query: Annotated[str, typer.Argument(help="Natural language search query.")],
     top: Annotated[
-        Optional[int],
+        int | None,
         typer.Option("--top", "-t", help="Number of results to return."),
     ] = None,
     ticker: Annotated[
-        Optional[str],
+        str | None,
         typer.Option("--ticker", "-k", help="Filter by ticker symbol."),
     ] = None,
     form: Annotated[
-        Optional[str],
+        str | None,
         typer.Option("--form", "-f", help="Filter by form type (10-K or 10-Q)."),
     ] = None,
 ) -> None:

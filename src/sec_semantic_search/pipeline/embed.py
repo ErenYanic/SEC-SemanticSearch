@@ -74,7 +74,7 @@ class EmbeddingGenerator:
             os.environ["HF_TOKEN"] = hf_token
 
         # Model loaded lazily
-        self._model: "SentenceTransformer | None" = None
+        self._model: SentenceTransformer | None = None
 
         # Idle timeout — auto-unload model after inactivity.
         self._idle_timeout_seconds: float = (

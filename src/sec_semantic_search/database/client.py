@@ -13,7 +13,6 @@ Usage:
     results = client.query(query_embeddings, n_results=5)
 """
 
-from typing import Optional
 
 import chromadb
 
@@ -42,7 +41,7 @@ class ChromaDBClient:
         >>> results = client.query(query_embeddings, n_results=5)
     """
 
-    def __init__(self, chroma_path: Optional[str] = None) -> None:
+    def __init__(self, chroma_path: str | None = None) -> None:
         """
         Initialise the ChromaDB client and collection.
 
@@ -196,9 +195,9 @@ class ChromaDBClient:
         self,
         query_embeddings: list[list[float]],
         n_results: int = 5,
-        ticker: Optional[str] = None,
-        form_type: Optional[str] = None,
-        accession_number: Optional[str] = None,
+        ticker: str | None = None,
+        form_type: str | None = None,
+        accession_number: str | None = None,
     ) -> list[SearchResult]:
         """
         Query the collection for similar chunks.
@@ -266,10 +265,10 @@ class ChromaDBClient:
 
     @staticmethod
     def _build_where_filter(
-        ticker: Optional[str] = None,
-        form_type: Optional[str] = None,
-        accession_number: Optional[str] = None,
-    ) -> Optional[dict]:
+        ticker: str | None = None,
+        form_type: str | None = None,
+        accession_number: str | None = None,
+    ) -> dict | None:
         """
         Build a ChromaDB where filter from optional parameters.
 

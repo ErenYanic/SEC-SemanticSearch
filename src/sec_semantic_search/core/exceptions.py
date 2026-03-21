@@ -16,7 +16,6 @@ Exception hierarchy:
     └── SearchError — Search operation failures
 """
 
-from typing import Optional
 
 
 class SECSemanticSearchError(Exception):
@@ -28,7 +27,7 @@ class SECSemanticSearchError(Exception):
         details: Optional additional context for debugging.
     """
 
-    def __init__(self, message: str, details: Optional[str] = None) -> None:
+    def __init__(self, message: str, details: str | None = None) -> None:
         self.message = message
         self.details = details
         super().__init__(self._format_message())
@@ -129,7 +128,7 @@ class FilingLimitExceededError(DatabaseError):
         self,
         current_count: int,
         max_filings: int,
-        details: Optional[str] = None,
+        details: str | None = None,
     ) -> None:
         self.current_count = current_count
         self.max_filings = max_filings

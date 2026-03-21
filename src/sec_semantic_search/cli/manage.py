@@ -1,6 +1,6 @@
 """Database management subcommands (status, list, remove)."""
 
-from typing import Annotated, Optional
+from typing import Annotated
 
 import typer
 from rich.console import Console
@@ -68,11 +68,11 @@ def status() -> None:
 @manage_app.command("list")
 def list_filings(
     ticker: Annotated[
-        Optional[str],
+        str | None,
         typer.Option("--ticker", "-k", help="Filter by ticker symbol."),
     ] = None,
     form: Annotated[
-        Optional[str],
+        str | None,
         typer.Option("--form", "-f", help="Filter by form type."),
     ] = None,
 ) -> None:
@@ -125,15 +125,15 @@ def list_filings(
 @manage_app.command("remove")
 def remove(
     accession_number: Annotated[
-        Optional[str],
+        str | None,
         typer.Argument(help="Accession number of the filing to remove."),
     ] = None,
     ticker: Annotated[
-        Optional[str],
+        str | None,
         typer.Option("--ticker", "-k", help="Remove all filings for this ticker."),
     ] = None,
     form: Annotated[
-        Optional[str],
+        str | None,
         typer.Option("--form", "-f", help="Remove all filings of this form type."),
     ] = None,
     yes: Annotated[

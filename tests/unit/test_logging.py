@@ -37,6 +37,8 @@ def reset_logging_state():
     logger.handlers.clear()
     yield
     log_module._logging_configured = False
+    for handler in logger.handlers:
+        handler.close()
     logger.handlers.clear()
 
 

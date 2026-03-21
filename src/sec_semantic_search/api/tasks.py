@@ -25,8 +25,8 @@ import time
 import uuid
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from enum import Enum
+from datetime import UTC, datetime
+from enum import StrEnum
 from typing import TypeVar
 
 from sec_semantic_search.config import get_settings
@@ -54,7 +54,7 @@ _TASK_TTL_SECONDS = 86_400  # 24 hours
 # ---------------------------------------------------------------------------
 
 
-class TaskState(str, Enum):
+class TaskState(StrEnum):
     """Lifecycle states for an ingestion task."""
 
     PENDING = "pending"
@@ -148,7 +148,7 @@ class TaskInfo:
     edgar_email: str | None = None
 
     cancel_event: threading.Event = field(default_factory=threading.Event)
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     started_at: datetime | None = None
     completed_at: datetime | None = None
 
@@ -465,12 +465,12 @@ class TaskManager:
             # Check for cancellation while queued.
             if info.cancel_event.is_set():
                 info.state = TaskState.CANCELLED
-                info.completed_at = datetime.now(timezone.utc)
+                info.completed_at = datetime.now(UTC)
                 self._push(info, {"type": "cancelled"})
                 return
 
             info.state = TaskState.RUNNING
-            info.started_at = datetime.now(timezone.utc)
+            info.started_at = datetime.now(UTC)
 
             # Start GPU time limit timer if configured.
             max_minutes = get_settings().api.max_task_duration_minutes
@@ -489,7 +489,7 @@ class TaskManager:
         except Exception as exc:
             info.state = TaskState.FAILED
             info.error = str(exc)
-            info.completed_at = datetime.now(timezone.utc)
+            info.completed_at = datetime.now(UTC)
             self._push(info, {
                 "type": "failed",
                 "error": str(exc),
@@ -551,7 +551,7 @@ class TaskManager:
             if info.cancel_event.is_set():
                 self._rollback(info)
                 info.state = TaskState.CANCELLED
-                info.completed_at = datetime.now(timezone.utc)
+                info.completed_at = datetime.now(UTC)
                 self._push(info, {"type": "cancelled"})
                 logger.info("Task %s cancelled", info.task_id[:8])
                 return
@@ -592,7 +592,7 @@ class TaskManager:
                         exc = FilingLimitExceededError(cached_count, max_filings)
                         info.state = TaskState.FAILED
                         info.error = exc.message
-                        info.completed_at = datetime.now(timezone.utc)
+                        info.completed_at = datetime.now(UTC)
                         self._push(info, {
                             "type": "failed",
                             "error": exc.message,
@@ -603,7 +603,7 @@ class TaskManager:
                     exc = FilingLimitExceededError(cached_count, max_filings)
                     info.state = TaskState.FAILED
                     info.error = exc.message
-                    info.completed_at = datetime.now(timezone.utc)
+                    info.completed_at = datetime.now(UTC)
                     self._push(info, {
                         "type": "failed",
                         "error": exc.message,
@@ -682,7 +682,7 @@ class TaskManager:
             except _CancelledError:
                 self._rollback(info)
                 info.state = TaskState.CANCELLED
-                info.completed_at = datetime.now(timezone.utc)
+                info.completed_at = datetime.now(UTC)
                 self._push(info, {"type": "cancelled"})
                 logger.info("Task %s cancelled during processing", info.task_id[:8])
                 return
@@ -711,7 +711,7 @@ class TaskManager:
             if info.cancel_event.is_set():
                 self._rollback(info)
                 info.state = TaskState.CANCELLED
-                info.completed_at = datetime.now(timezone.utc)
+                info.completed_at = datetime.now(UTC)
                 self._push(info, {"type": "cancelled"})
                 return
 
@@ -809,7 +809,7 @@ class TaskManager:
         # All filings processed — mark complete.
         if info.state == TaskState.RUNNING:
             info.state = TaskState.COMPLETED
-            info.completed_at = datetime.now(timezone.utc)
+            info.completed_at = datetime.now(UTC)
             info.progress.step_label = "Complete"
             self._push(info, {
                 "type": "completed",

@@ -17,7 +17,7 @@ This is a classic **vector similarity search** system — not RAG. There is no l
 
 ## Requirements
 
-- Python 3.13+
+- Python 3.12+
 - NVIDIA GPU with CUDA support (recommended; CPU fallback available)
 - [uv](https://docs.astral.sh/uv/) package manager (recommended)
 
@@ -29,8 +29,8 @@ git clone https://github.com/ErenYanic/SEC-SemanticSearch.git
 cd SEC-SemanticSearch
 
 # Create and activate a virtual environment
-uv venv uv_SEC_SemanticSearch
-source uv_SEC_SemanticSearch/bin/activate
+uv venv .venv --python 3.12
+source .venv/bin/activate
 
 # Install in development mode
 uv pip install -e ".[dev]"
