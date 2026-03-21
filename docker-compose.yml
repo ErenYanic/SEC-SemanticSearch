@@ -27,11 +27,11 @@ services:
     restart: unless-stopped
     volumes:
       - chroma_data:/app/data/chroma_db
-      - sqlite_data:/app/data
+      - sqlite_data:/app/data/sqlite
     environment:
-      # Database paths (match volume mounts)
+      # Database paths (match volume mounts above)
       - DB_CHROMA_PATH=/app/data/chroma_db
-      - DB_METADATA_DB_PATH=/app/data/metadata.sqlite
+      - DB_METADATA_DB_PATH=/app/data/sqlite/metadata.sqlite
       # Server binding
       - API_HOST=0.0.0.0
       - API_PORT=8000
@@ -102,7 +102,7 @@ services:
       # Server-only admin key for Next.js route handlers and admin session login
       - ADMIN_API_KEY=${ADMIN_API_KEY:-}
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:3000/"]
       interval: 30s
       timeout: 5s
       start_period: 10s
