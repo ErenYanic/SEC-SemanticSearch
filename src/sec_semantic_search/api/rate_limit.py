@@ -14,6 +14,14 @@ Design choices:
     - **Automatic cleanup** — stale entries are pruned periodically
       to prevent unbounded memory growth.
     - **Disableable** — set all limits to ``0`` to disable.
+
+.. warning::
+    **Single-worker requirement** — all rate-limit state lives in
+    process memory.  Running uvicorn with ``--workers > 1`` creates
+    independent copies of the counters, effectively multiplying
+    the allowed rate by the number of workers and resetting state
+    on every restart.  The Dockerfile enforces ``--workers 1``; do
+    not override this when rate limiting or ingest cooldown is active.
 """
 
 from __future__ import annotations
