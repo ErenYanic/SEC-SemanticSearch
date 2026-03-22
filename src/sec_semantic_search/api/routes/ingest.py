@@ -160,6 +160,7 @@ def _task_info_to_status(info: TaskInfo) -> TaskStatus:
 
 def _create_task(
     body: IngestRequest, manager: TaskManager, identity: EdgarIdentity,
+    *, client_ip: str = "unknown",
 ) -> TaskResponse:
     """Shared logic for both add and batch endpoints."""
     settings = get_settings()
@@ -230,6 +231,17 @@ def _create_task(
         body.count_mode,
     )
 
+    audit_log(
+        "ingest_task_created",
+        client_ip=client_ip,
+        endpoint="POST /api/ingest",
+        detail=(
+            f"task_id={task_id[:8]}, "
+            f"tickers={[redact_for_log(t) for t in body.tickers]}, "
+            f"forms={body.form_types}"
+        ),
+    )
+
     return TaskResponse(
         task_id=task_id,
         status="pending",
@@ -278,7 +290,7 @@ async def ingest_add(
 
     client_ip = request.client.host if request.client else "unknown"
     _check_cooldown(client_ip)
-    return _create_task(body, manager, identity)
+    return _create_task(body, manager, identity, client_ip=client_ip)
 
 
 @router.post(
@@ -302,7 +314,7 @@ async def ingest_batch(
     """
     client_ip = request.client.host if request.client else "unknown"
     _check_cooldown(client_ip)
-    return _create_task(body, manager, identity)
+    return _create_task(body, manager, identity, client_ip=client_ip)
 
 
 @router.get(
