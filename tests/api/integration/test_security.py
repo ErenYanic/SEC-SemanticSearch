@@ -1649,3 +1649,70 @@ class TestContentSizeLimit:
 
 
 # -----------------------------------------------------------------------
+# Hardening H3: Audit log covers ingest task creation
+# -----------------------------------------------------------------------
+
+
+class TestIngestAuditLog:
+    """Ingest task creation is recorded in the audit log."""
+
+    def test_ingest_add_emits_audit_log(self):
+        """POST /api/ingest/add should produce an audit_log entry."""
+        manager = MagicMock(spec=TaskManager)
+        manager.create_task.return_value = "task-id-123"
+        app.dependency_overrides[get_task_manager] = lambda: manager
+
+        client = TestClient(app)
+
+        with patch("sec_semantic_search.api.routes.ingest.audit_log") as mock_audit:
+            resp = client.post(
+                "/api/ingest/add",
+                json={"tickers": ["AAPL"], "form_types": ["10-K"]},
+            )
+
+        assert resp.status_code == 202
+        mock_audit.assert_called_once()
+        call_args = mock_audit.call_args
+        assert call_args[0][0] == "ingest_task_created"
+        assert "client_ip" in call_args[1]
+        assert "endpoint" in call_args[1]
+
+        app.dependency_overrides.clear()
+
+    def test_ingest_batch_emits_audit_log(self):
+        """POST /api/ingest/batch should also produce an audit_log entry."""
+        manager = MagicMock(spec=TaskManager)
+        manager.create_task.return_value = "task-id-456"
+        app.dependency_overrides[get_task_manager] = lambda: manager
+
+        client = TestClient(app)
+
+        with patch("sec_semantic_search.api.routes.ingest.audit_log") as mock_audit:
+            resp = client.post(
+                "/api/ingest/batch",
+                json={"tickers": ["AAPL", "MSFT"], "form_types": ["10-K"]},
+            )
+
+        assert resp.status_code == 202
+        mock_audit.assert_called_once()
+        assert mock_audit.call_args[0][0] == "ingest_task_created"
+
+        app.dependency_overrides.clear()
+
+
+# -----------------------------------------------------------------------
+# Hardening H6: Permissions-Policy header
+# -----------------------------------------------------------------------
+
+
+class TestPermissionsPolicyHeader:
+    """SecurityHeadersMiddleware includes Permissions-Policy."""
+
+    def test_permissions_policy_present_on_response(self):
+        """Every response should include a Permissions-Policy header."""
+        client = TestClient(app)
+        resp = client.get("/api/health")
+        pp = resp.headers.get("permissions-policy", "")
+        assert "camera=()" in pp
+        assert "microphone=()" in pp
+        assert "geolocation=()" in pp
