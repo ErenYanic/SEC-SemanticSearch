@@ -45,6 +45,7 @@ router = APIRouter()
 # ---------------------------------------------------------------------------
 
 # In-memory dict: IP → monotonic timestamp of last ingest request.
+# SECURITY: requires --workers 1 (in-memory state is per-process).
 _cooldown_lock = threading.Lock()
 _last_ingest: dict[str, float] = {}
 # How often to purge stale entries (seconds).
