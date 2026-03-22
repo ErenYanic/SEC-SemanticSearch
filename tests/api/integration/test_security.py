@@ -1601,3 +1601,51 @@ class TestTaskPersistence:
         mock_registry.save_task_history.assert_called_once()
         call_kwargs = mock_registry.save_task_history.call_args
         assert call_kwargs[0][0] == "prunable"  # first positional arg = task_id
+
+
+# -----------------------------------------------------------------------
+# Hardening H2: Request body size limit
+# -----------------------------------------------------------------------
+
+
+class TestContentSizeLimit:
+    """ContentSizeLimitMiddleware rejects oversized request bodies."""
+
+    def test_normal_request_passes(self):
+        """A normal-sized POST body should be accepted (not blocked by size limit)."""
+        mock_engine = MagicMock()
+        mock_engine.search.return_value = []
+        app.dependency_overrides[get_search_engine] = lambda: mock_engine
+        app.dependency_overrides[get_registry] = lambda: MagicMock()
+
+        client = TestClient(app)
+        resp = client.post("/api/search/", json={"query": "revenue growth", "top_k": 5})
+        # Should not be 413
+        assert resp.status_code != 413
+
+        app.dependency_overrides.clear()
+
+    def test_oversized_content_length_rejected(self):
+        """A request declaring > 1 MB Content-Length should get 413."""
+        client = TestClient(app)
+        resp = client.post(
+            "/api/search/",
+            content=b"x",
+            headers={"Content-Length": "2000000", "Content-Type": "application/json"},
+        )
+        assert resp.status_code == 413
+        body = resp.json()
+        assert body["detail"]["error"] == "payload_too_large"
+
+    def test_invalid_content_length_rejected(self):
+        """A request with a non-numeric Content-Length should get 400."""
+        client = TestClient(app)
+        resp = client.post(
+            "/api/search/",
+            content=b"{}",
+            headers={"Content-Length": "not-a-number", "Content-Type": "application/json"},
+        )
+        assert resp.status_code == 400
+
+
+# -----------------------------------------------------------------------
