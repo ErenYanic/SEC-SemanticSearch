@@ -12,9 +12,10 @@
 # ──────────────────────────────────────────────────────────────────────
 
 # ── Stage 1: Builder ─────────────────────────────────────────────────
-# Python 3.12 (Debian Bookworm): pysqlcipher3 uses C APIs removed in Python 3.13
+# Python 3.12.13 (Debian Bookworm): pysqlcipher3 uses C APIs removed in Python 3.13
 # (PyObject_AsCharBuffer, _PyLong_AsInt). Python 3.12 is supported until Oct 2028.
-FROM python:3.12-slim AS builder
+# Pinned to patch version for reproducible, secure builds (H5 hardening).
+FROM python:3.12.13-slim AS builder
 
 # Build-time argument for PyTorch index (CPU by default)
 ARG TORCH_INDEX_URL=https://download.pytorch.org/whl/cpu
@@ -48,7 +49,7 @@ RUN pip install --no-cache-dir --extra-index-url "$TORCH_INDEX_URL" \
 
 
 # ── Stage 2: Runtime ─────────────────────────────────────────────────
-FROM python:3.12-slim AS runtime
+FROM python:3.12.13-slim AS runtime
 
 # Runtime dependencies:
 #   libsqlcipher1 — SQLCipher shared library (Debian Trixie)
