@@ -45,7 +45,7 @@ services:
       - HUGGING_FACE_TOKEN=${HUGGING_FACE_TOKEN:-}
       # Embedding config
       - EMBEDDING_MODEL_NAME=${EMBEDDING_MODEL_NAME:-google/embeddinggemma-300m}
-      - EMBEDDING_DEVICE=${EMBEDDING_DEVICE:-cpu}
+      - EMBEDDING_DEVICE=${EMBEDDING_DEVICE:-cuda}
       - EMBEDDING_BATCH_SIZE=${EMBEDDING_BATCH_SIZE:-32}
       - EMBEDDING_IDLE_TIMEOUT_MINUTES=${EMBEDDING_IDLE_TIMEOUT_MINUTES:-0}
       # Database config
@@ -72,14 +72,14 @@ services:
       - API_MAX_FILINGS_PER_REQUEST=${API_MAX_FILINGS_PER_REQUEST:-0}
       - API_INGEST_COOLDOWN_SECONDS=${API_INGEST_COOLDOWN_SECONDS:-0}
       - API_MAX_TASK_DURATION_MINUTES=${API_MAX_TASK_DURATION_MINUTES:-0}
-    # Uncomment for NVIDIA GPU support:
-    # deploy:
-    #   resources:
-    #     reservations:
-    #       devices:
-    #         - driver: nvidia
-    #           count: 1
-    #           capabilities: [gpu]
+    # NVIDIA GPU support (requires nvidia-container-toolkit on host):
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"]
       interval: 30s
