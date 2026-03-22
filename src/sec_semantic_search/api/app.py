@@ -20,6 +20,7 @@ from contextlib import asynccontextmanager
 from fastapi import Depends, FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
+from starlette.responses import JSONResponse
 
 from sec_semantic_search import __version__
 from sec_semantic_search.api.dependencies import verify_api_key
@@ -99,6 +100,53 @@ class InsecureTransportWarningMiddleware(BaseHTTPMiddleware):
             "Scenarios B and C require TLS; enable HTTPS at the reverse proxy "
             "or launch the API with --ssl-certfile/--ssl-keyfile.",
         )
+
+
+# ---------------------------------------------------------------------------
+# Request body size limit middleware
+# ---------------------------------------------------------------------------
+
+# 1 MB — matches nginx client_max_body_size; defence in depth for
+# direct-to-uvicorn access (local dev without reverse proxy).
+_MAX_CONTENT_LENGTH = 1 * 1024 * 1024
+
+
+class ContentSizeLimitMiddleware(BaseHTTPMiddleware):
+    """Reject requests whose ``Content-Length`` exceeds the allowed limit.
+
+    This is a lightweight, header-based check.  It does not consume the
+    body — it simply inspects the ``Content-Length`` header and returns
+    413 if the declared size is too large.
+    """
+
+    async def dispatch(
+        self, request: Request, call_next: RequestResponseEndpoint,
+    ) -> Response:
+        content_length = request.headers.get("content-length")
+        if content_length is not None:
+            try:
+                length = int(content_length)
+            except ValueError:
+                return JSONResponse(
+                    status_code=400,
+                    content={"detail": "Invalid Content-Length header."},
+                )
+            if length > _MAX_CONTENT_LENGTH:
+                return JSONResponse(
+                    status_code=413,
+                    content={
+                        "detail": {
+                            "error": "payload_too_large",
+                            "message": (
+                                f"Request body too large ({length:,} bytes). "
+                                f"Maximum allowed: {_MAX_CONTENT_LENGTH:,} bytes."
+                            ),
+                            "details": None,
+                            "hint": "Reduce the request payload size.",
+                        },
+                    },
+                )
+        return await call_next(request)
 
 
 # ---------------------------------------------------------------------------
@@ -199,6 +247,9 @@ def create_app() -> FastAPI:
         openapi_url="/openapi.json",
         lifespan=lifespan,
     )
+
+    # -- Request body size limit --------------------------------------------
+    application.add_middleware(ContentSizeLimitMiddleware)
 
     # -- Rate limiting ------------------------------------------------------
     application.add_middleware(
