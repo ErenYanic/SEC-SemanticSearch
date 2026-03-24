@@ -8,6 +8,13 @@ This is a **vector similarity search** system — not RAG. No language model gen
 
 ## How it works
 
+<table>
+  <tr>
+    <td align="center"><img src="docs/Minimalist Flow Chart 1.png" alt="Ingest pipeline flow chart" width="460"/></td>
+    <td align="center"><img src="docs/Minimalist Flow Chart 2.png" alt="Search flow chart" width="460"/></td>
+  </tr>
+</table>
+
 ```
 Fetch (edgartools) → Parse (doc2dict) → Chunk (regex) → Embed (sentence-transformers) → Store (ChromaDB + SQLite)
      ↓                     ↓                 ↓                    ↓
