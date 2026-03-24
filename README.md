@@ -55,9 +55,23 @@ cd SEC-SemanticSearch
 uv venv .venv --python 3.12
 source .venv/bin/activate
 
-# Install in development mode
+# Install the package
+uv pip install .
+```
+
+To enable SQLCipher encryption for the SQLite metadata database (optional):
+
+```bash
+uv pip install ".[encryption]"
+```
+
+**For developers** (includes pytest, ruff, mypy):
+
+```bash
 uv pip install -e ".[dev]"
 ```
+
+The `-e` flag installs in editable mode — source changes are reflected immediately without reinstalling.
 
 ### Configuration
 
