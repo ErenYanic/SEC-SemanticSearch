@@ -10,8 +10,8 @@ This is a **vector similarity search** system — not RAG. No language model gen
 
 <table>
   <tr>
-    <td align="center"><img src="docs/Minimalist Flow Chart 1.png" alt="Ingest pipeline flow chart" width="460"/></td>
-    <td align="center"><img src="docs/Minimalist Flow Chart 2.png" alt="Search flow chart" width="460"/></td>
+    <td align="center" width="50%"><img src="assets/FlowChart1.png" alt="Ingest pipeline flow chart" width="100%"/></td>
+    <td align="center" width="50%"><img src="assets/FlowChart2.png" alt="Search flow chart" width="100%"/></td>
   </tr>
 </table>
 
