@@ -15,15 +15,6 @@ This is a **vector similarity search** system — not RAG. No language model gen
   </tr>
 </table>
 
-```
-Fetch (edgartools) → Parse (doc2dict) → Chunk (regex) → Embed (sentence-transformers) → Store (ChromaDB + SQLite)
-     ↓                     ↓                 ↓                    ↓
-FilingIdentifier      list[Segment]     list[Chunk]          np.ndarray
-+ HTML content        with paths        with indices         (n, 768)
-```
-
-**Search:** Query → Embed → ChromaDB cosine similarity → Ranked results with similarity scores
-
 ---
 
 ## Features
