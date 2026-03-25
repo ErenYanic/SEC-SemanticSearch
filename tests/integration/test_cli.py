@@ -390,6 +390,80 @@ class TestSearchCommand:
         assert result.exit_code == 1
         assert "Search failed" in result.output
 
+    def test_accession_filter_passed_to_engine(self):
+        """--accession/-a passes accession_number to SearchEngine.search()."""
+        with patch("sec_semantic_search.cli.search.SearchEngine") as MockEngine:
+            mock_engine = MagicMock()
+            mock_engine.search.return_value = []
+            MockEngine.return_value = mock_engine
+
+            result = runner.invoke(
+                app, ["search", "test query", "--accession", "0000320193-23-000106"]
+            )
+
+        assert result.exit_code == 0
+        mock_engine.search.assert_called_once_with(
+            query="test query",
+            top_k=None,
+            ticker=None,
+            form_type=None,
+            accession_number="0000320193-23-000106",
+        )
+
+    def test_accession_short_flag(self):
+        """The -a short flag should work identically to --accession."""
+        with patch("sec_semantic_search.cli.search.SearchEngine") as MockEngine:
+            mock_engine = MagicMock()
+            mock_engine.search.return_value = []
+            MockEngine.return_value = mock_engine
+
+            result = runner.invoke(
+                app, ["search", "test query", "-a", "0000320193-23-000106"]
+            )
+
+        assert result.exit_code == 0
+        mock_engine.search.assert_called_once_with(
+            query="test query",
+            top_k=None,
+            ticker=None,
+            form_type=None,
+            accession_number="0000320193-23-000106",
+        )
+
+    def test_accession_combined_with_other_filters(self):
+        """--accession can be used alongside --ticker and --form."""
+        with patch("sec_semantic_search.cli.search.SearchEngine") as MockEngine:
+            mock_engine = MagicMock()
+            mock_engine.search.return_value = []
+            MockEngine.return_value = mock_engine
+
+            result = runner.invoke(
+                app,
+                [
+                    "search", "test query",
+                    "-k", "AAPL",
+                    "-f", "10-K",
+                    "-a", "0000320193-23-000106",
+                    "-t", "3",
+                ],
+            )
+
+        assert result.exit_code == 0
+        mock_engine.search.assert_called_once_with(
+            query="test query",
+            top_k=3,
+            ticker="AAPL",
+            form_type="10-K",
+            accession_number="0000320193-23-000106",
+        )
+
+    def test_accession_appears_in_help(self):
+        """--accession should appear in the search --help output."""
+        result = runner.invoke(app, ["search", "--help"])
+        assert result.exit_code == 0
+        assert "--accession" in result.output
+        assert "-a" in result.output
+
 
 # -----------------------------------------------------------------------
 # ingest add — validation

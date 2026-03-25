@@ -47,6 +47,10 @@ def search(
         str | None,
         typer.Option("--form", "-f", help="Filter by form type (10-K or 10-Q)."),
     ] = None,
+    accession: Annotated[
+        str | None,
+        typer.Option("--accession", "-a", help="Restrict search to a single filing by accession number."),
+    ] = None,
 ) -> None:
     """
     Search ingested SEC filings with a natural language query.
@@ -58,6 +62,8 @@ def search(
         sec-search search "revenue recognition" -t 10 -k AAPL
 
         sec-search search "liquidity" -f 10-Q
+
+        sec-search search "debt covenants" -a 0000320193-23-000106
     """
     with console.status("Searching..."):
         try:
@@ -67,6 +73,7 @@ def search(
                 top_k=top,
                 ticker=ticker.upper() if ticker else None,
                 form_type=form.upper() if form else None,
+                accession_number=accession,
             )
         except SearchError as e:
             console.print(f"[red]Search failed:[/red] {e.message}")
