@@ -73,10 +73,10 @@ class SearchEngine:
         self,
         query: str,
         top_k: int | None = None,
-        ticker: str | None = None,
-        form_type: str | None = None,
+        ticker: str | list[str] | None = None,
+        form_type: str | list[str] | None = None,
         min_similarity: float | None = None,
-        accession_number: str | None = None,
+        accession_number: str | list[str] | None = None,
     ) -> list[SearchResult]:
         """
         Search ingested filings for chunks relevant to the query.
@@ -89,13 +89,14 @@ class SearchEngine:
             query: Natural language search query.
             top_k: Maximum number of results to return. Defaults to
                    ``SEARCH_TOP_K`` from settings.
-            ticker: Optional filter — only search filings from this ticker.
-            form_type: Optional filter — only search this form type
-                       (e.g. "10-K", "10-Q").
+            ticker: Optional filter — only search filings from these
+                ticker(s). Single string or list of strings.
+            form_type: Optional filter — only search these form type(s)
+                (e.g. "10-K", "10-Q"). Single string or list of strings.
             min_similarity: Minimum similarity threshold (0.0–1.0).
                             Defaults to ``SEARCH_MIN_SIMILARITY`` from settings.
-            accession_number: Optional filter — restrict search to a single
-                filing by accession number.
+            accession_number: Optional filter — restrict search to specific
+                filing(s) by accession number. Single string or list.
 
         Returns:
             List of ``SearchResult`` objects ordered by similarity
@@ -120,8 +121,8 @@ class SearchEngine:
             query[:80],
             effective_top_k,
             effective_min_sim,
-            ticker or "any",
-            form_type or "any",
+            ticker if ticker else "any",
+            form_type if form_type else "any",
         )
 
         try:

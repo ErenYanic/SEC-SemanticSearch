@@ -245,53 +245,68 @@ class SearchResultSchema(BaseModel):
 
 
 class SearchRequest(BaseModel):
-    """Request body for ``POST /api/search/``."""
+    """
+    Request body for ``POST /api/search/``.
+
+    Filter fields (``ticker``, ``form_type``, ``accession_number``) accept
+    either a single string or a list of strings.  A single string is
+    normalised to a one-element list for uniform downstream handling.
+    """
 
     query: str = Field(..., min_length=1, max_length=2000, description="Natural language search query")
     top_k: int = Field(5, ge=1, le=100, description="Maximum number of results")
-    ticker: str | None = Field(None, description="Filter to a specific ticker")
-    form_type: str | None = Field(None, description="Filter to '10-K' or '10-Q'")
+    ticker: list[str] | None = Field(None, description="Filter to specific ticker(s)")
+    form_type: list[str] | None = Field(None, description="Filter to form type(s) (e.g. '10-K', '10-Q')")
     min_similarity: float = Field(
         0.0, ge=0.0, le=1.0, description="Minimum similarity threshold"
     )
-    accession_number: str | None = Field(
-        None, max_length=20, description="Restrict search to a single filing"
+    accession_number: list[str] | None = Field(
+        None, description="Restrict search to specific filing(s) by accession number"
     )
 
-    @field_validator("accession_number")
+    @field_validator("accession_number", mode="before")
     @classmethod
-    def validate_accession_number(cls, v: str | None) -> str | None:
-        """Validate accession number format (NNNNNNNNNN-YY-NNNNNN)."""
+    def coerce_accession_number(cls, v: str | list[str] | None) -> list[str] | None:
+        """Wrap a single string in a list, then validate format."""
         if v is None:
             return None
-        if not _ACCESSION_RE.match(v):
-            msg = f"Invalid accession number format: '{v}'. Expected NNNNNNNNNN-YY-NNNNNN"
+        if isinstance(v, str):
+            v = [v]
+        invalid = [a for a in v if not _ACCESSION_RE.match(a)]
+        if invalid:
+            msg = f"Invalid accession number format: {invalid[:3]}. Expected NNNNNNNNNN-YY-NNNNNN"
             raise ValueError(msg)
         return v
 
-    @field_validator("form_type")
+    @field_validator("form_type", mode="before")
     @classmethod
-    def validate_form_type(cls, v: str | None) -> str | None:
-        """Normalise form_type to uppercase."""
+    def coerce_form_type(cls, v: str | list[str] | None) -> list[str] | None:
+        """Wrap a single string in a list, then normalise and validate."""
         if v is None:
             return None
-        upper = v.upper()
-        if upper not in ("10-K", "10-Q"):
-            msg = "form_type must be '10-K' or '10-Q'"
+        if isinstance(v, str):
+            v = [v]
+        normalised = [f.upper() for f in v]
+        invalid = [f for f in normalised if f not in ("10-K", "10-Q")]
+        if invalid:
+            msg = f"form_type must be '10-K' or '10-Q', got: {invalid}"
             raise ValueError(msg)
-        return upper
+        return normalised
 
-    @field_validator("ticker")
+    @field_validator("ticker", mode="before")
     @classmethod
-    def normalise_ticker(cls, v: str | None) -> str | None:
-        """Normalise and validate ticker format."""
+    def coerce_ticker(cls, v: str | list[str] | None) -> list[str] | None:
+        """Wrap a single string in a list, then normalise and validate."""
         if v is None:
             return None
-        upper = v.upper().strip()
-        if not _TICKER_RE.match(upper):
-            msg = f"Invalid ticker symbol: '{v}'. Expected 1–5 uppercase letters (e.g. AAPL, BRK.B)"
+        if isinstance(v, str):
+            v = [v]
+        result = [t.upper().strip() for t in v]
+        invalid = [t for t in result if not _TICKER_RE.match(t)]
+        if invalid:
+            msg = f"Invalid ticker symbol(s): {invalid}. Expected 1–5 uppercase letters (e.g. AAPL, BRK.B)"
             raise ValueError(msg)
-        return upper
+        return result
 
 
 class SearchResponse(BaseModel):

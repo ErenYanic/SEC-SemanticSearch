@@ -407,7 +407,7 @@ class TestSearchCommand:
             top_k=None,
             ticker=None,
             form_type=None,
-            accession_number="0000320193-23-000106",
+            accession_number=["0000320193-23-000106"],
         )
 
     def test_accession_short_flag(self):
@@ -427,7 +427,7 @@ class TestSearchCommand:
             top_k=None,
             ticker=None,
             form_type=None,
-            accession_number="0000320193-23-000106",
+            accession_number=["0000320193-23-000106"],
         )
 
     def test_accession_combined_with_other_filters(self):
@@ -452,9 +452,74 @@ class TestSearchCommand:
         mock_engine.search.assert_called_once_with(
             query="test query",
             top_k=3,
-            ticker="AAPL",
-            form_type="10-K",
-            accession_number="0000320193-23-000106",
+            ticker=["AAPL"],
+            form_type=["10-K"],
+            accession_number=["0000320193-23-000106"],
+        )
+
+    def test_multi_ticker_filter(self):
+        """Repeating --ticker/-k passes multiple tickers as a list."""
+        with patch("sec_semantic_search.cli.search.SearchEngine") as MockEngine:
+            mock_engine = MagicMock()
+            mock_engine.search.return_value = []
+            MockEngine.return_value = mock_engine
+
+            result = runner.invoke(
+                app, ["search", "test query", "-k", "AAPL", "-k", "MSFT"]
+            )
+
+        assert result.exit_code == 0
+        mock_engine.search.assert_called_once_with(
+            query="test query",
+            top_k=None,
+            ticker=["AAPL", "MSFT"],
+            form_type=None,
+            accession_number=None,
+        )
+
+    def test_multi_form_filter(self):
+        """Repeating --form/-f passes multiple form types as a list."""
+        with patch("sec_semantic_search.cli.search.SearchEngine") as MockEngine:
+            mock_engine = MagicMock()
+            mock_engine.search.return_value = []
+            MockEngine.return_value = mock_engine
+
+            result = runner.invoke(
+                app, ["search", "test query", "-f", "10-K", "-f", "10-Q"]
+            )
+
+        assert result.exit_code == 0
+        mock_engine.search.assert_called_once_with(
+            query="test query",
+            top_k=None,
+            ticker=None,
+            form_type=["10-K", "10-Q"],
+            accession_number=None,
+        )
+
+    def test_multi_accession_filter(self):
+        """Repeating --accession/-a passes multiple accession numbers."""
+        with patch("sec_semantic_search.cli.search.SearchEngine") as MockEngine:
+            mock_engine = MagicMock()
+            mock_engine.search.return_value = []
+            MockEngine.return_value = mock_engine
+
+            result = runner.invoke(
+                app,
+                [
+                    "search", "test query",
+                    "-a", "0000320193-23-000106",
+                    "-a", "0000320193-23-000107",
+                ],
+            )
+
+        assert result.exit_code == 0
+        mock_engine.search.assert_called_once_with(
+            query="test query",
+            top_k=None,
+            ticker=None,
+            form_type=None,
+            accession_number=["0000320193-23-000106", "0000320193-23-000107"],
         )
 
     def test_accession_appears_in_help(self):
