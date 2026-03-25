@@ -174,6 +174,21 @@ class FilingFetcher:
         set_identity(f"{name} {email}")
         logger.debug("EDGAR identity set via per-session credentials")
 
+    @staticmethod
+    def _is_amendment(filing) -> bool:
+        """Check whether a filing is an amendment (e.g. 10-K/A, 10-Q/A).
+
+        edgartools returns amendments alongside their parent form when
+        queried by form type.  We read the filing object's actual form
+        attribute and check for the ``/A`` suffix that EDGAR uses for
+        all amendment types.
+
+        Returns:
+            True if the filing's actual form type ends with ``/A``.
+        """
+        actual_form = getattr(filing, "form", "")
+        return isinstance(actual_form, str) and actual_form.endswith("/A")
+
     def _validate_form_type(self, form_type: str) -> str:
         """
         Validate and normalise form type.
@@ -498,8 +513,19 @@ class FilingFetcher:
 
         # Limit results — islice stops iteration after count items,
         # avoiding materialising the entire filing list from EDGAR.
+        # Amendments (e.g. 10-K/A) are filtered out so they do not
+        # displace the original filing via the UNIQUE constraint.
         result = []
-        for filing in islice(filings, count):
+        for filing in filings:
+            if len(result) >= count:
+                break
+            if self._is_amendment(filing):
+                logger.debug(
+                    "Skipping amendment %s (%s) — original filing preferred",
+                    filing.accession_no,
+                    getattr(filing, "form", "unknown"),
+                )
+                continue
             result.append(
                 FilingInfo(
                     ticker=ticker,
@@ -639,7 +665,8 @@ class FilingFetcher:
             company, form_type, year=year, start_date=start_date, end_date=end_date
         )
 
-        filings_list = list(filings)
+        # Filter out amendments (e.g. 10-K/A) before indexing.
+        filings_list = [f for f in filings if not self._is_amendment(f)]
 
         if index >= len(filings_list):
             raise FetchError(
@@ -725,8 +752,8 @@ class FilingFetcher:
             company, form_type, year=year, start_date=start_date, end_date=end_date
         )
 
-        # Limit to requested count
-        all_filings = list(filings)
+        # Filter out amendments (e.g. 10-K/A) and limit to requested count.
+        all_filings = [f for f in filings if not self._is_amendment(f)]
         filings_list = all_filings[:count]
         total_available = len(all_filings)
 
@@ -809,8 +836,10 @@ class FilingFetcher:
         company = self._get_company(ticker)
         filings = self._get_filings(company, form_type)
 
-        # Search for matching accession number
+        # Search for matching accession number, skipping amendments.
         for filing in filings:
+            if self._is_amendment(filing):
+                continue
             if filing.accession_no == accession_number:
                 filing_id, html_content = self._fetch_filing_content(
                     filing, ticker, form_type

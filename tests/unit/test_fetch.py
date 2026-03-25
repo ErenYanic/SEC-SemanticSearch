@@ -168,11 +168,12 @@ class TestGetCompanyError:
 
 
 def _make_mock_filing(accession_no, filing_date, *, html_content="<html></html>",
-                      html_side_effect=None):
+                      html_side_effect=None, form="10-K"):
     """Create a mock filing object with the given properties."""
     filing = MagicMock()
     filing.accession_no = accession_no
     filing.filing_date = filing_date
+    filing.form = form
     if html_side_effect is not None:
         filing.html.side_effect = html_side_effect
     else:
@@ -312,3 +313,150 @@ class TestFetchCountNone:
             results = list(fetcher.fetch("AAPL", "10-K", count=None))
 
         assert len(results) == 5
+
+
+# -----------------------------------------------------------------------
+# BF-002: Amendment filtering (10-K/A, 10-Q/A silently skipped)
+# -----------------------------------------------------------------------
+
+
+class TestIsAmendment:
+    """_is_amendment() detects filings whose actual form ends with /A."""
+
+    def test_original_10k(self, fetcher):
+        filing = _make_mock_filing("ACC-001", date(2024, 1, 1), form="10-K")
+        assert fetcher._is_amendment(filing) is False
+
+    def test_amendment_10ka(self, fetcher):
+        filing = _make_mock_filing("ACC-002", date(2024, 1, 1), form="10-K/A")
+        assert fetcher._is_amendment(filing) is True
+
+    def test_amendment_10qa(self, fetcher):
+        filing = _make_mock_filing("ACC-003", date(2024, 1, 1), form="10-Q/A")
+        assert fetcher._is_amendment(filing) is True
+
+    def test_no_form_attribute(self, fetcher):
+        """Filings without a form attribute should not be treated as amendments."""
+        filing = MagicMock(spec=[])
+        assert fetcher._is_amendment(filing) is False
+
+
+class TestAmendmentFilteringInListAvailable:
+    """list_available() should skip amendments and only return originals."""
+
+    def test_amendments_excluded(self, fetcher):
+        """10-K/A filings should be filtered out of list_available() results."""
+        filings = [
+            _make_mock_filing("ACC-001", date(2024, 11, 5), form="10-K/A"),
+            _make_mock_filing("ACC-002", date(2024, 11, 1), form="10-K"),
+        ]
+        mock_company = MagicMock()
+        mock_company.get_filings.return_value = _make_mock_filings(filings)
+
+        with patch.object(fetcher, "_get_company", return_value=mock_company):
+            result = fetcher.list_available("AAPL", "10-K", count=10)
+
+        assert len(result) == 1
+        assert result[0].accession_number == "ACC-002"
+
+    def test_count_respects_non_amendment_filings_only(self, fetcher):
+        """count should apply after amendment filtering, not before."""
+        filings = [
+            _make_mock_filing("ACC-001", date(2024, 3, 1), form="10-K/A"),
+            _make_mock_filing("ACC-002", date(2024, 2, 1), form="10-K"),
+            _make_mock_filing("ACC-003", date(2024, 1, 1), form="10-K"),
+        ]
+        mock_company = MagicMock()
+        mock_company.get_filings.return_value = _make_mock_filings(filings)
+
+        with patch.object(fetcher, "_get_company", return_value=mock_company):
+            result = fetcher.list_available("AAPL", "10-K", count=1)
+
+        # Should get only 1 original, not the amendment
+        assert len(result) == 1
+        assert result[0].accession_number == "ACC-002"
+
+    def test_amendment_skip_logged(self, fetcher, caplog):
+        """Skipped amendments should produce a debug log message."""
+        filings = [
+            _make_mock_filing("ACC-001", date(2024, 1, 1), form="10-K/A"),
+            _make_mock_filing("ACC-002", date(2024, 1, 1), form="10-K"),
+        ]
+        mock_company = MagicMock()
+        mock_company.get_filings.return_value = _make_mock_filings(filings)
+
+        pkg_logger = logging.getLogger("sec_semantic_search")
+        pkg_logger.propagate = True
+        try:
+            with patch.object(fetcher, "_get_company", return_value=mock_company):
+                with caplog.at_level(logging.DEBUG, logger="sec_semantic_search"):
+                    fetcher.list_available("AAPL", "10-K", count=10)
+        finally:
+            pkg_logger.propagate = False
+
+        assert "Skipping amendment ACC-001 (10-K/A)" in caplog.text
+
+
+class TestAmendmentFilteringInFetch:
+    """fetch() generator should skip amendments."""
+
+    def test_amendments_excluded_from_fetch(self, fetcher):
+        """Amendments should not be yielded by fetch()."""
+        filings = [
+            _make_mock_filing("ACC-001", date(2024, 2, 1), form="10-K/A",
+                              html_content="<html>amendment</html>"),
+            _make_mock_filing("ACC-002", date(2024, 1, 1), form="10-K",
+                              html_content="<html>original</html>"),
+        ]
+        mock_company = MagicMock()
+        mock_company.get_filings.return_value = _make_mock_filings(filings)
+
+        with patch.object(fetcher, "_get_company", return_value=mock_company):
+            results = list(fetcher.fetch("AAPL", "10-K", count=10))
+
+        assert len(results) == 1
+        assert results[0][0].accession_number == "ACC-002"
+        assert results[0][1] == "<html>original</html>"
+
+
+class TestAmendmentFilteringInFetchOne:
+    """fetch_one() should skip amendments when indexing."""
+
+    def test_index_counts_non_amendments_only(self, fetcher):
+        """Index should refer to the position among non-amendment filings."""
+        filings = [
+            _make_mock_filing("ACC-001", date(2024, 3, 1), form="10-K/A",
+                              html_content="<html>amendment</html>"),
+            _make_mock_filing("ACC-002", date(2024, 2, 1), form="10-K",
+                              html_content="<html>first</html>"),
+            _make_mock_filing("ACC-003", date(2024, 1, 1), form="10-K",
+                              html_content="<html>second</html>"),
+        ]
+        mock_company = MagicMock()
+        mock_company.get_filings.return_value = _make_mock_filings(filings)
+
+        with patch.object(fetcher, "_get_company", return_value=mock_company):
+            filing_id, html = fetcher.fetch_one("AAPL", "10-K", index=0)
+
+        # index=0 should return ACC-002 (first non-amendment), not ACC-001
+        assert filing_id.accession_number == "ACC-002"
+        assert html == "<html>first</html>"
+
+
+class TestAmendmentFilteringInFetchByAccession:
+    """fetch_by_accession() should refuse to fetch amendment filings."""
+
+    def test_amendment_accession_not_found(self, fetcher):
+        """Requesting an amendment's accession number should raise FetchError."""
+        filings = [
+            _make_mock_filing("ACC-001", date(2024, 1, 1), form="10-K/A",
+                              html_content="<html>amendment</html>"),
+            _make_mock_filing("ACC-002", date(2024, 1, 1), form="10-K",
+                              html_content="<html>original</html>"),
+        ]
+        mock_company = MagicMock()
+        mock_company.get_filings.return_value = _make_mock_filings(filings)
+
+        with patch.object(fetcher, "_get_company", return_value=mock_company):
+            with pytest.raises(FetchError, match="Filing not found"):
+                fetcher.fetch_by_accession("AAPL", "10-K", "ACC-001")

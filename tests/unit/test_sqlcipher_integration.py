@@ -80,7 +80,10 @@ class TestUnencryptedFallback:
 
     @pytest.fixture
     def registry(self, tmp_db_path):
-        return MetadataRegistry(db_path=tmp_db_path)
+        # Explicit empty key overrides any DB_ENCRYPTION_KEY in .env,
+        # ensuring this test exercises the unencrypted path regardless
+        # of the local environment.
+        return MetadataRegistry(db_path=tmp_db_path, encryption_key="")
 
     def test_encrypted_property_false(self, registry):
         assert registry.encrypted is False
@@ -305,7 +308,7 @@ class TestPragmaKeyExecution:
 
     def test_pragma_key_not_called_without_encryption(self, tmp_db_path):
         """PRAGMA key should NOT be executed when no encryption key is set."""
-        registry = MetadataRegistry(db_path=tmp_db_path)
+        registry = MetadataRegistry(db_path=tmp_db_path, encryption_key="")
         # Check that no PRAGMA key was issued by verifying we can still
         # query the database normally (if PRAGMA key was issued on plain
         # sqlite3, it would be treated as a no-op or error)
@@ -359,9 +362,19 @@ class TestGracefulDegradation:
 class TestEncryptionKeyEdgeCases:
     """Edge cases around encryption key values."""
 
-    def test_none_key_means_unencrypted(self, tmp_db_path):
+    def test_none_key_defers_to_settings(self, tmp_db_path):
+        """encryption_key=None defers to settings.database.encryption_key.
+
+        When DB_ENCRYPTION_KEY is set in .env, passing None still results
+        in an encrypted database.  To explicitly disable encryption
+        regardless of settings, pass encryption_key="".
+        """
+        from sec_semantic_search.config import get_settings
+
+        settings_key = get_settings().database.encryption_key
         registry = MetadataRegistry(db_path=tmp_db_path, encryption_key=None)
-        assert registry.encrypted is False
+        expected_encrypted = bool(settings_key)
+        assert registry.encrypted is expected_encrypted
         registry.close()
 
     def test_explicit_empty_string_key_means_unencrypted(self, tmp_db_path):

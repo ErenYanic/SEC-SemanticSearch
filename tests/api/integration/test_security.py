@@ -1465,7 +1465,9 @@ class TestTaskPersistence:
 
         from sec_semantic_search.database.metadata import MetadataRegistry
 
-        registry = MetadataRegistry(str(tmp_path / "test.sqlite"))
+        # Explicit empty key ensures unencrypted mode so raw sqlite3
+        # can read the file regardless of DB_ENCRYPTION_KEY in .env.
+        registry = MetadataRegistry(str(tmp_path / "test.sqlite"), encryption_key="")
         try:
             import sqlite3
             conn = sqlite3.connect(str(tmp_path / "test.sqlite"))
