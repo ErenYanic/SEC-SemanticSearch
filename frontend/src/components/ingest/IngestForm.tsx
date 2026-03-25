@@ -130,14 +130,16 @@ export function IngestForm({ onSubmit, isSubmitting }: IngestFormProps) {
   // ---- Form type chip toggle ----
 
   function toggleFormType(formType: string) {
+    // Guard before the state updater — calling addToast (which sets
+    // ToastProvider state) inside setFormTypes's updater would violate
+    // React's "no setState during another component's render" rule.
+    if (formTypes.has(formType) && formTypes.size === 1) {
+      addToast("info", "At least one form type must be selected.");
+      return;
+    }
     setFormTypes((prev) => {
       const next = new Set(prev);
       if (next.has(formType)) {
-        // Prevent deselecting the last one.
-        if (next.size === 1) {
-          addToast("info", "At least one form type must be selected.");
-          return prev;
-        }
         next.delete(formType);
       } else {
         next.add(formType);
