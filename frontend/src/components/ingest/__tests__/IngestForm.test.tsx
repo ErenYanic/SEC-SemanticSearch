@@ -117,4 +117,113 @@ describe("IngestForm", () => {
     expect(req.tickers).toEqual(["AAPL"]);
     expect(req.form_types).toEqual(expect.arrayContaining(["10-K", "10-Q"]));
   });
+
+  // -------------------------------------------------------------------
+  // BF-003: Count mode suppressed when date filters are active
+  // -------------------------------------------------------------------
+
+  it("hides count mode radio when a year filter is entered", async () => {
+    const user = userEvent.setup();
+    renderForm();
+
+    // Count mode should be visible initially.
+    expect(screen.getByText("Count mode")).toBeInTheDocument();
+
+    // Open date filters and enter a year.
+    await user.click(screen.getByRole("button", { name: /date filters/i }));
+    const yearInput = screen.getByPlaceholderText("e.g. 2024");
+    await user.type(yearInput, "2024");
+
+    // Count mode radio should be replaced by the informational note.
+    expect(screen.queryByText("Count mode")).not.toBeInTheDocument();
+    expect(
+      screen.getByText("When a date filter is active, all matching filings are fetched."),
+    ).toBeInTheDocument();
+  });
+
+  it("hides count mode radio when a start date is entered", async () => {
+    const user = userEvent.setup();
+    renderForm();
+
+    await user.click(screen.getByRole("button", { name: /date filters/i }));
+    const startDateInput = screen.getByLabelText("Start date");
+    await user.type(startDateInput, "2023-01-01");
+
+    expect(screen.queryByText("Count mode")).not.toBeInTheDocument();
+    expect(
+      screen.getByText("When a date filter is active, all matching filings are fetched."),
+    ).toBeInTheDocument();
+  });
+
+  it("restores count mode radio when all date filters are cleared", async () => {
+    const user = userEvent.setup();
+    renderForm();
+
+    // Activate a date filter.
+    await user.click(screen.getByRole("button", { name: /date filters/i }));
+    const yearInput = screen.getByPlaceholderText("e.g. 2024");
+    await user.type(yearInput, "2024");
+
+    expect(screen.queryByText("Count mode")).not.toBeInTheDocument();
+
+    // Clear the year filter.
+    await user.clear(yearInput);
+
+    // Count mode should reappear.
+    expect(screen.getByText("Count mode")).toBeInTheDocument();
+  });
+
+  it("submits count_mode 'latest' and no count when date filter is active", async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn();
+    renderForm({ onSubmit });
+
+    // Add a ticker.
+    const tickerInput = screen.getByPlaceholderText("Type a ticker and press Enter...");
+    await user.type(tickerInput, "AAPL{Enter}");
+
+    // Switch to "total" count mode and set count before adding a date filter.
+    await user.click(screen.getByLabelText(/total/i));
+    // The count input should appear for total mode.
+    const countInput = screen.getByPlaceholderText("e.g. 3");
+    await user.type(countInput, "5");
+
+    // Now activate a date filter — count mode should be suppressed.
+    await user.click(screen.getByRole("button", { name: /date filters/i }));
+    const yearInput = screen.getByPlaceholderText("e.g. 2024");
+    await user.type(yearInput, "2023");
+
+    // Submit.
+    await user.click(screen.getByRole("button", { name: /start ingestion/i }));
+
+    expect(onSubmit).toHaveBeenCalledTimes(1);
+    const req = onSubmit.mock.calls[0][0];
+    expect(req.count_mode).toBe("latest");
+    expect(req.count).toBeUndefined();
+    expect(req.year).toBe(2023);
+  });
+
+  it("submits the selected count mode when no date filter is active", async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn();
+    renderForm({ onSubmit });
+
+    const tickerInput = screen.getByPlaceholderText("Type a ticker and press Enter...");
+    await user.type(tickerInput, "MSFT{Enter}");
+
+    // Select "per_form" mode and set count.  Use the exact label text to avoid
+    // matching "Latest" (whose description contains "per form type per ticker").
+    const perFormRadio = screen.getByDisplayValue("per_form");
+    await user.click(perFormRadio);
+    const countInput = screen.getByPlaceholderText("e.g. 3");
+    await user.type(countInput, "2");
+
+    await user.click(screen.getByRole("button", { name: /start ingestion/i }));
+
+    expect(onSubmit).toHaveBeenCalledTimes(1);
+    const req = onSubmit.mock.calls[0][0];
+    expect(req.count_mode).toBe("per_form");
+    expect(req.count).toBe(2);
+    expect(req.year).toBeUndefined();
+  });
 });

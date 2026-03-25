@@ -95,6 +95,10 @@ export function IngestForm({ onSubmit, isSubmitting }: IngestFormProps) {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
 
+  // When any date filter is active, count mode is suppressed — all matching
+  // filings are fetched, consistent with CLI behaviour (BF-003).
+  const hasDateFilter = !!(year || startDate || endDate);
+
   // ---- Ticker helpers ----
 
   /** Add a ticker tag, rejecting empty strings and duplicates. */
@@ -156,12 +160,20 @@ export function IngestForm({ onSubmit, isSubmitting }: IngestFormProps) {
     e.preventDefault();
     if (!canSubmit) return;
 
+    // When date filters are active, suppress count mode and fetch all matching
+    // filings (count: null).  This matches CLI behaviour (BF-003).
+    const effectiveCountMode = hasDateFilter ? "latest" : countMode;
+    const effectiveCount = hasDateFilter
+      ? undefined
+      : countMode === "latest"
+        ? undefined
+        : (Number(count) || undefined);
+
     const request: IngestRequest = {
       tickers,
       form_types: Array.from(formTypes),
-      count_mode: countMode,
-      // "latest" mode always sends 1 per form (backend default), no count needed.
-      count: countMode === "latest" ? undefined : (Number(count) || undefined),
+      count_mode: effectiveCountMode,
+      count: effectiveCount,
       year: Number(year) || undefined,
       start_date: startDate || undefined,
       end_date: endDate || undefined,
@@ -235,67 +247,73 @@ export function IngestForm({ onSubmit, isSubmitting }: IngestFormProps) {
         </div>
       </div>
 
-      {/* ---- Count mode radio ---- */}
-      <div className="space-y-2">
-        <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-          Count mode
-        </label>
-        <div className="grid gap-3 sm:grid-cols-3">
-          {(Object.keys(COUNT_MODE_INFO) as Array<"latest" | "total" | "per_form">).map(
-            (mode) => {
-              const info = COUNT_MODE_INFO[mode];
-              const isSelected = countMode === mode;
-              return (
-                <label
-                  key={mode}
-                  className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors ${
-                    isSelected
-                      ? "border-blue-300 bg-blue-50 dark:border-blue-700 dark:bg-blue-950"
-                      : "border-gray-200 bg-white hover:border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:hover:border-gray-600"
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="countMode"
-                    value={mode}
-                    checked={isSelected}
-                    onChange={() => setCountMode(mode)}
-                    className="mt-0.5 accent-blue-600"
-                  />
-                  <div>
-                    <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                      {info.label}
-                    </span>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">
-                      {info.description}
-                    </p>
-                  </div>
-                </label>
-              );
-            },
+      {/* ---- Count mode radio (hidden when date filters are active) ---- */}
+      {hasDateFilter ? (
+        <p className="text-sm text-gray-500 dark:text-gray-400">
+          When a date filter is active, all matching filings are fetched.
+        </p>
+      ) : (
+        <div className="space-y-2">
+          <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+            Count mode
+          </label>
+          <div className="grid gap-3 sm:grid-cols-3">
+            {(Object.keys(COUNT_MODE_INFO) as Array<"latest" | "total" | "per_form">).map(
+              (mode) => {
+                const info = COUNT_MODE_INFO[mode];
+                const isSelected = countMode === mode;
+                return (
+                  <label
+                    key={mode}
+                    className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors ${
+                      isSelected
+                        ? "border-blue-300 bg-blue-50 dark:border-blue-700 dark:bg-blue-950"
+                        : "border-gray-200 bg-white hover:border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:hover:border-gray-600"
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="countMode"
+                      value={mode}
+                      checked={isSelected}
+                      onChange={() => setCountMode(mode)}
+                      className="mt-0.5 accent-blue-600"
+                    />
+                    <div>
+                      <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                        {info.label}
+                      </span>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        {info.description}
+                      </p>
+                    </div>
+                  </label>
+                );
+              },
+            )}
+          </div>
+
+          {/* Count input — visible only for total / per_form modes */}
+          {countMode !== "latest" && (
+            <div className="mt-2">
+              <label className="space-y-1">
+                <span className="text-xs font-medium text-gray-600 dark:text-gray-400">
+                  Number of filings
+                </span>
+                <input
+                  type="number"
+                  min={1}
+                  max={20}
+                  value={count}
+                  onChange={(e) => setCount(e.target.value)}
+                  placeholder="e.g. 3"
+                  className="w-32 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 placeholder:text-gray-400 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:placeholder:text-gray-500"
+                />
+              </label>
+            </div>
           )}
         </div>
-
-        {/* Count input — visible only for total / per_form modes */}
-        {countMode !== "latest" && (
-          <div className="mt-2">
-            <label className="space-y-1">
-              <span className="text-xs font-medium text-gray-600 dark:text-gray-400">
-                Number of filings
-              </span>
-              <input
-                type="number"
-                min={1}
-                max={20}
-                value={count}
-                onChange={(e) => setCount(e.target.value)}
-                placeholder="e.g. 3"
-                className="w-32 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 placeholder:text-gray-400 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:placeholder:text-gray-500"
-              />
-            </label>
-          </div>
-        )}
-      </div>
+      )}
 
       {/* ---- Date filters (collapsible) ---- */}
       <div>
