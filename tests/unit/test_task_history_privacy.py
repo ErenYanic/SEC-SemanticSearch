@@ -42,7 +42,10 @@ def registry(tmp_path, monkeypatch, _reset_settings):
     from sec_semantic_search.config import reload_settings
     reload_settings()
 
-    reg = MetadataRegistry(str(tmp_path / "test.sqlite"))
+    # Explicit empty key ensures unencrypted mode regardless of
+    # DB_ENCRYPTION_KEY in .env — tests that read the database file
+    # directly via sqlite3 need plain (non-SQLCipher) databases.
+    reg = MetadataRegistry(str(tmp_path / "test.sqlite"), encryption_key="")
     yield reg
     reg.close()
 

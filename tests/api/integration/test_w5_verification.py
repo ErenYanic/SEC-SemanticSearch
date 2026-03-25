@@ -108,7 +108,9 @@ class TestEncryptedDBRoundTrip:
     def test_unencrypted_full_lifecycle(self, tmp_path):
         """Full register → duplicate check → list → get → delete cycle."""
         db_path = str(tmp_path / "test.sqlite")
-        registry = MetadataRegistry(db_path=db_path)
+        # Explicit empty key ensures unencrypted mode regardless of
+        # DB_ENCRYPTION_KEY in .env.
+        registry = MetadataRegistry(db_path=db_path, encryption_key="")
 
         filing_id = FilingIdentifier(
             ticker="AAPL",
