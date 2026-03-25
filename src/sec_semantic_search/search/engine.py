@@ -95,7 +95,7 @@ class SearchEngine:
             min_similarity: Minimum similarity threshold (0.0–1.0).
                             Defaults to ``SEARCH_MIN_SIMILARITY`` from settings.
             accession_number: Optional filter — restrict search to a single
-                filing by accession number (web-only feature).
+                filing by accession number.
 
         Returns:
             List of ``SearchResult`` objects ordered by similarity
