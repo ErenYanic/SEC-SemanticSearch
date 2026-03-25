@@ -108,11 +108,14 @@ export default function SearchPage() {
       query: submittedQuery,
       top_k: filters.topK,
       min_similarity: filters.minSimilarity,
-      // Convert empty strings to undefined so they're omitted from
+      // Convert empty arrays to undefined so they're omitted from
       // the request body. The API treats missing fields as "no filter".
-      ticker: filters.ticker || undefined,
-      form_type: filters.formType || undefined,
-      accession_number: filters.accessionNumber || undefined,
+      ticker: filters.tickers.length > 0 ? filters.tickers : undefined,
+      form_type: filters.formTypes.length > 0 ? filters.formTypes : undefined,
+      accession_number:
+        filters.accessionNumbers.length > 0
+          ? filters.accessionNumbers
+          : undefined,
     });
   }
 

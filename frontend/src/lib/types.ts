@@ -135,10 +135,10 @@ export interface SearchResult {
 export interface SearchRequest {
   query: string;
   top_k?: number;
-  ticker?: string | null;
-  form_type?: string | null;
+  ticker?: string[] | null;
+  form_type?: string[] | null;
   min_similarity?: number;
-  accession_number?: string | null;
+  accession_number?: string[] | null;
 }
 
 /** POST /api/search/ — response */

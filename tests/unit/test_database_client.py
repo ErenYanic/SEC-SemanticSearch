@@ -65,3 +65,59 @@ class TestBuildWhereFilter:
         """Empty strings are falsy and should be ignored."""
         result = ChromaDBClient._build_where_filter(ticker="", form_type="")
         assert result is None
+
+
+class TestBuildWhereFilterMultiValue:
+    """_build_where_filter() supports list[str] for multi-value matching."""
+
+    def test_single_item_list_uses_equality(self):
+        """A one-element list should produce a simple equality filter."""
+        result = ChromaDBClient._build_where_filter(ticker=["AAPL"])
+        assert result == {"ticker": "AAPL"}
+
+    def test_multi_item_list_uses_in_operator(self):
+        """Multiple items should produce a $in filter."""
+        result = ChromaDBClient._build_where_filter(ticker=["AAPL", "MSFT"])
+        assert result == {"ticker": {"$in": ["AAPL", "MSFT"]}}
+
+    def test_multi_ticker_uppercased(self):
+        result = ChromaDBClient._build_where_filter(ticker=["aapl", "msft"])
+        assert result == {"ticker": {"$in": ["AAPL", "MSFT"]}}
+
+    def test_multi_form_type_uses_in(self):
+        result = ChromaDBClient._build_where_filter(form_type=["10-K", "10-Q"])
+        assert result == {"form_type": {"$in": ["10-K", "10-Q"]}}
+
+    def test_multi_form_type_uppercased(self):
+        result = ChromaDBClient._build_where_filter(form_type=["10-k", "10-q"])
+        assert result == {"form_type": {"$in": ["10-K", "10-Q"]}}
+
+    def test_multi_accession_uses_in(self):
+        result = ChromaDBClient._build_where_filter(
+            accession_number=["ACC-001", "ACC-002"]
+        )
+        assert result == {"accession_number": {"$in": ["ACC-001", "ACC-002"]}}
+
+    def test_mixed_list_and_scalar(self):
+        """A list ticker + scalar form_type should combine via $and."""
+        result = ChromaDBClient._build_where_filter(
+            ticker=["AAPL", "MSFT"], form_type="10-K"
+        )
+        assert "$and" in result
+        assert {"ticker": {"$in": ["AAPL", "MSFT"]}} in result["$and"]
+        assert {"form_type": "10-K"} in result["$and"]
+
+    def test_all_three_multi_value(self):
+        """All filters as lists should produce $and with $in conditions."""
+        result = ChromaDBClient._build_where_filter(
+            ticker=["AAPL", "MSFT"],
+            form_type=["10-K", "10-Q"],
+            accession_number=["ACC-001", "ACC-002"],
+        )
+        assert "$and" in result
+        assert len(result["$and"]) == 3
+
+    def test_empty_list_treated_as_falsy(self):
+        """An empty list should be treated as no filter."""
+        result = ChromaDBClient._build_where_filter(ticker=[], form_type=[])
+        assert result is None

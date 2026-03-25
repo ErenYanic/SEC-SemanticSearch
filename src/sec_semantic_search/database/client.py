@@ -195,9 +195,9 @@ class ChromaDBClient:
         self,
         query_embeddings: list[list[float]],
         n_results: int = 5,
-        ticker: str | None = None,
-        form_type: str | None = None,
-        accession_number: str | None = None,
+        ticker: str | list[str] | None = None,
+        form_type: str | list[str] | None = None,
+        accession_number: str | list[str] | None = None,
     ) -> list[SearchResult]:
         """
         Query the collection for similar chunks.
@@ -207,10 +207,12 @@ class ChromaDBClient:
                 (``list[list[float]]``), typically from
                 ``EmbeddingGenerator.embed_query_for_chromadb()``.
             n_results: Maximum number of results to return.
-            ticker: Optional filter by ticker symbol.
-            form_type: Optional filter by form type.
-            accession_number: Optional filter to restrict search to a
-                single filing (web-only feature).
+            ticker: Optional filter by ticker symbol(s). A single string
+                or a list of strings (matched via ``$in``).
+            form_type: Optional filter by form type(s). A single string
+                or a list of strings.
+            accession_number: Optional filter to restrict search to
+                specific filing(s) by accession number.
 
         Returns:
             List of SearchResult objects, ordered by similarity
@@ -264,33 +266,55 @@ class ChromaDBClient:
     # ------------------------------------------------------------------
 
     @staticmethod
+    def _build_field_condition(field: str, value: str | list[str], upper: bool = False) -> dict:
+        """
+        Build a single ChromaDB field condition.
+
+        For a single value, returns ``{"field": value}``.
+        For multiple values, returns ``{"field": {"$in": values}}``.
+        """
+        if isinstance(value, list):
+            values = [v.upper() for v in value] if upper else list(value)
+            if len(values) == 1:
+                return {field: values[0]}
+            return {field: {"$in": values}}
+        return {field: value.upper() if upper else value}
+
+    @staticmethod
     def _build_where_filter(
-        ticker: str | None = None,
-        form_type: str | None = None,
-        accession_number: str | None = None,
+        ticker: str | list[str] | None = None,
+        form_type: str | list[str] | None = None,
+        accession_number: str | list[str] | None = None,
     ) -> dict | None:
         """
         Build a ChromaDB where filter from optional parameters.
 
-        ChromaDB uses ``{"field": "value"}`` for single conditions and
+        ChromaDB uses ``{"field": "value"}`` for single conditions,
+        ``{"field": {"$in": [...]}}`` for multi-value conditions, and
         ``{"$and": [...]}`` for multiple conditions.
 
         Args:
-            ticker: Optional ticker filter.
-            form_type: Optional form type filter.
+            ticker: Optional ticker filter (single or list).
+            form_type: Optional form type filter (single or list).
             accession_number: Optional accession number filter
-                (restricts search to a single filing).
+                (single or list).
 
         Returns:
             Where filter dict, or None if no filters specified.
         """
         conditions = []
         if ticker:
-            conditions.append({"ticker": ticker.upper()})
+            conditions.append(
+                ChromaDBClient._build_field_condition("ticker", ticker, upper=True)
+            )
         if form_type:
-            conditions.append({"form_type": form_type.upper()})
+            conditions.append(
+                ChromaDBClient._build_field_condition("form_type", form_type, upper=True)
+            )
         if accession_number:
-            conditions.append({"accession_number": accession_number})
+            conditions.append(
+                ChromaDBClient._build_field_condition("accession_number", accession_number)
+            )
 
         if not conditions:
             return None

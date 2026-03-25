@@ -282,11 +282,19 @@ class TestSearchRequest:
 
     def test_ticker_normalised_uppercase(self):
         req = SearchRequest(query="test", ticker="aapl")
-        assert req.ticker == "AAPL"
+        assert req.ticker == ["AAPL"]
+
+    def test_ticker_list_normalised(self):
+        req = SearchRequest(query="test", ticker=["aapl", "msft"])
+        assert req.ticker == ["AAPL", "MSFT"]
 
     def test_form_type_normalised_uppercase(self):
         req = SearchRequest(query="test", form_type="10-q")
-        assert req.form_type == "10-Q"
+        assert req.form_type == ["10-Q"]
+
+    def test_form_type_list_normalised(self):
+        req = SearchRequest(query="test", form_type=["10-k", "10-q"])
+        assert req.form_type == ["10-K", "10-Q"]
 
     def test_invalid_form_type_raises(self):
         with pytest.raises(ValidationError, match="form_type must be"):

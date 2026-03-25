@@ -255,15 +255,19 @@ class TestTickerValidation:
 
     def test_valid_ticker(self):
         req = SearchRequest(query="test", ticker="AAPL")
-        assert req.ticker == "AAPL"
+        assert req.ticker == ["AAPL"]
 
     def test_valid_ticker_with_dot(self):
         req = SearchRequest(query="test", ticker="BRK.B")
-        assert req.ticker == "BRK.B"
+        assert req.ticker == ["BRK.B"]
 
     def test_ticker_normalised_to_uppercase(self):
         req = SearchRequest(query="test", ticker="aapl")
-        assert req.ticker == "AAPL"
+        assert req.ticker == ["AAPL"]
+
+    def test_valid_ticker_list(self):
+        req = SearchRequest(query="test", ticker=["AAPL", "MSFT"])
+        assert req.ticker == ["AAPL", "MSFT"]
 
     def test_invalid_ticker_path_traversal(self):
         with pytest.raises(ValidationError, match="Invalid ticker"):
@@ -302,15 +306,28 @@ class TestAccessionNumberValidation:
         req = SearchRequest(
             query="test", accession_number="0000320193-24-000001"
         )
-        assert req.accession_number == "0000320193-24-000001"
+        assert req.accession_number == ["0000320193-24-000001"]
+
+    def test_valid_accession_number_list(self):
+        req = SearchRequest(
+            query="test",
+            accession_number=["0000320193-24-000001", "0000320193-24-000002"],
+        )
+        assert req.accession_number == [
+            "0000320193-24-000001",
+            "0000320193-24-000002",
+        ]
 
     def test_invalid_accession_number(self):
         with pytest.raises(ValidationError, match="Invalid accession"):
             SearchRequest(query="test", accession_number="invalid-format")
 
-    def test_accession_too_long(self):
-        with pytest.raises(ValidationError, match="at most 20"):
-            SearchRequest(query="test", accession_number="x" * 21)
+    def test_invalid_accession_in_list(self):
+        with pytest.raises(ValidationError, match="Invalid accession"):
+            SearchRequest(
+                query="test",
+                accession_number=["0000320193-24-000001", "not-valid"],
+            )
 
     def test_delete_by_ids_accession_validation(self):
         with pytest.raises(ValidationError, match="Invalid accession"):

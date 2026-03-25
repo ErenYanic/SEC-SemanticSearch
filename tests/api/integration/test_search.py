@@ -88,20 +88,41 @@ class TestSearchEndpoint:
         assert resp.json()["detail"]["error"] == "search_error"
 
     def test_ticker_filter_passed(self):
+        """Single-string ticker is coerced to a one-element list."""
         client, engine = _make_client()
         client.post("/api/search/", json={"query": "test", "ticker": "aapl"})
         _, kwargs = engine.search.call_args
-        assert kwargs["ticker"] == "AAPL"
+        assert kwargs["ticker"] == ["AAPL"]
+
+    def test_ticker_list_filter_passed(self):
+        """Multiple tickers are passed as a list."""
+        client, engine = _make_client()
+        client.post("/api/search/", json={"query": "test", "ticker": ["aapl", "msft"]})
+        _, kwargs = engine.search.call_args
+        assert kwargs["ticker"] == ["AAPL", "MSFT"]
 
     def test_form_type_filter_passed(self):
+        """Single-string form_type is coerced to a one-element list."""
         client, engine = _make_client()
         client.post("/api/search/", json={"query": "test", "form_type": "10-q"})
         _, kwargs = engine.search.call_args
-        assert kwargs["form_type"] == "10-Q"
+        assert kwargs["form_type"] == ["10-Q"]
+
+    def test_form_type_list_filter_passed(self):
+        """Multiple form types are passed as a list."""
+        client, engine = _make_client()
+        client.post("/api/search/", json={"query": "test", "form_type": ["10-K", "10-Q"]})
+        _, kwargs = engine.search.call_args
+        assert kwargs["form_type"] == ["10-K", "10-Q"]
 
     def test_invalid_form_type_returns_422(self):
         client, _ = _make_client()
         resp = client.post("/api/search/", json={"query": "test", "form_type": "8-K"})
+        assert resp.status_code == 422
+
+    def test_invalid_form_type_in_list_returns_422(self):
+        client, _ = _make_client()
+        resp = client.post("/api/search/", json={"query": "test", "form_type": ["10-K", "8-K"]})
         assert resp.status_code == 422
 
     def test_top_k_out_of_range_returns_422(self):
@@ -110,7 +131,29 @@ class TestSearchEndpoint:
         assert resp.status_code == 422
 
     def test_accession_number_passed(self):
+        """Single-string accession is coerced to a one-element list."""
         client, engine = _make_client()
         client.post("/api/search/", json={"query": "test", "accession_number": "0000320193-24-000001"})
         _, kwargs = engine.search.call_args
-        assert kwargs["accession_number"] == "0000320193-24-000001"
+        assert kwargs["accession_number"] == ["0000320193-24-000001"]
+
+    def test_accession_number_list_passed(self):
+        """Multiple accession numbers are passed as a list."""
+        client, engine = _make_client()
+        client.post(
+            "/api/search/",
+            json={
+                "query": "test",
+                "accession_number": ["0000320193-24-000001", "0000320193-24-000002"],
+            },
+        )
+        _, kwargs = engine.search.call_args
+        assert kwargs["accession_number"] == ["0000320193-24-000001", "0000320193-24-000002"]
+
+    def test_invalid_accession_in_list_returns_422(self):
+        client, _ = _make_client()
+        resp = client.post(
+            "/api/search/",
+            json={"query": "test", "accession_number": ["0000320193-24-000001", "invalid"]},
+        )
+        assert resp.status_code == 422

@@ -40,16 +40,16 @@ def search(
         typer.Option("--top", "-t", help="Number of results to return."),
     ] = None,
     ticker: Annotated[
-        str | None,
-        typer.Option("--ticker", "-k", help="Filter by ticker symbol."),
+        list[str] | None,
+        typer.Option("--ticker", "-k", help="Filter by ticker symbol(s). Repeat for multiple."),
     ] = None,
     form: Annotated[
-        str | None,
-        typer.Option("--form", "-f", help="Filter by form type (10-K or 10-Q)."),
+        list[str] | None,
+        typer.Option("--form", "-f", help="Filter by form type(s). Repeat for multiple."),
     ] = None,
     accession: Annotated[
-        str | None,
-        typer.Option("--accession", "-a", help="Restrict search to a single filing by accession number."),
+        list[str] | None,
+        typer.Option("--accession", "-a", help="Restrict search to specific filing(s) by accession number. Repeat for multiple."),
     ] = None,
 ) -> None:
     """
@@ -61,6 +61,8 @@ def search(
 
         sec-search search "revenue recognition" -t 10 -k AAPL
 
+        sec-search search "revenue" -k AAPL -k MSFT
+
         sec-search search "liquidity" -f 10-Q
 
         sec-search search "debt covenants" -a 0000320193-23-000106
@@ -68,11 +70,18 @@ def search(
     with console.status("Searching..."):
         try:
             engine = SearchEngine()
+            # Normalise ticker(s) to uppercase; pass list or None.
+            ticker_filter: list[str] | None = (
+                [t.upper() for t in ticker] if ticker else None
+            )
+            form_filter: list[str] | None = (
+                [f.upper() for f in form] if form else None
+            )
             results = engine.search(
                 query=query,
                 top_k=top,
-                ticker=ticker.upper() if ticker else None,
-                form_type=form.upper() if form else None,
+                ticker=ticker_filter,
+                form_type=form_filter,
                 accession_number=accession,
             )
         except SearchError as e:
