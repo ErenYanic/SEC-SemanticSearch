@@ -63,9 +63,15 @@ class TestValidateFormType:
     def test_valid_10q_lowercase(self, fetcher):
         assert fetcher._validate_form_type("10-q") == "10-Q"
 
+    def test_valid_8k(self, fetcher):
+        assert fetcher._validate_form_type("8-K") == "8-K"
+
+    def test_valid_8k_lowercase(self, fetcher):
+        assert fetcher._validate_form_type("8-k") == "8-K"
+
     def test_invalid_form_raises(self, fetcher):
         with pytest.raises(FetchError, match="Unsupported form type"):
-            fetcher._validate_form_type("8-K")
+            fetcher._validate_form_type("20-F")
 
 
 class TestParseFilingDate:

@@ -197,9 +197,13 @@ class TestBulkDeleteRequest:
         req = BulkDeleteRequest(form_type="10-k")
         assert req.form_type == "10-K"
 
+    def test_valid_8k_form_type(self):
+        req = BulkDeleteRequest(form_type="8-K")
+        assert req.form_type == "8-K"
+
     def test_invalid_form_type_raises(self):
         with pytest.raises(ValidationError, match="form_type must be"):
-            BulkDeleteRequest(form_type="8-K")
+            BulkDeleteRequest(form_type="20-F")
 
     def test_none_form_type_ok(self):
         req = BulkDeleteRequest(ticker="AAPL", form_type=None)
@@ -296,9 +300,13 @@ class TestSearchRequest:
         req = SearchRequest(query="test", form_type=["10-k", "10-q"])
         assert req.form_type == ["10-K", "10-Q"]
 
+    def test_valid_8k_form_type(self):
+        req = SearchRequest(query="test", form_type="8-K")
+        assert req.form_type == ["8-K"]
+
     def test_invalid_form_type_raises(self):
         with pytest.raises(ValidationError, match="form_type must be"):
-            SearchRequest(query="test", form_type="8-K")
+            SearchRequest(query="test", form_type="20-F")
 
     def test_min_similarity_out_of_range(self):
         with pytest.raises(ValidationError):
@@ -372,9 +380,13 @@ class TestIngestRequest:
         with pytest.raises(ValidationError):
             IngestRequest(tickers=[])
 
+    def test_valid_8k_form_type(self):
+        req = IngestRequest(tickers=["AAPL"], form_types=["8-K"])
+        assert req.form_types == ["8-K"]
+
     def test_invalid_form_types_raises(self):
         with pytest.raises(ValidationError, match="Unsupported form types"):
-            IngestRequest(tickers=["AAPL"], form_types=["8-K"])
+            IngestRequest(tickers=["AAPL"], form_types=["20-F"])
 
     def test_form_types_normalised_uppercase(self):
         req = IngestRequest(tickers=["AAPL"], form_types=["10-k", "10-q"])

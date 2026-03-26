@@ -4,7 +4,7 @@
  * Top navigation bar — present on every page.
  *
  * Layout:
- *   [GitHub icon]  SEC Semantic Search  |  Dashboard  Search  Ingest  Filings  |  [task indicator]  [theme toggle]
+ *   SEC Semantic Search  |  Dashboard  Search  Ingest  Filings  |  [task indicator]  [GitHub]  [LinkedIn]  [theme toggle]
  *
  * "use client" is required because we use `usePathname()` (a React
  * hook) to highlight the active navigation link, and `useTheme()` to
@@ -87,26 +87,8 @@ export function Navbar({ isTaskActive = false }: NavbarProps) {
     <nav className="border-b border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-950">
       <div className="mx-auto flex h-16 max-w-7xl items-center px-4 sm:px-6 lg:px-8">
 
-        {/* ---- Left: GitHub link + app title ---- */}
+        {/* ---- Left: app title ---- */}
         <div className="flex items-center gap-3">
-          <a
-            href="https://github.com/ErenYanic"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-gray-500 transition-colors hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100"
-            aria-label="GitHub profile"
-          >
-            <Github className="h-6 w-6" />
-          </a>
-          <a
-            href="https://www.linkedin.com/in/erenyanic/"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-gray-500 transition-colors hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100"
-            aria-label="LinkedIn profile"
-          >
-            <Linkedin className="h-6 w-6" />
-          </a>
           <Link
             href="/"
             className="text-lg font-semibold text-gray-900 dark:text-gray-100"
@@ -143,7 +125,7 @@ export function Navbar({ isTaskActive = false }: NavbarProps) {
           })}
         </div>
 
-        {/* ---- Right: active task indicator + theme toggle ---- */}
+        {/* ---- Right: active task indicator + portfolio links + theme toggle ---- */}
         <div className="ml-auto flex items-center gap-3">
 
           {/* Active task indicator — only visible when a task is running */}
@@ -176,6 +158,26 @@ export function Navbar({ isTaskActive = false }: NavbarProps) {
               <span className="hidden sm:inline">Admin Active</span>
             </button>
           )}
+
+          {/* Portfolio links — circular "key press" buttons */}
+          <a
+            href="https://github.com/ErenYanic"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex h-8 w-8 items-center justify-center rounded-full border border-gray-200 text-gray-500 transition-all hover:border-gray-400 hover:bg-gray-100 hover:text-gray-900 active:shadow-inner dark:border-gray-700 dark:text-gray-400 dark:hover:border-gray-500 dark:hover:bg-gray-800 dark:hover:text-gray-100"
+            aria-label="GitHub profile"
+          >
+            <Github className="h-4 w-4" />
+          </a>
+          <a
+            href="https://www.linkedin.com/in/erenyanic/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex h-8 w-8 items-center justify-center rounded-full border border-gray-200 text-gray-500 transition-all hover:border-gray-400 hover:bg-gray-100 hover:text-gray-900 active:shadow-inner dark:border-gray-700 dark:text-gray-400 dark:hover:border-gray-500 dark:hover:bg-gray-800 dark:hover:text-gray-100"
+            aria-label="LinkedIn profile"
+          >
+            <Linkedin className="h-4 w-4" />
+          </a>
 
           {/* Theme toggle button */}
           <button

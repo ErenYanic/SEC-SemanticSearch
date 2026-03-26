@@ -47,7 +47,8 @@ class TestConstants:
     """Verify critical constants that other modules depend on."""
 
     def test_supported_forms(self):
-        """SUPPORTED_FORMS must include both 10-K and 10-Q."""
+        """SUPPORTED_FORMS must include 8-K, 10-K, and 10-Q."""
+        assert "8-K" in SUPPORTED_FORMS
         assert "10-K" in SUPPORTED_FORMS
         assert "10-Q" in SUPPORTED_FORMS
 

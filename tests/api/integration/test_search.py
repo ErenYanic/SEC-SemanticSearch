@@ -115,14 +115,21 @@ class TestSearchEndpoint:
         _, kwargs = engine.search.call_args
         assert kwargs["form_type"] == ["10-K", "10-Q"]
 
+    def test_valid_8k_form_type_accepted(self):
+        client, engine = _make_client()
+        resp = client.post("/api/search/", json={"query": "test", "form_type": "8-K"})
+        assert resp.status_code == 200
+        _, kwargs = engine.search.call_args
+        assert kwargs["form_type"] == ["8-K"]
+
     def test_invalid_form_type_returns_422(self):
         client, _ = _make_client()
-        resp = client.post("/api/search/", json={"query": "test", "form_type": "8-K"})
+        resp = client.post("/api/search/", json={"query": "test", "form_type": "20-F"})
         assert resp.status_code == 422
 
     def test_invalid_form_type_in_list_returns_422(self):
         client, _ = _make_client()
-        resp = client.post("/api/search/", json={"query": "test", "form_type": ["10-K", "8-K"]})
+        resp = client.post("/api/search/", json={"query": "test", "form_type": ["10-K", "20-F"]})
         assert resp.status_code == 422
 
     def test_top_k_out_of_range_returns_422(self):
