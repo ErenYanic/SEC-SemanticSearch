@@ -232,6 +232,132 @@ class TestChromaDBClient:
 
 
 # -----------------------------------------------------------------------
+# filing_date_int migration (BF-012)
+# -----------------------------------------------------------------------
+
+
+class TestFilingDateIntMigration:
+    """Auto-migration should backfill filing_date_int for legacy chunks."""
+
+    def test_migration_backfills_missing_field(
+        self, tmp_chroma_path, sample_chunks, sample_filing_id
+    ):
+        """Chunks stored without filing_date_int get it added on next init."""
+        import chromadb
+        from sec_semantic_search.config.constants import COLLECTION_NAME
+
+        # Step 1: Store chunks directly via raw ChromaDB (no filing_date_int)
+        raw_client = chromadb.PersistentClient(path=tmp_chroma_path)
+        collection = raw_client.get_or_create_collection(
+            name=COLLECTION_NAME,
+            metadata={"hnsw:space": "cosine"},
+        )
+
+        embeddings = np.random.default_rng(42).random(
+            (len(sample_chunks), EMBEDDING_DIMENSION), dtype=np.float32
+        )
+        ids = [c.chunk_id for c in sample_chunks]
+        documents = [c.content for c in sample_chunks]
+        # Deliberately omit filing_date_int (simulates pre-BF-012 data)
+        metadatas = [
+            {
+                "path": c.path,
+                "content_type": c.content_type.value,
+                "ticker": c.filing_id.ticker,
+                "form_type": c.filing_id.form_type,
+                "filing_date": c.filing_id.date_str,
+                "accession_number": c.filing_id.accession_number,
+            }
+            for c in sample_chunks
+        ]
+        collection.add(ids=ids, embeddings=embeddings.tolist(), documents=documents, metadatas=metadatas)
+
+        # Verify filing_date_int is NOT present before migration
+        pre = collection.get(include=["metadatas"])
+        assert all("filing_date_int" not in m for m in pre["metadatas"])
+
+        # Step 2: Create a ChromaDBClient — migration should run automatically
+        client = ChromaDBClient(chroma_path=tmp_chroma_path)
+
+        # Step 3: Verify filing_date_int is now present
+        post = client._collection.get(include=["metadatas"])
+        for meta in post["metadatas"]:
+            assert "filing_date_int" in meta
+            assert meta["filing_date_int"] == int(meta["filing_date"].replace("-", ""))
+
+    def test_migration_skips_already_migrated(
+        self, tmp_chroma_path, sample_chunks, sample_filing_id
+    ):
+        """Chunks that already have filing_date_int are left unchanged."""
+        # Store normally (includes filing_date_int)
+        client = ChromaDBClient(chroma_path=tmp_chroma_path)
+        pf = _make_processed_filing(sample_chunks, sample_filing_id)
+        client.store_filing(pf)
+
+        # Reinitialise — migration should be a no-op
+        client2 = ChromaDBClient(chroma_path=tmp_chroma_path)
+        post = client2._collection.get(include=["metadatas"])
+        for meta in post["metadatas"]:
+            assert meta["filing_date_int"] == 20241101
+
+    def test_migration_empty_collection(self, tmp_chroma_path):
+        """Migration on an empty collection should be a no-op (no error)."""
+        client = ChromaDBClient(chroma_path=tmp_chroma_path)
+        assert client.collection_count() == 0
+
+    def test_date_filter_works_after_migration(
+        self, tmp_chroma_path, sample_chunks, sample_filing_id
+    ):
+        """After migration, date-range queries should match backfilled data."""
+        import chromadb
+        from sec_semantic_search.config.constants import COLLECTION_NAME
+
+        # Store without filing_date_int (pre-BF-012)
+        raw_client = chromadb.PersistentClient(path=tmp_chroma_path)
+        collection = raw_client.get_or_create_collection(
+            name=COLLECTION_NAME,
+            metadata={"hnsw:space": "cosine"},
+        )
+        embeddings = np.random.default_rng(42).random(
+            (len(sample_chunks), EMBEDDING_DIMENSION), dtype=np.float32
+        )
+        ids = [c.chunk_id for c in sample_chunks]
+        documents = [c.content for c in sample_chunks]
+        metadatas = [
+            {
+                "path": c.path,
+                "content_type": c.content_type.value,
+                "ticker": c.filing_id.ticker,
+                "form_type": c.filing_id.form_type,
+                "filing_date": c.filing_id.date_str,
+                "accession_number": c.filing_id.accession_number,
+            }
+            for c in sample_chunks
+        ]
+        collection.add(ids=ids, embeddings=embeddings.tolist(), documents=documents, metadatas=metadatas)
+
+        # Init triggers migration
+        client = ChromaDBClient(chroma_path=tmp_chroma_path)
+
+        # Query with date range covering 2024-11-01
+        query_emb = np.random.default_rng(99).random(
+            (1, EMBEDDING_DIMENSION), dtype=np.float32
+        ).tolist()
+        results = client.query(
+            query_emb, n_results=5,
+            start_date="2024-01-01", end_date="2024-12-31",
+        )
+        assert len(results) > 0
+
+        # Query with date range NOT covering 2024-11-01
+        results_empty = client.query(
+            query_emb, n_results=5,
+            start_date="2025-01-01", end_date="2025-12-31",
+        )
+        assert len(results_empty) == 0
+
+
+# -----------------------------------------------------------------------
 # Dual-store consistency
 # -----------------------------------------------------------------------
 
