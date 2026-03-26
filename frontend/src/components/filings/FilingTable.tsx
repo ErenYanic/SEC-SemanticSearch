@@ -20,11 +20,11 @@
 
 "use client";
 
-import { useMemo, useState } from "react";
-import { ChevronLeft, ChevronRight, Trash2 } from "lucide-react";
+import { useCallback, useMemo, useState } from "react";
+import { Check, ChevronLeft, ChevronRight, Copy, Trash2 } from "lucide-react";
 import type { Filing } from "@/lib/types";
 import type { FilingListParams } from "@/lib/api";
-import { Badge, Button } from "@/components/ui";
+import { Badge, Button, useToast } from "@/components/ui";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -68,6 +68,7 @@ interface Column {
 const COLUMNS: Column[] = [
   { label: "Ticker", sortKey: "ticker" },
   { label: "Form", sortKey: "form_type" },
+  { label: "Accession No.", sortKey: null },
   { label: "Filing Date", sortKey: "filing_date" },
   { label: "Chunks", sortKey: "chunk_count", align: "right" },
   { label: "Ingested", sortKey: "ingested_at" },
@@ -93,6 +94,21 @@ export function FilingTable({
   onDeleteFiling,
   isDeleting,
 }: FilingTableProps) {
+  // ---- Copy-to-clipboard state ----
+  const { addToast } = useToast();
+  const [copiedAccession, setCopiedAccession] = useState<string | null>(null);
+
+  const handleCopyAccession = useCallback(async (accession: string) => {
+    try {
+      await navigator.clipboard.writeText(accession);
+      setCopiedAccession(accession);
+      addToast("success", "Copied to clipboard");
+      setTimeout(() => setCopiedAccession(null), 2000);
+    } catch {
+      addToast("error", "Failed to copy — try selecting the text manually");
+    }
+  }, [addToast]);
+
   // ---- Pagination state (local to the table) ----
   const [rawPage, setPage] = useState(0);
   const [pageSize, setPageSize] = useState<number>(10);
@@ -288,6 +304,28 @@ export function FilingTable({
                 {/* Form type */}
                 <td className="px-4 py-3">
                   <Badge variant="blue">{filing.form_type}</Badge>
+                </td>
+
+                {/* Accession number */}
+                <td className="px-4 py-3">
+                  <span className="inline-flex items-center gap-1.5">
+                    <span className="font-mono text-xs text-gray-600 dark:text-gray-400">
+                      {filing.accession_number}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleCopyAccession(filing.accession_number)}
+                      className="rounded p-0.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 dark:text-gray-500 dark:hover:bg-gray-800 dark:hover:text-gray-300"
+                      title="Copy accession number to clipboard"
+                      aria-label={`Copy accession number ${filing.accession_number}`}
+                    >
+                      {copiedAccession === filing.accession_number ? (
+                        <Check className="h-3.5 w-3.5 text-green-600" />
+                      ) : (
+                        <Copy className="h-3.5 w-3.5" />
+                      )}
+                    </button>
+                  </span>
                 </td>
 
                 {/* Filing date */}
