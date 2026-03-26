@@ -20,6 +20,8 @@ from datetime import date, datetime
 
 from pydantic import BaseModel, Field, field_validator
 
+from sec_semantic_search.config.constants import SUPPORTED_FORMS
+
 # SEC ticker symbols: 1–5 uppercase letters, optionally with dots (e.g. BRK.B).
 _TICKER_RE = re.compile(r"^[A-Z][A-Z.]{0,4}$")
 
@@ -138,7 +140,7 @@ class BulkDeleteRequest(BaseModel):
     """Request body for ``POST /api/filings/bulk-delete``."""
 
     ticker: str | None = Field(None, description="Filter by ticker symbol")
-    form_type: str | None = Field(None, description="Filter by form type (10-K or 10-Q)")
+    form_type: str | None = Field(None, description="Filter by form type (8-K, 10-K, or 10-Q)")
 
     @field_validator("ticker")
     @classmethod
@@ -159,8 +161,9 @@ class BulkDeleteRequest(BaseModel):
         if v is None:
             return None
         upper = v.upper()
-        if upper not in ("10-K", "10-Q"):
-            msg = "form_type must be '10-K' or '10-Q'"
+        if upper not in SUPPORTED_FORMS:
+            allowed = ", ".join(SUPPORTED_FORMS)
+            msg = f"form_type must be one of: {allowed}"
             raise ValueError(msg)
         return upper
 
@@ -256,7 +259,7 @@ class SearchRequest(BaseModel):
     query: str = Field(..., min_length=1, max_length=2000, description="Natural language search query")
     top_k: int = Field(5, ge=1, le=100, description="Maximum number of results")
     ticker: list[str] | None = Field(None, description="Filter to specific ticker(s)")
-    form_type: list[str] | None = Field(None, description="Filter to form type(s) (e.g. '10-K', '10-Q')")
+    form_type: list[str] | None = Field(None, description="Filter to form type(s) (e.g. '8-K', '10-K', '10-Q')")
     min_similarity: float = Field(
         0.0, ge=0.0, le=1.0, description="Minimum similarity threshold"
     )
@@ -306,9 +309,10 @@ class SearchRequest(BaseModel):
         if isinstance(v, str):
             v = [v]
         normalised = [f.upper() for f in v]
-        invalid = [f for f in normalised if f not in ("10-K", "10-Q")]
+        invalid = [f for f in normalised if f not in SUPPORTED_FORMS]
         if invalid:
-            msg = f"form_type must be '10-K' or '10-Q', got: {invalid}"
+            allowed = ", ".join(SUPPORTED_FORMS)
+            msg = f"form_type must be one of: {allowed}; got: {invalid}"
             raise ValueError(msg)
         return normalised
 
@@ -399,7 +403,7 @@ class IngestRequest(BaseModel):
     tickers: list[str] = Field(..., min_length=1, description="Ticker symbols to ingest")
     form_types: list[str] = Field(
         default=["10-K", "10-Q"],
-        description="SEC form types to ingest",
+        description="SEC form types to ingest (8-K, 10-K, 10-Q)",
     )
     count_mode: str = Field(
         "latest",
@@ -434,9 +438,10 @@ class IngestRequest(BaseModel):
     def validate_form_types(cls, v: list[str]) -> list[str]:
         """Normalise and validate form types."""
         normalised = [f.upper().strip() for f in v]
-        invalid = [f for f in normalised if f not in ("10-K", "10-Q")]
+        invalid = [f for f in normalised if f not in SUPPORTED_FORMS]
         if invalid:
-            msg = f"Unsupported form types: {invalid}. Allowed: 10-K, 10-Q"
+            allowed = ", ".join(SUPPORTED_FORMS)
+            msg = f"Unsupported form types: {invalid}. Allowed: {allowed}"
             raise ValueError(msg)
         return normalised
 

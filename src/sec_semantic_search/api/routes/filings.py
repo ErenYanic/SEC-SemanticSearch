@@ -55,7 +55,7 @@ def _record_to_schema(record: FilingRecord) -> FilingSchema:
 async def list_filings(
     registry: MetadataRegistry = Depends(get_registry),
     ticker: str | None = Query(None, description="Filter by ticker symbol"),
-    form_type: str | None = Query(None, description="Filter by form type (10-K or 10-Q)"),
+    form_type: str | None = Query(None, description="Filter by form type (8-K, 10-K, or 10-Q)"),
     sort_by: Literal["filing_date", "ticker", "form_type", "chunk_count", "ingested_at"] = Query(
         "filing_date", description="Column to sort by"
     ),

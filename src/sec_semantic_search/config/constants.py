@@ -1,7 +1,7 @@
 """Application-wide constants."""
 
-# Supported SEC filing forms
-SUPPORTED_FORMS = ("10-K", "10-Q")
+# Supported SEC filing forms (alphabetical order)
+SUPPORTED_FORMS = ("8-K", "10-K", "10-Q")
 
 # Default form types for ingestion (both forms)
 DEFAULT_FORM_TYPES = "10-K,10-Q"

@@ -29,7 +29,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "SEC Semantic Search",
   description:
-    "Semantic search over SEC filings (10-K, 10-Q) using vector similarity",
+    "Semantic search over SEC filings (8-K, 10-K, 10-Q) using vector similarity",
 };
 
 /**

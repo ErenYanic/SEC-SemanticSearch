@@ -40,7 +40,7 @@ interface IngestFormProps {
 // Constants
 // ---------------------------------------------------------------------------
 
-const FORM_TYPES = ["10-K", "10-Q"] as const;
+const FORM_TYPES = ["8-K", "10-K", "10-Q"] as const;
 
 /** Descriptions shown beneath each count mode radio option. */
 const COUNT_MODE_INFO: Record<string, { label: string; description: string }> = {
@@ -79,7 +79,7 @@ export function IngestForm({ onSubmit, isSubmitting }: IngestFormProps) {
 
   // ---- Form type chips ----
   const [formTypes, setFormTypes] = useState<Set<string>>(
-    new Set(FORM_TYPES),
+    new Set(["10-K", "10-Q"]),
   );
 
   // ---- Count mode ----

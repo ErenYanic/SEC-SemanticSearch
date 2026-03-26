@@ -1,7 +1,7 @@
 """
 SEC filing fetcher using edgartools.
 
-This module wraps the edgartools library to fetch SEC filings (10-K, 10-Q)
+This module wraps the edgartools library to fetch SEC filings (8-K, 10-K, 10-Q)
 from the EDGAR database. It provides flexible selection methods including:
     - Single latest filing
     - Specific filing by index position
@@ -482,7 +482,7 @@ class FilingFetcher:
 
         Args:
             ticker: Stock ticker symbol (e.g., "AAPL")
-            form_type: SEC form type ("10-K" or "10-Q")
+            form_type: SEC form type ("8-K", "10-K", or "10-Q")
             count: Maximum number of filings to list (default: max_filings)
             year: Filter by year (single int, list, or range)
             start_date: Filter by date range start (YYYY-MM-DD or date)
@@ -599,7 +599,7 @@ class FilingFetcher:
 
         Args:
             ticker: Stock ticker symbol (e.g., "AAPL", "MSFT")
-            form_type: SEC form type ("10-K" or "10-Q")
+            form_type: SEC form type ("8-K", "10-K", or "10-Q")
 
         Returns:
             Tuple of (FilingIdentifier, html_content)
@@ -631,7 +631,7 @@ class FilingFetcher:
 
         Args:
             ticker: Stock ticker symbol
-            form_type: SEC form type ("10-K" or "10-Q")
+            form_type: SEC form type ("8-K", "10-K", or "10-Q")
             index: Position in filtered results (0=most recent)
             year: Filter by year before selecting index
             start_date: Filter by date range start
@@ -705,7 +705,7 @@ class FilingFetcher:
 
         Args:
             ticker: Stock ticker symbol
-            form_type: SEC form type ("10-K" or "10-Q")
+            form_type: SEC form type ("8-K", "10-K", or "10-Q")
             count: Maximum number of filings (default: max_filings setting)
             year: Filter by year - accepts:
                   - Single int: year=2023
@@ -809,7 +809,7 @@ class FilingFetcher:
 
         Args:
             ticker: Stock ticker symbol
-            form_type: SEC form type ("10-K" or "10-Q")
+            form_type: SEC form type ("8-K", "10-K", or "10-Q")
             accession_number: SEC accession number (e.g., "0000320193-23-000077")
 
         Returns:
@@ -877,7 +877,7 @@ class FilingFetcher:
 
         Args:
             tickers: List of stock ticker symbols
-            form_type: SEC form type ("10-K" or "10-Q")
+            form_type: SEC form type ("8-K", "10-K", or "10-Q")
             count_per_ticker: Max filings per company (default: max_filings)
             year: Filter by year (single int, list, or range)
             start_date: Filter by date range start
@@ -949,7 +949,7 @@ class FilingFetcher:
 
         Args:
             tickers: List of stock ticker symbols
-            form_type: SEC form type ("10-K" or "10-Q")
+            form_type: SEC form type ("8-K", "10-K", or "10-Q")
             count_per_ticker: Max filings per company (default: max_filings)
             year: Filter by year (single int, list, or range)
             start_date: Filter by date range start

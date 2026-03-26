@@ -2,7 +2,7 @@
 SEC-SemanticSearch — semantic search over SEC filings.
 
 This package provides the complete pipeline for fetching, parsing, chunking,
-embedding, and searching SEC filings (10-K, 10-Q).
+embedding, and searching SEC filings (8-K, 10-K, 10-Q).
 
 Usage:
     from sec_semantic_search import __version__

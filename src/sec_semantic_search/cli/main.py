@@ -16,7 +16,7 @@ console = Console()
 
 app = typer.Typer(
     name="sec-search",
-    help="Semantic search for SEC filings (10-K, 10-Q).",
+    help="Semantic search for SEC filings (8-K, 10-K, 10-Q).",
     no_args_is_help=True,
 )
 
@@ -54,7 +54,7 @@ def main(
         is_eager=True,
     ),
 ) -> None:
-    """Semantic search for SEC filings (10-K, 10-Q)."""
+    """Semantic search for SEC filings (8-K, 10-K, 10-Q)."""
 
 
 # Register sub-command groups.
