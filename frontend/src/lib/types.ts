@@ -139,6 +139,8 @@ export interface SearchRequest {
   form_type?: string[] | null;
   min_similarity?: number;
   accession_number?: string[] | null;
+  start_date?: string | null;
+  end_date?: string | null;
 }
 
 /** POST /api/search/ — response */

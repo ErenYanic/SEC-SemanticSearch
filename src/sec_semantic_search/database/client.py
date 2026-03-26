@@ -198,6 +198,8 @@ class ChromaDBClient:
         ticker: str | list[str] | None = None,
         form_type: str | list[str] | None = None,
         accession_number: str | list[str] | None = None,
+        start_date: str | None = None,
+        end_date: str | None = None,
     ) -> list[SearchResult]:
         """
         Query the collection for similar chunks.
@@ -213,6 +215,11 @@ class ChromaDBClient:
                 or a list of strings.
             accession_number: Optional filter to restrict search to
                 specific filing(s) by accession number.
+            start_date: Optional lower bound for filing_date (inclusive,
+                ``YYYY-MM-DD``). Lexicographic comparison works because
+                dates are stored in ISO 8601 format.
+            end_date: Optional upper bound for filing_date (inclusive,
+                ``YYYY-MM-DD``).
 
         Returns:
             List of SearchResult objects, ordered by similarity
@@ -221,7 +228,9 @@ class ChromaDBClient:
         Raises:
             DatabaseError: If the query fails.
         """
-        where_filter = self._build_where_filter(ticker, form_type, accession_number)
+        where_filter = self._build_where_filter(
+            ticker, form_type, accession_number, start_date, end_date
+        )
 
         try:
             results = self._collection.query(
@@ -285,19 +294,31 @@ class ChromaDBClient:
         ticker: str | list[str] | None = None,
         form_type: str | list[str] | None = None,
         accession_number: str | list[str] | None = None,
+        start_date: str | None = None,
+        end_date: str | None = None,
     ) -> dict | None:
         """
         Build a ChromaDB where filter from optional parameters.
 
         ChromaDB uses ``{"field": "value"}`` for single conditions,
-        ``{"field": {"$in": [...]}}`` for multi-value conditions, and
-        ``{"$and": [...]}`` for multiple conditions.
+        ``{"field": {"$in": [...]}}`` for multi-value conditions,
+        ``{"$and": [...]}`` for multiple conditions, and comparison
+        operators (``$gte``, ``$lte``) for range queries.
+
+        Because ``filing_date`` is stored as an ISO 8601 string
+        (``YYYY-MM-DD``), lexicographic ordering is identical to
+        chronological ordering, making ``$gte``/``$lte`` reliable
+        without type coercion.
 
         Args:
             ticker: Optional ticker filter (single or list).
             form_type: Optional form type filter (single or list).
             accession_number: Optional accession number filter
                 (single or list).
+            start_date: Optional lower bound for filing_date
+                (inclusive, ``YYYY-MM-DD``).
+            end_date: Optional upper bound for filing_date
+                (inclusive, ``YYYY-MM-DD``).
 
         Returns:
             Where filter dict, or None if no filters specified.
@@ -315,6 +336,10 @@ class ChromaDBClient:
             conditions.append(
                 ChromaDBClient._build_field_condition("accession_number", accession_number)
             )
+        if start_date:
+            conditions.append({"filing_date": {"$gte": start_date}})
+        if end_date:
+            conditions.append({"filing_date": {"$lte": end_date}})
 
         if not conditions:
             return None

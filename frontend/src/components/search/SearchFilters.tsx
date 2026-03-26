@@ -39,6 +39,8 @@ export interface SearchFilterValues {
   topK: number;
   minSimilarity: number;
   accessionNumbers: string[];
+  startDate: string;
+  endDate: string;
 }
 
 interface SearchFiltersProps {
@@ -58,6 +60,8 @@ export const DEFAULT_FILTERS: SearchFilterValues = {
   topK: 5,
   minSimilarity: 0,
   accessionNumbers: [],
+  startDate: "",
+  endDate: "",
 };
 
 // ---------------------------------------------------------------------------
@@ -72,6 +76,8 @@ export function countActiveFilters(filters: SearchFilterValues): number {
   if (filters.topK !== DEFAULT_FILTERS.topK) count++;
   if (filters.minSimilarity !== DEFAULT_FILTERS.minSimilarity) count++;
   if (filters.accessionNumbers.length > 0) count++;
+  if (filters.startDate) count++;
+  if (filters.endDate) count++;
   return count;
 }
 
@@ -269,6 +275,32 @@ export function SearchFilters({
                 onChange={(e) => handleAccessionChange(e.target.value)}
                 placeholder="e.g. 0000320193-24-000123, 0000320193-24-000456"
                 className="w-full rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 placeholder:text-gray-400 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:placeholder:text-gray-500"
+              />
+            </label>
+
+            {/* Date range — From */}
+            <label className="space-y-1">
+              <span className="text-xs font-medium text-gray-600 dark:text-gray-400">
+                From date
+              </span>
+              <input
+                type="date"
+                value={filters.startDate}
+                onChange={(e) => update({ startDate: e.target.value })}
+                className="w-full rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
+              />
+            </label>
+
+            {/* Date range — To */}
+            <label className="space-y-1">
+              <span className="text-xs font-medium text-gray-600 dark:text-gray-400">
+                To date
+              </span>
+              <input
+                type="date"
+                value={filters.endDate}
+                onChange={(e) => update({ endDate: e.target.value })}
+                className="w-full rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
               />
             </label>
           </div>

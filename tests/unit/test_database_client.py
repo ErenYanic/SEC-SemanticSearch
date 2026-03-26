@@ -121,3 +121,59 @@ class TestBuildWhereFilterMultiValue:
         """An empty list should be treated as no filter."""
         result = ChromaDBClient._build_where_filter(ticker=[], form_type=[])
         assert result is None
+
+
+class TestBuildWhereFilterDateRange:
+    """_build_where_filter() supports date-range filtering via $gte/$lte."""
+
+    def test_start_date_only(self):
+        """start_date produces a $gte condition on filing_date."""
+        result = ChromaDBClient._build_where_filter(start_date="2023-01-01")
+        assert result == {"filing_date": {"$gte": "2023-01-01"}}
+
+    def test_end_date_only(self):
+        """end_date produces a $lte condition on filing_date."""
+        result = ChromaDBClient._build_where_filter(end_date="2023-12-31")
+        assert result == {"filing_date": {"$lte": "2023-12-31"}}
+
+    def test_both_dates_produces_and(self):
+        """start_date + end_date produces $and with both conditions."""
+        result = ChromaDBClient._build_where_filter(
+            start_date="2023-01-01", end_date="2023-12-31"
+        )
+        assert "$and" in result
+        assert {"filing_date": {"$gte": "2023-01-01"}} in result["$and"]
+        assert {"filing_date": {"$lte": "2023-12-31"}} in result["$and"]
+
+    def test_date_with_ticker(self):
+        """Date range combined with ticker filter uses $and."""
+        result = ChromaDBClient._build_where_filter(
+            ticker="AAPL", start_date="2023-01-01"
+        )
+        assert "$and" in result
+        assert {"ticker": "AAPL"} in result["$and"]
+        assert {"filing_date": {"$gte": "2023-01-01"}} in result["$and"]
+
+    def test_date_with_all_filters(self):
+        """Date range combined with all other filters."""
+        result = ChromaDBClient._build_where_filter(
+            ticker="AAPL",
+            form_type="10-K",
+            accession_number="ACC-001",
+            start_date="2023-01-01",
+            end_date="2023-12-31",
+        )
+        assert "$and" in result
+        assert len(result["$and"]) == 5
+
+    def test_none_dates_ignored(self):
+        """None date values should not add conditions."""
+        result = ChromaDBClient._build_where_filter(
+            ticker="AAPL", start_date=None, end_date=None
+        )
+        assert result == {"ticker": "AAPL"}
+
+    def test_empty_string_dates_ignored(self):
+        """Empty string dates should be treated as falsy."""
+        result = ChromaDBClient._build_where_filter(start_date="", end_date="")
+        assert result is None

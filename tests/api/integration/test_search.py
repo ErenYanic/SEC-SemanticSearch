@@ -157,3 +157,38 @@ class TestSearchEndpoint:
             json={"query": "test", "accession_number": ["0000320193-24-000001", "invalid"]},
         )
         assert resp.status_code == 422
+
+    def test_start_date_passed(self):
+        """start_date is forwarded to the search engine."""
+        client, engine = _make_client()
+        client.post("/api/search/", json={"query": "test", "start_date": "2023-01-01"})
+        _, kwargs = engine.search.call_args
+        assert kwargs["start_date"] == "2023-01-01"
+
+    def test_end_date_passed(self):
+        """end_date is forwarded to the search engine."""
+        client, engine = _make_client()
+        client.post("/api/search/", json={"query": "test", "end_date": "2023-12-31"})
+        _, kwargs = engine.search.call_args
+        assert kwargs["end_date"] == "2023-12-31"
+
+    def test_both_dates_passed(self):
+        """start_date and end_date are both forwarded."""
+        client, engine = _make_client()
+        client.post(
+            "/api/search/",
+            json={"query": "test", "start_date": "2023-01-01", "end_date": "2023-12-31"},
+        )
+        _, kwargs = engine.search.call_args
+        assert kwargs["start_date"] == "2023-01-01"
+        assert kwargs["end_date"] == "2023-12-31"
+
+    def test_invalid_start_date_returns_422(self):
+        client, _ = _make_client()
+        resp = client.post("/api/search/", json={"query": "test", "start_date": "bad"})
+        assert resp.status_code == 422
+
+    def test_invalid_end_date_returns_422(self):
+        client, _ = _make_client()
+        resp = client.post("/api/search/", json={"query": "test", "end_date": "2023-13-01"})
+        assert resp.status_code == 422

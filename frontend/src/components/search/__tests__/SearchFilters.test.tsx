@@ -37,7 +37,19 @@ describe("countActiveFilters", () => {
     ).toBe(1);
   });
 
-  it("counts multiple active filters", () => {
+  it("counts startDate as one filter", () => {
+    expect(
+      countActiveFilters({ ...DEFAULT_FILTERS, startDate: "2023-01-01" }),
+    ).toBe(1);
+  });
+
+  it("counts endDate as one filter", () => {
+    expect(
+      countActiveFilters({ ...DEFAULT_FILTERS, endDate: "2023-12-31" }),
+    ).toBe(1);
+  });
+
+  it("counts multiple active filters including dates", () => {
     expect(
       countActiveFilters({
         tickers: ["AAPL"],
@@ -45,8 +57,10 @@ describe("countActiveFilters", () => {
         topK: 10,
         minSimilarity: 0.5,
         accessionNumbers: ["ACC-001"],
+        startDate: "2023-01-01",
+        endDate: "2023-12-31",
       }),
-    ).toBe(5);
+    ).toBe(7);
   });
 });
 
@@ -184,5 +198,65 @@ describe("SearchFilters", () => {
       "0000320193-24-000123",
       "0000320193-24-000456",
     ]);
+  });
+
+  it("renders date inputs when panel is open", async () => {
+    const user = userEvent.setup();
+    renderFilters();
+
+    await user.click(screen.getByRole("button", { name: /filters/i }));
+
+    expect(screen.getByLabelText("From date")).toBeInTheDocument();
+    expect(screen.getByLabelText("To date")).toBeInTheDocument();
+  });
+
+  it("calls onChange with startDate when From date is changed", async () => {
+    const user = userEvent.setup();
+    const { onChange } = renderFilters();
+
+    await user.click(screen.getByRole("button", { name: /filters/i }));
+    const fromInput = screen.getByLabelText("From date");
+    // fireEvent is needed for date inputs since userEvent doesn't handle type="date" well
+    await user.clear(fromInput);
+    // Use fireEvent for date input since userEvent.type doesn't work reliably
+    const { fireEvent } = await import("@testing-library/react");
+    fireEvent.change(fromInput, { target: { value: "2023-01-01" } });
+
+    expect(onChange).toHaveBeenCalledWith(
+      expect.objectContaining({ startDate: "2023-01-01" }),
+    );
+  });
+
+  it("calls onChange with endDate when To date is changed", async () => {
+    const user = userEvent.setup();
+    const { onChange } = renderFilters();
+
+    await user.click(screen.getByRole("button", { name: /filters/i }));
+    const toInput = screen.getByLabelText("To date");
+    const { fireEvent } = await import("@testing-library/react");
+    fireEvent.change(toInput, { target: { value: "2023-12-31" } });
+
+    expect(onChange).toHaveBeenCalledWith(
+      expect.objectContaining({ endDate: "2023-12-31" }),
+    );
+  });
+
+  it("shows date filter badge count", () => {
+    renderFilters({ startDate: "2023-01-01", endDate: "2023-12-31" });
+
+    // Badge should show 2 active filters (start + end date)
+    expect(screen.getByText("2")).toBeInTheDocument();
+  });
+
+  it("clears dates when Clear button is clicked", async () => {
+    const user = userEvent.setup();
+    const { onChange } = renderFilters({
+      startDate: "2023-01-01",
+      endDate: "2023-12-31",
+    });
+
+    await user.click(screen.getByRole("button", { name: /clear/i }));
+
+    expect(onChange).toHaveBeenCalledWith(DEFAULT_FILTERS);
   });
 });

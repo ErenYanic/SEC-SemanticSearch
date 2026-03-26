@@ -77,6 +77,8 @@ class SearchEngine:
         form_type: str | list[str] | None = None,
         min_similarity: float | None = None,
         accession_number: str | list[str] | None = None,
+        start_date: str | None = None,
+        end_date: str | None = None,
     ) -> list[SearchResult]:
         """
         Search ingested filings for chunks relevant to the query.
@@ -97,6 +99,10 @@ class SearchEngine:
                             Defaults to ``SEARCH_MIN_SIMILARITY`` from settings.
             accession_number: Optional filter — restrict search to specific
                 filing(s) by accession number. Single string or list.
+            start_date: Optional lower bound for filing date (inclusive,
+                ``YYYY-MM-DD``).
+            end_date: Optional upper bound for filing date (inclusive,
+                ``YYYY-MM-DD``).
 
         Returns:
             List of ``SearchResult`` objects ordered by similarity
@@ -134,6 +140,8 @@ class SearchEngine:
                 ticker=ticker,
                 form_type=form_type,
                 accession_number=accession_number,
+                start_date=start_date,
+                end_date=end_date,
             )
         except SearchError:
             raise

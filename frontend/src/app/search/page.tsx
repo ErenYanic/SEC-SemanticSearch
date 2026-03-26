@@ -108,7 +108,7 @@ export default function SearchPage() {
       query: submittedQuery,
       top_k: filters.topK,
       min_similarity: filters.minSimilarity,
-      // Convert empty arrays to undefined so they're omitted from
+      // Convert empty arrays/strings to undefined so they're omitted from
       // the request body. The API treats missing fields as "no filter".
       ticker: filters.tickers.length > 0 ? filters.tickers : undefined,
       form_type: filters.formTypes.length > 0 ? filters.formTypes : undefined,
@@ -116,6 +116,8 @@ export default function SearchPage() {
         filters.accessionNumbers.length > 0
           ? filters.accessionNumbers
           : undefined,
+      start_date: filters.startDate || undefined,
+      end_date: filters.endDate || undefined,
     });
   }
 
