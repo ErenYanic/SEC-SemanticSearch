@@ -1,9 +1,19 @@
 """Application-wide constants."""
 
-# Supported SEC filing forms (alphabetical order)
-SUPPORTED_FORMS = ("8-K", "10-K", "10-Q")
+# Supported SEC filing forms (alphabetical order).
+# Amendments (e.g. 10-K/A) are separate form types because edgartools
+# marks them with a distinct ``form`` attribute and supports querying
+# them directly via ``Company.get_filings(form='10-K/A')``.
+SUPPORTED_FORMS = ("8-K", "8-K/A", "10-K", "10-K/A", "10-Q", "10-Q/A")
 
-# Default form types for ingestion (both forms)
+# Base (non-amendment) form types — used by the amendment filter to
+# decide whether to skip ``/A`` filings returned by edgartools.
+BASE_FORMS = ("8-K", "10-K", "10-Q")
+
+# Amendment form types — the ``/A`` variants.
+AMENDMENT_FORMS = ("8-K/A", "10-K/A", "10-Q/A")
+
+# Default form types for ingestion (both annual and quarterly)
 DEFAULT_FORM_TYPES = "10-K,10-Q"
 
 

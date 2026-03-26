@@ -11,6 +11,8 @@ import pytest
 
 import sec_semantic_search.config.settings as settings_module
 from sec_semantic_search.config.constants import (
+    AMENDMENT_FORMS,
+    BASE_FORMS,
     COLLECTION_NAME,
     DEFAULT_CHUNK_TOKEN_LIMIT,
     DEFAULT_CHUNK_TOLERANCE,
@@ -47,10 +49,25 @@ class TestConstants:
     """Verify critical constants that other modules depend on."""
 
     def test_supported_forms(self):
-        """SUPPORTED_FORMS must include 8-K, 10-K, and 10-Q."""
+        """SUPPORTED_FORMS must include base and amendment form types."""
         assert "8-K" in SUPPORTED_FORMS
         assert "10-K" in SUPPORTED_FORMS
         assert "10-Q" in SUPPORTED_FORMS
+        assert "8-K/A" in SUPPORTED_FORMS
+        assert "10-K/A" in SUPPORTED_FORMS
+        assert "10-Q/A" in SUPPORTED_FORMS
+
+    def test_base_forms(self):
+        """BASE_FORMS contains only the non-amendment form types."""
+        assert BASE_FORMS == ("8-K", "10-K", "10-Q")
+
+    def test_amendment_forms(self):
+        """AMENDMENT_FORMS contains only the /A variants."""
+        assert AMENDMENT_FORMS == ("8-K/A", "10-K/A", "10-Q/A")
+
+    def test_base_plus_amendment_equals_supported(self):
+        """BASE_FORMS + AMENDMENT_FORMS should cover all SUPPORTED_FORMS."""
+        assert set(BASE_FORMS) | set(AMENDMENT_FORMS) == set(SUPPORTED_FORMS)
 
     def test_embedding_dimension(self):
         """Must match google/embeddinggemma-300m's output dimension."""
@@ -118,6 +135,24 @@ class TestParseFormTypes:
 
     def test_all_three_forms(self):
         assert parse_form_types("8-K,10-K,10-Q") == ("10-K", "10-Q", "8-K")
+
+    def test_amendment_10ka(self):
+        assert parse_form_types("10-K/A") == ("10-K/A",)
+
+    def test_amendment_10qa(self):
+        assert parse_form_types("10-Q/A") == ("10-Q/A",)
+
+    def test_amendment_8ka(self):
+        assert parse_form_types("8-K/A") == ("8-K/A",)
+
+    def test_base_and_amendment_together(self):
+        result = parse_form_types("10-K,10-K/A")
+        assert "10-K" in result
+        assert "10-K/A" in result
+
+    def test_all_six_forms(self):
+        result = parse_form_types("8-K,8-K/A,10-K,10-K/A,10-Q,10-Q/A")
+        assert len(result) == 6
 
     def test_invalid_form_raises(self):
         with pytest.raises(ValueError, match="Unsupported"):
