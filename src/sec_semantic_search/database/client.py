@@ -75,6 +75,59 @@ class ChromaDBClient:
                 details=str(e),
             ) from e
 
+        self._migrate_filing_date_int()
+
+    # ------------------------------------------------------------------
+    # Migrations
+    # ------------------------------------------------------------------
+
+    def _migrate_filing_date_int(self) -> None:
+        """
+        Backfill ``filing_date_int`` for chunks ingested before BF-012.
+
+        Scans all documents in the collection and adds the integer
+        ``YYYYMMDD`` field to any chunk that has ``filing_date`` but
+        is missing ``filing_date_int``. Runs once per client init;
+        skips quickly when no migration is needed.
+        """
+        total = self._collection.count()
+        if total == 0:
+            return
+
+        batch_size = 1000
+        migrated = 0
+
+        for offset in range(0, total, batch_size):
+            batch = self._collection.get(
+                limit=batch_size,
+                offset=offset,
+                include=["metadatas"],
+            )
+
+            ids_to_update: list[str] = []
+            metas_to_update: list[dict] = []
+
+            for doc_id, meta in zip(batch["ids"], batch["metadatas"]):
+                if "filing_date_int" not in meta and "filing_date" in meta:
+                    meta["filing_date_int"] = int(
+                        meta["filing_date"].replace("-", "")
+                    )
+                    ids_to_update.append(doc_id)
+                    metas_to_update.append(meta)
+
+            if ids_to_update:
+                self._collection.update(
+                    ids=ids_to_update,
+                    metadatas=metas_to_update,
+                )
+                migrated += len(ids_to_update)
+
+        if migrated > 0:
+            logger.info(
+                "Migrated %d chunk(s): added filing_date_int field",
+                migrated,
+            )
+
     # ------------------------------------------------------------------
     # Write operations
     # ------------------------------------------------------------------
