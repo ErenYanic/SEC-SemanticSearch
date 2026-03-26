@@ -113,14 +113,20 @@ class TestParseFormTypes:
         with pytest.raises(ValueError, match="Empty form type"):
             parse_form_types("")
 
+    def test_8k_valid(self):
+        assert parse_form_types("8-K") == ("8-K",)
+
+    def test_all_three_forms(self):
+        assert parse_form_types("8-K,10-K,10-Q") == ("10-K", "10-Q", "8-K")
+
     def test_invalid_form_raises(self):
         with pytest.raises(ValueError, match="Unsupported"):
-            parse_form_types("8-K")
+            parse_form_types("20-F")
 
     def test_mixed_valid_invalid_raises(self):
         """Even one invalid form in a comma-separated list should fail."""
         with pytest.raises(ValueError, match="Unsupported"):
-            parse_form_types("10-K,8-K")
+            parse_form_types("10-K,20-F")
 
 
 # -----------------------------------------------------------------------

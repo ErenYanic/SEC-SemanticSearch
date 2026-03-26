@@ -119,6 +119,46 @@ describe("IngestForm", () => {
   });
 
   // -------------------------------------------------------------------
+  // BF-008: 8-K form type support
+  // -------------------------------------------------------------------
+
+  it("renders the 8-K form type chip", () => {
+    renderForm();
+    expect(screen.getByRole("button", { name: "8-K" })).toBeInTheDocument();
+  });
+
+  it("does not include 8-K in defaults (opt-in only)", async () => {
+    const onSubmit = vi.fn();
+    const user = userEvent.setup();
+    renderForm({ onSubmit });
+
+    const tickerInput = screen.getByPlaceholderText("Type a ticker and press Enter...");
+    await user.type(tickerInput, "AAPL{Enter}");
+    await user.click(screen.getByRole("button", { name: /start ingestion/i }));
+
+    const req = onSubmit.mock.calls[0][0];
+    expect(req.form_types).not.toContain("8-K");
+    expect(req.form_types).toEqual(expect.arrayContaining(["10-K", "10-Q"]));
+  });
+
+  it("includes 8-K when explicitly selected", async () => {
+    const onSubmit = vi.fn();
+    const user = userEvent.setup();
+    renderForm({ onSubmit });
+
+    const tickerInput = screen.getByPlaceholderText("Type a ticker and press Enter...");
+    await user.type(tickerInput, "MSFT{Enter}");
+
+    // Select 8-K
+    await user.click(screen.getByRole("button", { name: "8-K" }));
+
+    await user.click(screen.getByRole("button", { name: /start ingestion/i }));
+
+    const req = onSubmit.mock.calls[0][0];
+    expect(req.form_types).toContain("8-K");
+  });
+
+  // -------------------------------------------------------------------
   // BF-003: Count mode suppressed when date filters are active
   // -------------------------------------------------------------------
 

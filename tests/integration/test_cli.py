@@ -629,7 +629,7 @@ class TestIngestAddValidation:
     """ingest add should validate form types before doing work."""
 
     def test_unsupported_form_type(self):
-        result = runner.invoke(app, ["ingest", "add", "AAPL", "--form", "8-K"])
+        result = runner.invoke(app, ["ingest", "add", "AAPL", "--form", "20-F"])
         assert result.exit_code == 1
         assert "Unsupported" in result.output
 
