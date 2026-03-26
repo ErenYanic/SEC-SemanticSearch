@@ -408,6 +408,8 @@ class TestSearchCommand:
             ticker=None,
             form_type=None,
             accession_number=["0000320193-23-000106"],
+            start_date=None,
+            end_date=None,
         )
 
     def test_accession_short_flag(self):
@@ -428,6 +430,8 @@ class TestSearchCommand:
             ticker=None,
             form_type=None,
             accession_number=["0000320193-23-000106"],
+            start_date=None,
+            end_date=None,
         )
 
     def test_accession_combined_with_other_filters(self):
@@ -455,6 +459,8 @@ class TestSearchCommand:
             ticker=["AAPL"],
             form_type=["10-K"],
             accession_number=["0000320193-23-000106"],
+            start_date=None,
+            end_date=None,
         )
 
     def test_multi_ticker_filter(self):
@@ -475,6 +481,8 @@ class TestSearchCommand:
             ticker=["AAPL", "MSFT"],
             form_type=None,
             accession_number=None,
+            start_date=None,
+            end_date=None,
         )
 
     def test_multi_form_filter(self):
@@ -495,6 +503,8 @@ class TestSearchCommand:
             ticker=None,
             form_type=["10-K", "10-Q"],
             accession_number=None,
+            start_date=None,
+            end_date=None,
         )
 
     def test_multi_accession_filter(self):
@@ -520,6 +530,8 @@ class TestSearchCommand:
             ticker=None,
             form_type=None,
             accession_number=["0000320193-23-000106", "0000320193-23-000107"],
+            start_date=None,
+            end_date=None,
         )
 
     def test_accession_appears_in_help(self):
@@ -528,6 +540,84 @@ class TestSearchCommand:
         assert result.exit_code == 0
         assert "--accession" in result.output
         assert "-a" in result.output
+
+    def test_start_date_passed_to_engine(self):
+        """--start-date passes start_date to SearchEngine.search()."""
+        with patch("sec_semantic_search.cli.search.SearchEngine") as MockEngine:
+            mock_engine = MagicMock()
+            mock_engine.search.return_value = []
+            MockEngine.return_value = mock_engine
+
+            result = runner.invoke(
+                app, ["search", "test query", "--start-date", "2023-01-01"]
+            )
+
+        assert result.exit_code == 0
+        mock_engine.search.assert_called_once_with(
+            query="test query",
+            top_k=None,
+            ticker=None,
+            form_type=None,
+            accession_number=None,
+            start_date="2023-01-01",
+            end_date=None,
+        )
+
+    def test_end_date_passed_to_engine(self):
+        """--end-date passes end_date to SearchEngine.search()."""
+        with patch("sec_semantic_search.cli.search.SearchEngine") as MockEngine:
+            mock_engine = MagicMock()
+            mock_engine.search.return_value = []
+            MockEngine.return_value = mock_engine
+
+            result = runner.invoke(
+                app, ["search", "test query", "--end-date", "2023-12-31"]
+            )
+
+        assert result.exit_code == 0
+        mock_engine.search.assert_called_once_with(
+            query="test query",
+            top_k=None,
+            ticker=None,
+            form_type=None,
+            accession_number=None,
+            start_date=None,
+            end_date="2023-12-31",
+        )
+
+    def test_date_range_combined(self):
+        """--start-date and --end-date can be used together."""
+        with patch("sec_semantic_search.cli.search.SearchEngine") as MockEngine:
+            mock_engine = MagicMock()
+            mock_engine.search.return_value = []
+            MockEngine.return_value = mock_engine
+
+            result = runner.invoke(
+                app,
+                [
+                    "search", "test query",
+                    "--start-date", "2023-01-01",
+                    "--end-date", "2023-12-31",
+                ],
+            )
+
+        assert result.exit_code == 0
+        mock_engine.search.assert_called_once_with(
+            query="test query",
+            top_k=None,
+            ticker=None,
+            form_type=None,
+            accession_number=None,
+            start_date="2023-01-01",
+            end_date="2023-12-31",
+        )
+
+    def test_date_range_appears_in_help(self):
+        """--start-date and --end-date should appear in search --help."""
+        result = runner.invoke(app, ["search", "--help"])
+        assert result.exit_code == 0
+        assert "--start-date" in result.output
+        assert "--end-date" in result.output
 
 
 # -----------------------------------------------------------------------

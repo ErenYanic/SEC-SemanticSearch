@@ -16,7 +16,7 @@ All datetime strings are ISO 8601.  Similarity scores are floats in [0.0, 1.0].
 from __future__ import annotations
 
 import re
-from datetime import datetime
+from datetime import date, datetime
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -263,6 +263,25 @@ class SearchRequest(BaseModel):
     accession_number: list[str] | None = Field(
         None, description="Restrict search to specific filing(s) by accession number"
     )
+    start_date: str | None = Field(
+        None, description="Lower bound for filing date (inclusive, YYYY-MM-DD)"
+    )
+    end_date: str | None = Field(
+        None, description="Upper bound for filing date (inclusive, YYYY-MM-DD)"
+    )
+
+    @field_validator("start_date", "end_date")
+    @classmethod
+    def validate_date_format(cls, v: str | None) -> str | None:
+        """Validate that date strings are well-formed ``YYYY-MM-DD``."""
+        if v is None:
+            return None
+        try:
+            date.fromisoformat(v)
+        except ValueError:
+            msg = f"Invalid date format: '{v}'. Expected YYYY-MM-DD"
+            raise ValueError(msg) from None
+        return v
 
     @field_validator("accession_number", mode="before")
     @classmethod

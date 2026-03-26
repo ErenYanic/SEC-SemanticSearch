@@ -54,6 +54,8 @@ async def search(
             form_type=body.form_type,
             min_similarity=body.min_similarity,
             accession_number=body.accession_number,
+            start_date=body.start_date,
+            end_date=body.end_date,
         )
     except SearchError as exc:
         # Empty query is a validation error (400); everything else is 500.

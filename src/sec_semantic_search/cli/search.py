@@ -51,6 +51,14 @@ def search(
         list[str] | None,
         typer.Option("--accession", "-a", help="Restrict search to specific filing(s) by accession number. Repeat for multiple."),
     ] = None,
+    start_date: Annotated[
+        str | None,
+        typer.Option("--start-date", help="Filter results to filings on or after this date (YYYY-MM-DD)."),
+    ] = None,
+    end_date: Annotated[
+        str | None,
+        typer.Option("--end-date", help="Filter results to filings on or before this date (YYYY-MM-DD)."),
+    ] = None,
 ) -> None:
     """
     Search ingested SEC filings with a natural language query.
@@ -66,6 +74,8 @@ def search(
         sec-search search "liquidity" -f 10-Q
 
         sec-search search "debt covenants" -a 0000320193-23-000106
+
+        sec-search search "revenue" --start-date 2023-01-01 --end-date 2023-12-31
     """
     with console.status("Searching..."):
         try:
@@ -83,6 +93,8 @@ def search(
                 ticker=ticker_filter,
                 form_type=form_filter,
                 accession_number=accession,
+                start_date=start_date,
+                end_date=end_date,
             )
         except SearchError as e:
             console.print(f"[red]Search failed:[/red] {e.message}")

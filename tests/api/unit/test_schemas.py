@@ -308,6 +308,36 @@ class TestSearchRequest:
         with pytest.raises(ValidationError):
             SearchRequest(query="test", min_similarity=-0.1)
 
+    def test_start_date_valid(self):
+        req = SearchRequest(query="test", start_date="2023-01-15")
+        assert req.start_date == "2023-01-15"
+
+    def test_end_date_valid(self):
+        req = SearchRequest(query="test", end_date="2023-12-31")
+        assert req.end_date == "2023-12-31"
+
+    def test_both_dates_valid(self):
+        req = SearchRequest(query="test", start_date="2023-01-01", end_date="2023-12-31")
+        assert req.start_date == "2023-01-01"
+        assert req.end_date == "2023-12-31"
+
+    def test_dates_default_none(self):
+        req = SearchRequest(query="test")
+        assert req.start_date is None
+        assert req.end_date is None
+
+    def test_invalid_start_date_raises(self):
+        with pytest.raises(ValidationError, match="Invalid date format"):
+            SearchRequest(query="test", start_date="not-a-date")
+
+    def test_invalid_end_date_raises(self):
+        with pytest.raises(ValidationError, match="Invalid date format"):
+            SearchRequest(query="test", end_date="2023-13-01")
+
+    def test_partial_date_raises(self):
+        with pytest.raises(ValidationError, match="Invalid date format"):
+            SearchRequest(query="test", start_date="2023-01")
+
 
 class TestSearchResponse:
     """Search response."""
