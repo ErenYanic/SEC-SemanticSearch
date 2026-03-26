@@ -40,7 +40,7 @@ interface IngestFormProps {
 // Constants
 // ---------------------------------------------------------------------------
 
-const FORM_TYPES = ["8-K", "10-K", "10-Q"] as const;
+const FORM_TYPES = ["8-K", "8-K/A", "10-K", "10-K/A", "10-Q", "10-Q/A"] as const;
 
 /** Descriptions shown beneath each count mode radio option. */
 const COUNT_MODE_INFO: Record<string, { label: string; description: string }> = {

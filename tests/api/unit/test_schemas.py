@@ -308,6 +308,26 @@ class TestSearchRequest:
         with pytest.raises(ValidationError, match="form_type must be"):
             SearchRequest(query="test", form_type="20-F")
 
+    def test_amendment_form_type_10ka(self):
+        req = SearchRequest(query="test", form_type="10-K/A")
+        assert req.form_type == ["10-K/A"]
+
+    def test_amendment_form_type_10qa(self):
+        req = SearchRequest(query="test", form_type="10-Q/A")
+        assert req.form_type == ["10-Q/A"]
+
+    def test_amendment_form_type_8ka(self):
+        req = SearchRequest(query="test", form_type="8-K/A")
+        assert req.form_type == ["8-K/A"]
+
+    def test_amendment_form_type_case_insensitive(self):
+        req = SearchRequest(query="test", form_type="10-k/a")
+        assert req.form_type == ["10-K/A"]
+
+    def test_mixed_base_and_amendment_form_types(self):
+        req = SearchRequest(query="test", form_type=["10-K", "10-K/A"])
+        assert req.form_type == ["10-K", "10-K/A"]
+
     def test_min_similarity_out_of_range(self):
         with pytest.raises(ValidationError):
             SearchRequest(query="test", min_similarity=1.5)
@@ -391,6 +411,14 @@ class TestIngestRequest:
     def test_form_types_normalised_uppercase(self):
         req = IngestRequest(tickers=["AAPL"], form_types=["10-k", "10-q"])
         assert req.form_types == ["10-K", "10-Q"]
+
+    def test_amendment_form_types_accepted(self):
+        req = IngestRequest(tickers=["AAPL"], form_types=["10-K/A", "10-Q/A", "8-K/A"])
+        assert req.form_types == ["10-K/A", "10-Q/A", "8-K/A"]
+
+    def test_amendment_form_type_case_insensitive(self):
+        req = IngestRequest(tickers=["AAPL"], form_types=["10-k/a"])
+        assert req.form_types == ["10-K/A"]
 
     def test_invalid_count_mode_raises(self):
         with pytest.raises(ValidationError, match="count_mode must be"):

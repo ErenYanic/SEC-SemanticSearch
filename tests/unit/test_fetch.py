@@ -474,3 +474,83 @@ class TestAmendmentFilteringInFetchByAccession:
         with patch.object(fetcher, "_get_company", return_value=mock_company):
             with pytest.raises(FetchError, match="Filing not found"):
                 fetcher.fetch_by_accession("AAPL", "10-K", "ACC-001")
+
+
+# -----------------------------------------------------------------------
+# BF-011: _should_skip() and amendment form type support
+# -----------------------------------------------------------------------
+
+
+class TestShouldSkip:
+    """_should_skip() conditionally filters amendments based on requested form."""
+
+    def test_base_form_skips_amendment(self, fetcher):
+        """When requesting 10-K, 10-K/A filings should be skipped."""
+        filing = _make_mock_filing("ACC-001", date(2024, 1, 1), form="10-K/A")
+        assert fetcher._should_skip(filing, "10-K") is True
+
+    def test_base_form_keeps_original(self, fetcher):
+        """When requesting 10-K, 10-K filings should not be skipped."""
+        filing = _make_mock_filing("ACC-001", date(2024, 1, 1), form="10-K")
+        assert fetcher._should_skip(filing, "10-K") is False
+
+    def test_amendment_form_keeps_amendment(self, fetcher):
+        """When requesting 10-K/A, 10-K/A filings should not be skipped."""
+        filing = _make_mock_filing("ACC-001", date(2024, 1, 1), form="10-K/A")
+        assert fetcher._should_skip(filing, "10-K/A") is False
+
+    def test_8k_base_skips_8ka(self, fetcher):
+        filing = _make_mock_filing("ACC-001", date(2024, 1, 1), form="8-K/A")
+        assert fetcher._should_skip(filing, "8-K") is True
+
+    def test_8ka_form_keeps_8ka(self, fetcher):
+        filing = _make_mock_filing("ACC-001", date(2024, 1, 1), form="8-K/A")
+        assert fetcher._should_skip(filing, "8-K/A") is False
+
+    def test_10q_base_skips_10qa(self, fetcher):
+        filing = _make_mock_filing("ACC-001", date(2024, 1, 1), form="10-Q/A")
+        assert fetcher._should_skip(filing, "10-Q") is True
+
+    def test_10qa_form_keeps_10qa(self, fetcher):
+        filing = _make_mock_filing("ACC-001", date(2024, 1, 1), form="10-Q/A")
+        assert fetcher._should_skip(filing, "10-Q/A") is False
+
+    def test_no_form_attribute_not_skipped(self, fetcher):
+        filing = MagicMock(spec=[])
+        assert fetcher._should_skip(filing, "10-K") is False
+
+
+class TestAmendmentFormValidation:
+    """Amendment form types (10-K/A, 10-Q/A, 8-K/A) are valid in SUPPORTED_FORMS."""
+
+    def test_validate_10ka(self, fetcher):
+        assert fetcher._validate_form_type("10-K/A") == "10-K/A"
+
+    def test_validate_10qa(self, fetcher):
+        assert fetcher._validate_form_type("10-Q/A") == "10-Q/A"
+
+    def test_validate_8ka(self, fetcher):
+        assert fetcher._validate_form_type("8-K/A") == "8-K/A"
+
+    def test_validate_case_insensitive(self, fetcher):
+        assert fetcher._validate_form_type("10-k/a") == "10-K/A"
+
+
+class TestAmendmentListAvailable:
+    """list_available() should include amendments when the amendment form is requested."""
+
+    def test_amendments_included_when_requested(self, fetcher):
+        """When requesting 10-K/A, amendment filings should be returned."""
+        filings = [
+            _make_mock_filing("ACC-001", date(2024, 11, 5), form="10-K/A"),
+            _make_mock_filing("ACC-002", date(2024, 11, 1), form="10-K/A"),
+        ]
+        mock_company = MagicMock()
+        mock_company.get_filings.return_value = _make_mock_filings(filings)
+
+        with patch.object(fetcher, "_get_company", return_value=mock_company):
+            result = fetcher.list_available("AAPL", "10-K/A", count=10)
+
+        assert len(result) == 2
+        assert result[0].accession_number == "ACC-001"
+        assert result[1].accession_number == "ACC-002"

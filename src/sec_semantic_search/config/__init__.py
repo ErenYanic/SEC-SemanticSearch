@@ -1,6 +1,8 @@
 """Configuration module — settings and constants."""
 
 from sec_semantic_search.config.constants import (
+    AMENDMENT_FORMS,
+    BASE_FORMS,
     COLLECTION_NAME,
     DEFAULT_CHROMADB_PATH,
     DEFAULT_CHUNK_TOKEN_LIMIT,
@@ -32,6 +34,8 @@ from sec_semantic_search.config.settings import (
 __all__ = [
     # Constants
     "SUPPORTED_FORMS",
+    "BASE_FORMS",
+    "AMENDMENT_FORMS",
     "DEFAULT_FORM_TYPES",
     "parse_form_types",
     "EMBEDDING_DIMENSION",
