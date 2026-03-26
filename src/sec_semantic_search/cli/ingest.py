@@ -498,7 +498,7 @@ def add(
         str,
         typer.Option(
             "--form", "-f",
-            help="SEC form type(s), comma-separated (e.g. 10-K, 10-Q, or 10-K,10-Q).",
+            help="SEC form type(s), comma-separated (e.g. 8-K, 10-K, 10-Q).",
         ),
     ] = DEFAULT_FORM_TYPES,
     total: Annotated[
@@ -685,7 +685,7 @@ def batch(
         str,
         typer.Option(
             "--form", "-f",
-            help="SEC form type(s), comma-separated (e.g. 10-K, 10-Q, or 10-K,10-Q).",
+            help="SEC form type(s), comma-separated (e.g. 8-K, 10-K, 10-Q).",
         ),
     ] = DEFAULT_FORM_TYPES,
     total: Annotated[

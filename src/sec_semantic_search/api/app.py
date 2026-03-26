@@ -242,7 +242,7 @@ def create_app() -> FastAPI:
         title="SEC Semantic Search API",
         description=(
             "REST API for semantic search over ingested SEC filings "
-            "(10-K, 10-Q). Wraps the sec-semantic-search Python package "
+            "(8-K, 10-K, 10-Q). Wraps the sec-semantic-search Python package "
             "over HTTP."
         ),
         version=__version__,

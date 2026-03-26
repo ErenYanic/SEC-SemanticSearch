@@ -215,7 +215,7 @@ class PipelineOrchestrator:
 
         Args:
             ticker: Stock ticker symbol
-            form_type: SEC form type ("10-K" or "10-Q")
+            form_type: SEC form type ("8-K", "10-K", or "10-Q")
             progress_callback: Optional callback(step_name, current, total)
 
         Returns:
@@ -250,7 +250,7 @@ class PipelineOrchestrator:
 
         Args:
             ticker: Stock ticker symbol
-            form_type: SEC form type ("10-K" or "10-Q")
+            form_type: SEC form type ("8-K", "10-K", or "10-Q")
             index: Position in results (0=most recent)
             year: Optional year filter
             progress_callback: Optional callback

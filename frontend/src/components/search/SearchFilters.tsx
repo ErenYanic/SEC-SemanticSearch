@@ -212,7 +212,7 @@ export function SearchFilters({
               Form type
             </span>
             <div className="flex flex-wrap gap-1.5" role="group" aria-label="Form type filters">
-              {["10-K", "10-Q"].map((f) => {
+              {["8-K", "10-K", "10-Q"].map((f) => {
                 const isActive = filters.formTypes.includes(f);
                 return (
                   <button
