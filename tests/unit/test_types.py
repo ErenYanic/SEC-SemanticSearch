@@ -171,6 +171,7 @@ class TestChunk:
             "ticker",
             "form_type",
             "filing_date",
+            "filing_date_int",
             "accession_number",
         }
         assert set(meta.keys()) == expected_keys
@@ -181,14 +182,17 @@ class TestChunk:
         assert meta["ticker"] == "AAPL"
         assert meta["form_type"] == "10-K"
         assert meta["filing_date"] == "2024-11-01"
+        assert meta["filing_date_int"] == 20241101
         assert meta["content_type"] == "text"
         assert meta["path"] == "Part I > Item 1 > Business"
 
-    def test_to_metadata_all_strings(self, sample_chunks):
-        """ChromaDB metadata values must all be strings."""
+    def test_to_metadata_all_strings_or_int(self, sample_chunks):
+        """ChromaDB metadata values must all be strings or ints."""
         meta = sample_chunks[0].to_metadata()
         for key, value in meta.items():
-            assert isinstance(value, str), f"meta[{key!r}] is {type(value).__name__}, not str"
+            assert isinstance(value, (str, int)), (
+                f"meta[{key!r}] is {type(value).__name__}, expected str or int"
+            )
 
 
 # -----------------------------------------------------------------------

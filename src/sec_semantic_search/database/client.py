@@ -290,6 +290,19 @@ class ChromaDBClient:
         return {field: value.upper() if upper else value}
 
     @staticmethod
+    def _date_str_to_int(date_str: str) -> int:
+        """
+        Convert an ISO date string to a ``YYYYMMDD`` integer.
+
+        Args:
+            date_str: Date in ``YYYY-MM-DD`` format.
+
+        Returns:
+            Integer representation, e.g. ``"2023-01-15"`` → ``20230115``.
+        """
+        return int(date_str.replace("-", ""))
+
+    @staticmethod
     def _build_where_filter(
         ticker: str | list[str] | None = None,
         form_type: str | list[str] | None = None,
@@ -305,10 +318,9 @@ class ChromaDBClient:
         ``{"$and": [...]}`` for multiple conditions, and comparison
         operators (``$gte``, ``$lte``) for range queries.
 
-        Because ``filing_date`` is stored as an ISO 8601 string
-        (``YYYY-MM-DD``), lexicographic ordering is identical to
-        chronological ordering, making ``$gte``/``$lte`` reliable
-        without type coercion.
+        Date range filters use the ``filing_date_int`` field (an integer
+        in ``YYYYMMDD`` format) because ChromaDB's ``$gte``/``$lte``
+        operators only accept numeric operands.
 
         Args:
             ticker: Optional ticker filter (single or list).
@@ -337,9 +349,13 @@ class ChromaDBClient:
                 ChromaDBClient._build_field_condition("accession_number", accession_number)
             )
         if start_date:
-            conditions.append({"filing_date": {"$gte": start_date}})
+            conditions.append(
+                {"filing_date_int": {"$gte": ChromaDBClient._date_str_to_int(start_date)}}
+            )
         if end_date:
-            conditions.append({"filing_date": {"$lte": end_date}})
+            conditions.append(
+                {"filing_date_int": {"$lte": ChromaDBClient._date_str_to_int(end_date)}}
+            )
 
         if not conditions:
             return None

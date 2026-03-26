@@ -150,7 +150,9 @@ class Chunk:
         Convert chunk metadata to ChromaDB-compatible dict.
 
         Returns:
-            Dictionary with string values suitable for ChromaDB metadata.
+            Dictionary suitable for ChromaDB metadata. Includes both
+            ``filing_date`` (ISO string for display) and ``filing_date_int``
+            (``YYYYMMDD`` integer for range queries with ``$gte``/``$lte``).
         """
         return {
             "path": self.path,
@@ -158,6 +160,7 @@ class Chunk:
             "ticker": self.filing_id.ticker,
             "form_type": self.filing_id.form_type,
             "filing_date": self.filing_id.date_str,
+            "filing_date_int": int(self.filing_id.date_str.replace("-", "")),
             "accession_number": self.filing_id.accession_number,
         }
 

@@ -182,3 +182,46 @@ class TestTopK:
         results = engine.search("test", top_k=100)
         # We stored 3 sample chunks, so we should get at most 3
         assert len(results) <= 3
+
+
+# -----------------------------------------------------------------------
+# Date-range filtering (BF-012)
+# -----------------------------------------------------------------------
+
+
+class TestDateRangeFiltering:
+    """Date filters should use the numeric filing_date_int field in ChromaDB."""
+
+    def test_matching_date_range_returns_results(self, engine):
+        """Sample data is dated 2024-11-01; a range covering it should match."""
+        results = engine.search("test", start_date="2024-01-01", end_date="2024-12-31")
+        assert len(results) > 0
+
+    def test_future_start_date_returns_empty(self, engine):
+        """A start_date after the stored filing should return nothing."""
+        results = engine.search("test", start_date="2025-01-01")
+        assert len(results) == 0
+
+    def test_past_end_date_returns_empty(self, engine):
+        """An end_date before the stored filing should return nothing."""
+        results = engine.search("test", end_date="2023-12-31")
+        assert len(results) == 0
+
+    def test_exact_date_match(self, engine):
+        """Both bounds set to the exact filing date should still match."""
+        results = engine.search("test", start_date="2024-11-01", end_date="2024-11-01")
+        assert len(results) > 0
+
+    def test_date_with_ticker_filter(self, engine):
+        """Date range combined with matching ticker should return results."""
+        results = engine.search(
+            "test", ticker="AAPL", start_date="2024-01-01", end_date="2024-12-31"
+        )
+        assert len(results) > 0
+
+    def test_date_with_non_matching_ticker(self, engine):
+        """Date range with non-matching ticker should return nothing."""
+        results = engine.search(
+            "test", ticker="MSFT", start_date="2024-01-01", end_date="2024-12-31"
+        )
+        assert len(results) == 0

@@ -124,17 +124,17 @@ class TestBuildWhereFilterMultiValue:
 
 
 class TestBuildWhereFilterDateRange:
-    """_build_where_filter() supports date-range filtering via $gte/$lte."""
+    """_build_where_filter() supports date-range filtering via $gte/$lte on filing_date_int."""
 
     def test_start_date_only(self):
-        """start_date produces a $gte condition on filing_date."""
+        """start_date produces a $gte condition on filing_date_int."""
         result = ChromaDBClient._build_where_filter(start_date="2023-01-01")
-        assert result == {"filing_date": {"$gte": "2023-01-01"}}
+        assert result == {"filing_date_int": {"$gte": 20230101}}
 
     def test_end_date_only(self):
-        """end_date produces a $lte condition on filing_date."""
+        """end_date produces a $lte condition on filing_date_int."""
         result = ChromaDBClient._build_where_filter(end_date="2023-12-31")
-        assert result == {"filing_date": {"$lte": "2023-12-31"}}
+        assert result == {"filing_date_int": {"$lte": 20231231}}
 
     def test_both_dates_produces_and(self):
         """start_date + end_date produces $and with both conditions."""
@@ -142,8 +142,8 @@ class TestBuildWhereFilterDateRange:
             start_date="2023-01-01", end_date="2023-12-31"
         )
         assert "$and" in result
-        assert {"filing_date": {"$gte": "2023-01-01"}} in result["$and"]
-        assert {"filing_date": {"$lte": "2023-12-31"}} in result["$and"]
+        assert {"filing_date_int": {"$gte": 20230101}} in result["$and"]
+        assert {"filing_date_int": {"$lte": 20231231}} in result["$and"]
 
     def test_date_with_ticker(self):
         """Date range combined with ticker filter uses $and."""
@@ -152,7 +152,7 @@ class TestBuildWhereFilterDateRange:
         )
         assert "$and" in result
         assert {"ticker": "AAPL"} in result["$and"]
-        assert {"filing_date": {"$gte": "2023-01-01"}} in result["$and"]
+        assert {"filing_date_int": {"$gte": 20230101}} in result["$and"]
 
     def test_date_with_all_filters(self):
         """Date range combined with all other filters."""
@@ -177,3 +177,22 @@ class TestBuildWhereFilterDateRange:
         """Empty string dates should be treated as falsy."""
         result = ChromaDBClient._build_where_filter(start_date="", end_date="")
         assert result is None
+
+
+class TestDateStrToInt:
+    """_date_str_to_int() converts ISO date strings to YYYYMMDD integers."""
+
+    def test_standard_date(self):
+        assert ChromaDBClient._date_str_to_int("2023-01-15") == 20230115
+
+    def test_first_day_of_year(self):
+        assert ChromaDBClient._date_str_to_int("2020-01-01") == 20200101
+
+    def test_last_day_of_year(self):
+        assert ChromaDBClient._date_str_to_int("2025-12-31") == 20251231
+
+    def test_preserves_chronological_ordering(self):
+        """Integer ordering must match chronological ordering."""
+        dates = ["2022-06-15", "2023-01-01", "2023-12-31", "2024-03-05"]
+        ints = [ChromaDBClient._date_str_to_int(d) for d in dates]
+        assert ints == sorted(ints)
