@@ -341,6 +341,14 @@ class TestIsAmendment:
         filing = _make_mock_filing("ACC-003", date(2024, 1, 1), form="10-Q/A")
         assert fetcher._is_amendment(filing) is True
 
+    def test_original_8k(self, fetcher):
+        filing = _make_mock_filing("ACC-004", date(2024, 1, 1), form="8-K")
+        assert fetcher._is_amendment(filing) is False
+
+    def test_amendment_8ka(self, fetcher):
+        filing = _make_mock_filing("ACC-005", date(2024, 1, 1), form="8-K/A")
+        assert fetcher._is_amendment(filing) is True
+
     def test_no_form_attribute(self, fetcher):
         """Filings without a form attribute should not be treated as amendments."""
         filing = MagicMock(spec=[])

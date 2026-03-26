@@ -259,4 +259,29 @@ describe("SearchFilters", () => {
 
     expect(onChange).toHaveBeenCalledWith(DEFAULT_FILTERS);
   });
+
+  // -----------------------------------------------------------------
+  // BF-008: 8-K form type chip in search filters
+  // -----------------------------------------------------------------
+
+  it("renders the 8-K form type chip", async () => {
+    const user = userEvent.setup();
+    renderFilters();
+
+    await user.click(screen.getByRole("button", { name: /filters/i }));
+
+    expect(screen.getByRole("button", { name: "8-K" })).toBeInTheDocument();
+  });
+
+  it("selects 8-K form type", async () => {
+    const user = userEvent.setup();
+    const { onChange } = renderFilters();
+
+    await user.click(screen.getByRole("button", { name: /filters/i }));
+    await user.click(screen.getByRole("button", { name: "8-K" }));
+
+    expect(onChange).toHaveBeenCalledWith(
+      expect.objectContaining({ formTypes: ["8-K"] }),
+    );
+  });
 });
