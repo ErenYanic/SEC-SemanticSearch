@@ -1,6 +1,6 @@
 # SEC-SemanticSearch
 
-A **semantic search system** for SEC filings (10-K, 10-Q). Fetches filings from EDGAR, parses them into meaningful segments, embeds them with a local GPU-accelerated model, and retrieves the most relevant passages for any natural language query.
+A **semantic search system** for SEC filings (8-K, 10-K, 10-Q, and their amended variants). Fetches filings from EDGAR, parses them into meaningful segments, embeds them with a local GPU-accelerated model, and retrieves the most relevant passages for any natural language query.
 
 This is a **vector similarity search** system — not RAG. No language model generates answers; the system returns the actual filing text that best matches your query.
 
@@ -14,6 +14,8 @@ This is a **vector similarity search** system — not RAG. No language model gen
     <td align="center" width="50%"><img src="assets/FlowChart2.png" alt="Search flow chart" width="100%"/></td>
   </tr>
 </table>
+
+Filing content is fetched from SEC EDGAR, parsed into structured sections, split into 500-token chunks at sentence boundaries, and encoded as 768-dimensional vectors by a local sentence-transformer model. Vectors are stored in ChromaDB alongside a SQLite metadata registry that handles duplicate detection and filing management. At search time, the query is embedded with the same model and the most semantically similar chunks are retrieved — results are always direct excerpts from the original filings, never generated text.
 
 ---
 
@@ -31,7 +33,7 @@ This is a **vector similarity search** system — not RAG. No language model gen
 - **Flexible filtering** — Search and manage by ticker, form type, or date range
 - **Duplicate detection** — Checks for existing filings before any GPU work begins
 - **Configuration-driven deployment** — Three deployment scenarios (local, team, public) controlled entirely via environment variables
-- **799 backend tests and 144 frontend tests**, all passing
+- **909 backend tests and 193 frontend tests**, all passing
 
 ---
 
@@ -157,6 +159,16 @@ sec-search search "revenue recognition" --top 10 --ticker AAPL
 
 # Filter by form type
 sec-search search "liquidity" --form 10-Q
+
+# Multi-value filters — repeat the flag for each value
+sec-search search "supply chain" --ticker AAPL --ticker MSFT
+sec-search search "revenue" --form 10-K --form 10-K/A
+
+# Restrict to a single filing by accession number
+sec-search search "debt covenants" --accession 0000320193-23-000106
+
+# Date-range filtering
+sec-search search "interest rate risk" --start-date 2022-01-01 --end-date 2023-12-31
 ```
 
 Results appear in a Rich table with colour-coded similarity scores: green for ≥ 40%, yellow for ≥ 25%, and dim below that.
@@ -333,15 +345,19 @@ Additional: dark/light theme, CSS-only loading skeletons, skip-to-content, keybo
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
+| GET | `/api/health` | None | Liveness check |
 | GET | `/api/status/` | API key | Database overview |
 | GET | `/api/filings/` | API key | List filings (with filters) |
+| GET | `/api/filings/{accession}` | API key | Get single filing |
 | DELETE | `/api/filings/{accession}` | API key | Delete single filing |
-| POST | `/api/filings/bulk-delete` | Admin key | Bulk delete by filter |
+| POST | `/api/filings/delete-by-ids` | API key | Delete up to 50 selected filings by accession number |
+| POST | `/api/filings/bulk-delete` | Admin key | Bulk delete by ticker/form filter |
 | DELETE | `/api/filings/` | Admin key | Clear all filings |
 | POST | `/api/search/` | API key | Semantic search |
 | POST | `/api/ingest/add` | API key | Start single-ticker ingestion |
 | POST | `/api/ingest/batch` | API key | Start multi-ticker ingestion |
-| GET | `/api/ingest/tasks` | API key | List ingestion tasks |
+| GET | `/api/ingest/tasks` | API key | List all ingestion tasks |
+| GET | `/api/ingest/tasks/{task_id}` | API key | Get task status and progress |
 | DELETE | `/api/ingest/tasks/{task_id}` | API key | Cancel running task |
 | GET | `/api/resources/gpu` | API key | GPU/model status |
 | DELETE | `/api/resources/gpu` | Admin key | Unload GPU model |
@@ -433,9 +449,9 @@ python -m pytest tests/integration/
 python -m pytest tests/api/
 ```
 
-**Backend:** 799 tests, all passing.
+**Backend:** 909 tests, all passing.
 
-**Frontend:** 144 tests (Vitest + React Testing Library):
+**Frontend:** 193 tests (Vitest + React Testing Library):
 
 ```bash
 cd frontend
