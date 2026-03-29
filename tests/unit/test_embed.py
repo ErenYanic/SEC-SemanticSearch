@@ -7,10 +7,11 @@ device detection, lazy loading, input validation, error wrapping,
 and the embed_query_for_chromadb() format conversion.
 """
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, patch, call
 
 import numpy as np
 import pytest
+import torch
 
 from sec_semantic_search.config.constants import EMBEDDING_DIMENSION
 from sec_semantic_search.core.exceptions import EmbeddingError
@@ -58,6 +59,61 @@ class TestDeviceDetection:
     def test_explicit_cuda(self):
         gen = EmbeddingGenerator(device="cuda")
         assert gen.device == "cuda"
+
+
+# -----------------------------------------------------------------------
+# BF16 quantisation
+# -----------------------------------------------------------------------
+
+
+class TestBF16Quantisation:
+    """BF16 quantisation is applied automatically on CUDA devices."""
+
+    def test_bf16_applied_on_cuda(self):
+        """Verify torch_dtype=torch.bfloat16 is passed when device is CUDA."""
+        gen = EmbeddingGenerator(device="cuda")
+
+        with patch("sentence_transformers.SentenceTransformer") as mock_st:
+            _ = gen._load_model()
+
+            # Verify SentenceTransformer was called with model_kwargs containing torch_dtype
+            call_kwargs = mock_st.call_args[1]
+            assert "model_kwargs" in call_kwargs
+            assert "torch_dtype" in call_kwargs["model_kwargs"]
+            assert call_kwargs["model_kwargs"]["torch_dtype"] == torch.bfloat16
+
+    def test_bf16_not_applied_on_cpu(self):
+        """Verify torch_dtype is NOT passed when device is CPU."""
+        gen = EmbeddingGenerator(device="cpu")
+
+        with patch("sentence_transformers.SentenceTransformer") as mock_st:
+            _ = gen._load_model()
+
+            # Verify SentenceTransformer was called without torch_dtype on CPU
+            call_kwargs = mock_st.call_args[1]
+            assert "model_kwargs" in call_kwargs
+            # model_kwargs should be empty dict when device is CPU
+            assert call_kwargs["model_kwargs"] == {}
+
+    def test_cuda_device_passed_correctly(self):
+        """Verify device parameter is passed to SentenceTransformer."""
+        gen = EmbeddingGenerator(device="cuda")
+
+        with patch("sentence_transformers.SentenceTransformer") as mock_st:
+            _ = gen._load_model()
+
+            call_kwargs = mock_st.call_args[1]
+            assert call_kwargs["device"] == "cuda"
+
+    def test_cpu_device_passed_correctly(self):
+        """Verify device parameter is passed to SentenceTransformer."""
+        gen = EmbeddingGenerator(device="cpu")
+
+        with patch("sentence_transformers.SentenceTransformer") as mock_st:
+            _ = gen._load_model()
+
+            call_kwargs = mock_st.call_args[1]
+            assert call_kwargs["device"] == "cpu"
 
 
 # -----------------------------------------------------------------------
