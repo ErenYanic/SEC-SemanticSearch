@@ -22,7 +22,7 @@ Filing content is fetched from SEC EDGAR, parsed into structured sections, split
 ## Features
 
 - **Full pipeline** — Fetch, parse, chunk, embed, and store SEC filings in one command
-- **GPU-accelerated embeddings** — Uses `google/embeddinggemma-300m` (768-dim) via sentence-transformers with CUDA support
+- **GPU-accelerated embeddings** — Uses `google/embeddinggemma-300m` (768-dim) via sentence-transformers with CUDA support; BF16 quantisation applied automatically on CUDA devices
 - **Dual-store architecture** — ChromaDB for vector search, SQLite for relational metadata
 - **Web application** — FastAPI backend + React/Next.js frontend with real-time WebSocket progress
 - **Rich CLI** — Progress bars, colour-coded similarity output, formatted tables, contextual error hints
@@ -33,7 +33,17 @@ Filing content is fetched from SEC EDGAR, parsed into structured sections, split
 - **Flexible filtering** — Search and manage by ticker, form type, or date range
 - **Duplicate detection** — Checks for existing filings before any GPU work begins
 - **Configuration-driven deployment** — Three deployment scenarios (local, team, public) controlled entirely via environment variables
-- **909 backend tests and 193 frontend tests**, all passing
+- **913 backend tests and 193 frontend tests**, all passing
+
+---
+
+## Embedding Model & Quantisation
+
+The system uses `google/embeddinggemma-300m`, a 768-dimensional sentence-transformer model, for all vector encoding. On CUDA devices, BF16 quantisation is applied automatically at model load time — no configuration required.
+
+BF16 was selected after measuring the trade-off between VRAM reduction and embedding quality. Whilst the theoretical VRAM reduction from FP32 → BF16 is 50%, practical measurement in the production deployment of this system achieved **27.12% savings** due to model architecture overhead, CUDA runtime buffers, and ChromaDB memory usage sharing the same GPU. Performance degradation remained below **0.0001 in cosine similarity**, effectively preserving search quality without detectable information loss.
+
+> For the full investigation — including quantisation experiments comparing FP32, BF16, INT8, and INT4 — see the [quantization notebook in the *Today I Learned* repository](https://github.com/ErenYanic/til/tree/main/quantization).
 
 ---
 
@@ -449,7 +459,7 @@ python -m pytest tests/integration/
 python -m pytest tests/api/
 ```
 
-**Backend:** 909 tests, all passing.
+**Backend:** 913 tests, all passing.
 
 **Frontend:** 193 tests (Vitest + React Testing Library):
 
