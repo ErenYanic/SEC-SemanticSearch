@@ -1735,3 +1735,60 @@ class TestPermissionsPolicyHeader:
         assert "camera=()" in pp
         assert "microphone=()" in pp
         assert "geolocation=()" in pp
+
+
+# -----------------------------------------------------------------------
+# Finding F1: OpenAPI/Swagger UI exposed by default
+# -----------------------------------------------------------------------
+
+
+class TestOpenApiConditionalExposure:
+    """OpenAPI docs are disabled when API_KEY is set (§F1)."""
+
+    def _build_app(self, *, api_key: str | None):
+        """Create a fresh FastAPI app with the given API key setting."""
+        from sec_semantic_search.api.app import create_app
+
+        mock_settings = MagicMock()
+        mock_settings.api.key = api_key
+        mock_settings.api.admin_key = None
+        mock_settings.api.cors_origins = ["http://localhost:3000"]
+        mock_settings.api.rate_limit_search = 0
+        mock_settings.api.rate_limit_ingest = 0
+        mock_settings.api.rate_limit_delete = 0
+        mock_settings.api.rate_limit_general = 0
+        mock_settings.api.edgar_session_required = False
+        with patch(
+            "sec_semantic_search.api.app.get_settings", return_value=mock_settings,
+        ):
+            return create_app()
+
+    def test_docs_available_without_api_key(self):
+        """When API_KEY is unset, /docs, /redoc, /openapi.json are served."""
+        test_app = self._build_app(api_key=None)
+        assert test_app.docs_url == "/docs"
+        assert test_app.redoc_url == "/redoc"
+        assert test_app.openapi_url == "/openapi.json"
+
+    def test_docs_disabled_with_api_key(self):
+        """When API_KEY is set, /docs, /redoc, /openapi.json are disabled."""
+        test_app = self._build_app(api_key="test-secret-key")
+        assert test_app.docs_url is None
+        assert test_app.redoc_url is None
+        assert test_app.openapi_url is None
+
+    def test_docs_endpoint_returns_404_with_api_key(self):
+        """HTTP requests to /docs return 404 when API_KEY is set."""
+        test_app = self._build_app(api_key="test-secret-key")
+        client = TestClient(test_app, raise_server_exceptions=False)
+        assert client.get("/docs").status_code == 404
+        assert client.get("/redoc").status_code == 404
+        assert client.get("/openapi.json").status_code == 404
+
+    def test_docs_endpoint_returns_200_without_api_key(self):
+        """HTTP requests to /docs return 200 when API_KEY is unset."""
+        test_app = self._build_app(api_key=None)
+        client = TestClient(test_app, raise_server_exceptions=False)
+        assert client.get("/docs").status_code == 200
+        assert client.get("/redoc").status_code == 200
+        assert client.get("/openapi.json").status_code == 200

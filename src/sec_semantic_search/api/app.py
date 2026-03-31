@@ -238,6 +238,11 @@ def create_app() -> FastAPI:
     """
     settings = get_settings()
 
+    # Disable OpenAPI/Swagger UI when authentication is enabled (Scenarios
+    # B/C).  In dev mode (no API_KEY) the docs remain available for API
+    # discoverability.  See SECURITY VULNERABILITIES.md §F1.
+    is_protected = bool(settings.api.key)
+
     application = FastAPI(
         title="SEC Semantic Search API",
         description=(
@@ -246,9 +251,9 @@ def create_app() -> FastAPI:
             "over HTTP."
         ),
         version=__version__,
-        docs_url="/docs",
-        redoc_url="/redoc",
-        openapi_url="/openapi.json",
+        docs_url=None if is_protected else "/docs",
+        redoc_url=None if is_protected else "/redoc",
+        openapi_url=None if is_protected else "/openapi.json",
         lifespan=lifespan,
     )
 
