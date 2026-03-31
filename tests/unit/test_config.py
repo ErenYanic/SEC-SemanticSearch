@@ -191,7 +191,7 @@ class TestSettingsDefaults:
         s = DatabaseSettings()
         assert s.chroma_path == "./data/chroma_db"
         assert s.metadata_db_path == "./data/metadata.sqlite"
-        assert s.max_filings == 500
+        assert s.max_filings == 2500
 
     def test_search_defaults(self):
         s = SearchSettings()
