@@ -51,6 +51,19 @@ services:
       # Database config
       - DB_MAX_FILINGS=${DB_MAX_FILINGS:-500}
       - DB_ENCRYPTION_KEY=${DB_ENCRYPTION_KEY:-}
+      # ── Docker secrets alternative (recommended for production) ────────
+      # Using Docker secrets prevents the key from appearing in
+      # /proc/<pid>/environ (see SECURITY VULNERABILITIES.md §F5).
+      #
+      # Step 1 — Create the secret:
+      #   echo "your-strong-key" | docker secret create db_encryption_key -
+      #   # OR for docker compose: place key in ./secrets/db_encryption_key.txt
+      #
+      # Step 2 — Uncomment the secrets sections below and remove
+      #          DB_ENCRYPTION_KEY from the environment above.
+      #
+      # - DB_ENCRYPTION_KEY_FILE=/run/secrets/db_encryption_key
+      # ─────────────────────────────────────────────────────────────────
       - DB_TASK_HISTORY_RETENTION_DAYS=${DB_TASK_HISTORY_RETENTION_DAYS:-0}
       - DB_TASK_HISTORY_PERSIST_TICKERS=${DB_TASK_HISTORY_PERSIST_TICKERS:-false}
       # Search defaults
@@ -139,3 +152,10 @@ volumes:
     driver: local
   sqlite_data:
     driver: local
+
+# ── Secrets (optional) ───────────────────────────────────────────────
+# Uncomment to use Docker secrets for DB_ENCRYPTION_KEY (see F5 mitigation).
+# secrets:
+#   db_encryption_key:
+#     file: ./secrets/db_encryption_key.txt   # local compose
+#     # external: true                         # Swarm / managed secret

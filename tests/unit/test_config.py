@@ -315,6 +315,63 @@ class TestDatabaseSettingsW5:
         s = DatabaseSettings()
         assert s.task_history_persist_tickers is True
 
+    # F5 mitigation: file-based encryption key loading
+    def test_encryption_key_file_default_none(self, monkeypatch):
+        monkeypatch.delenv("DB_ENCRYPTION_KEY_FILE", raising=False)
+        s = DatabaseSettings()
+        assert s.encryption_key_file is None
+
+    def test_encryption_key_read_from_file(self, tmp_path, monkeypatch):
+        """encryption_key_file is set → encryption_key resolved from file."""
+        key_file = tmp_path / "secret.key"
+        key_file.write_text("super-secret-key")
+        monkeypatch.setenv("DB_ENCRYPTION_KEY_FILE", str(key_file))
+        monkeypatch.delenv("DB_ENCRYPTION_KEY", raising=False)
+        s = DatabaseSettings()
+        assert s.encryption_key == "super-secret-key"
+
+    def test_encryption_key_file_strips_trailing_newline(self, tmp_path, monkeypatch):
+        """Docker secrets append newline → should be stripped."""
+        key_file = tmp_path / "secret.key"
+        key_file.write_text("my-secret\n")
+        monkeypatch.setenv("DB_ENCRYPTION_KEY_FILE", str(key_file))
+        monkeypatch.delenv("DB_ENCRYPTION_KEY", raising=False)
+        s = DatabaseSettings()
+        assert s.encryption_key == "my-secret"
+
+    def test_encryption_key_file_and_direct_key_conflict(self, tmp_path, monkeypatch):
+        """Both encryption_key and encryption_key_file set → ValueError."""
+        key_file = tmp_path / "secret.key"
+        key_file.write_text("secret")
+        monkeypatch.setenv("DB_ENCRYPTION_KEY", "direct-key")
+        monkeypatch.setenv("DB_ENCRYPTION_KEY_FILE", str(key_file))
+        with pytest.raises(ValueError, match="mutually exclusive"):
+            DatabaseSettings()
+
+    def test_encryption_key_file_not_found(self, monkeypatch):
+        """File path does not exist → ValueError."""
+        monkeypatch.setenv("DB_ENCRYPTION_KEY_FILE", "/nonexistent/path/to/secret")
+        monkeypatch.delenv("DB_ENCRYPTION_KEY", raising=False)
+        with pytest.raises(ValueError, match="does not exist"):
+            DatabaseSettings()
+
+    def test_encryption_key_file_empty_content(self, tmp_path, monkeypatch):
+        """File exists but is empty → ValueError."""
+        key_file = tmp_path / "empty.key"
+        key_file.write_text("")
+        monkeypatch.setenv("DB_ENCRYPTION_KEY_FILE", str(key_file))
+        monkeypatch.delenv("DB_ENCRYPTION_KEY", raising=False)
+        with pytest.raises(ValueError, match="is empty"):
+            DatabaseSettings()
+
+    def test_encryption_key_file_empty_string_env_var(self, monkeypatch):
+        """DB_ENCRYPTION_KEY_FILE='' (empty string) → no error, treated as unset."""
+        monkeypatch.setenv("DB_ENCRYPTION_KEY_FILE", "")
+        monkeypatch.delenv("DB_ENCRYPTION_KEY", raising=False)
+        s = DatabaseSettings()
+        assert s.encryption_key is None
+        assert s.encryption_key_file == ""
+
 
 class TestLoggingSettings:
     """New LoggingSettings class for optional file logging."""
