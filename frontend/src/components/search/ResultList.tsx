@@ -14,6 +14,10 @@
  * Shows "{n} results for '{query}' in {time}ms" — echoing back
  * the query and timing gives the user confidence the system
  * understood their request and is performing well.
+ *
+ * The query text comes from the page's local state, **not** from the
+ * API response — the search endpoint intentionally omits the query
+ * to avoid echoing sensitive input over the wire (see §F4).
  */
 
 import { SearchX } from "lucide-react";
@@ -27,13 +31,14 @@ import type { SearchResponse } from "@/lib/types";
 
 interface ResultListProps {
   response: SearchResponse;
+  query: string;
 }
 
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
-export function ResultList({ response }: ResultListProps) {
+export function ResultList({ response, query }: ResultListProps) {
   if (response.results.length === 0) {
     return (
       <EmptyState
@@ -49,7 +54,7 @@ export function ResultList({ response }: ResultListProps) {
       {/* Summary header */}
       <p className="text-sm text-gray-600 dark:text-gray-400">
         {response.total_results} result{response.total_results !== 1 && "s"}{" "}
-        for &ldquo;{response.query}&rdquo; in{" "}
+        for &ldquo;{query}&rdquo; in{" "}
         {response.search_time_ms.toFixed(0)} ms
       </p>
 

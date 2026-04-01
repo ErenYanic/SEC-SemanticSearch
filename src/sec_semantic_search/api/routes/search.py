@@ -8,6 +8,7 @@ Provides a single route:
 import time
 
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import JSONResponse
 
 from sec_semantic_search.api.dependencies import get_search_engine
 from sec_semantic_search.api.schemas import (
@@ -105,9 +106,12 @@ async def search(
         elapsed_ms,
     )
 
-    return SearchResponse(
-        query=body.query,
+    payload = SearchResponse(
         results=result_schemas,
         total_results=len(result_schemas),
         search_time_ms=round(elapsed_ms, 1),
+    )
+    return JSONResponse(
+        content=payload.model_dump(),
+        headers={"Cache-Control": "no-store"},
     )
