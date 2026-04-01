@@ -702,6 +702,15 @@ class TestApiKeyAuthentication:
         resp = client.get("/api/health")
         assert resp.status_code == 200
 
+    def test_health_does_not_expose_version(self):
+        """Health endpoint must not reveal the application version (§F3)."""
+        client = TestClient(app)
+        resp = client.get("/api/health")
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body == {"status": "ok"}
+        assert "version" not in body
+
     # -- Auth disabled (default) --
 
     def test_no_key_configured_allows_all(self):

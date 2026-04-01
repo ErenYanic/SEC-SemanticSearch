@@ -310,8 +310,14 @@ def create_app() -> FastAPI:
     # -- Health check -------------------------------------------------------
     @application.get("/api/health", tags=["meta"], summary="Health check")
     async def health() -> dict[str, str]:
-        """Return API liveness status."""
-        return {"status": "ok", "version": __version__}
+        """Return API liveness status.
+
+        The version is intentionally omitted from this unauthenticated
+        endpoint to avoid disclosing it to anonymous clients (see
+        SECURITY VULNERABILITIES.md §F3).  Authenticated users can
+        obtain the version via ``GET /api/status/``.
+        """
+        return {"status": "ok"}
 
     return application
 
