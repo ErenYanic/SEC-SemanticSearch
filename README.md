@@ -33,7 +33,7 @@ Filing content is fetched from SEC EDGAR, parsed into structured sections, split
 - **Flexible filtering** — Search and manage by ticker, form type, or date range
 - **Duplicate detection** — Checks for existing filings before any GPU work begins
 - **Configuration-driven deployment** — Three deployment scenarios (local, team, public) controlled entirely via environment variables
-- **913 backend tests and 193 frontend tests**, all passing
+- **918 backend tests and 193 frontend tests**, all passing
 
 ---
 
@@ -115,7 +115,7 @@ The SEC requires a name and email in the User-Agent header of every EDGAR reques
 | `DB_CHROMA_PATH` | `./data/chroma_db` | ChromaDB storage path |
 | `DB_METADATA_DB_PATH` | `./data/metadata.sqlite` | SQLite metadata path |
 | `DB_ENCRYPTION_KEY` | unset | SQLCipher key; unset = plain SQLite |
-| `DB_MAX_FILINGS` | `500` | Maximum filings to store |
+| `DB_MAX_FILINGS` | `2500` | Maximum filings to store |
 | `SEARCH_TOP_K` | `5` | Default number of search results |
 | `API_KEY` | unset | General API access key; unset = no authentication |
 | `ADMIN_API_KEY` | unset | Admin key for destructive operations |
@@ -459,7 +459,7 @@ python -m pytest tests/integration/
 python -m pytest tests/api/
 ```
 
-**Backend:** 913 tests, all passing.
+**Backend:** 918 tests, all passing.
 
 **Frontend:** 193 tests (Vitest + React Testing Library):
 
