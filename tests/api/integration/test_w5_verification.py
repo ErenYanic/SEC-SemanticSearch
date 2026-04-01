@@ -321,17 +321,17 @@ class TestQueryNeverPersisted:
         deps["registry"].save_task_history.assert_not_called()
 
     def test_search_response_includes_query_but_never_stores_it(self):
-        """Search response includes query for display but never stores it."""
+        """Search response must not echo the query (§F4) and never stores it."""
         client, deps = _make_full_client()
         deps["engine"].search.return_value = []
 
         resp = client.post("/api/search/", json={"query": "semiconductor supply chain"})
         data = resp.json()
 
-        # Query is in the response (for the UI) — that's expected
-        assert data["query"] == "semiconductor supply chain"
+        # Query must not be echoed in the response (§F4)
+        assert "query" not in data
 
-        # But no writes to any store
+        # No writes to any store
         deps["registry"].register_filing.assert_not_called()
 
 

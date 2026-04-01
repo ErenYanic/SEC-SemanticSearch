@@ -143,9 +143,8 @@ export interface SearchRequest {
   end_date?: string | null;
 }
 
-/** POST /api/search/ — response */
+/** POST /api/search/ — response (query intentionally omitted; see §F4). */
 export interface SearchResponse {
-  query: string;
   results: SearchResult[];
   total_results: number;
   search_time_ms: number;

@@ -55,7 +55,7 @@ class TestSearchEndpoint:
         resp = client.post("/api/search/", json={"query": "revenue"})
         assert resp.status_code == 200
         data = resp.json()
-        assert data["query"] == "revenue"
+        assert "query" not in data  # §F4: query not echoed in response
         assert data["total_results"] == 1
         assert data["search_time_ms"] >= 0
         assert data["results"][0]["ticker"] == "AAPL"

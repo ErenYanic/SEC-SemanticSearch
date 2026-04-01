@@ -372,9 +372,16 @@ class TestSearchResponse:
 
     def test_valid(self):
         resp = SearchResponse(
-            query="test", results=[], total_results=0, search_time_ms=1.5,
+            results=[], total_results=0, search_time_ms=1.5,
         )
         assert resp.search_time_ms == 1.5
+
+    def test_query_not_in_response(self):
+        """Query must not be echoed in the response (§F4)."""
+        resp = SearchResponse(
+            results=[], total_results=0, search_time_ms=1.0,
+        )
+        assert "query" not in resp.model_dump()
 
 
 # -----------------------------------------------------------------------

@@ -223,6 +223,30 @@ class TestErrorRedaction:
         assert "CUDA" not in body.get("message", "")
         assert body.get("details") is None
 
+    def test_search_response_omits_query(self):
+        """Search response must not echo the query back to the caller (§F4)."""
+        engine = MagicMock()
+        engine.search.return_value = []
+
+        app.dependency_overrides[get_search_engine] = lambda: engine
+        client = TestClient(app, raise_server_exceptions=False)
+
+        resp = client.post("/api/search/", json={"query": "revenue growth"})
+        assert resp.status_code == 200
+        assert "query" not in resp.json()
+
+    def test_search_response_has_no_store_header(self):
+        """Search response must include Cache-Control: no-store (§F4)."""
+        engine = MagicMock()
+        engine.search.return_value = []
+
+        app.dependency_overrides[get_search_engine] = lambda: engine
+        client = TestClient(app, raise_server_exceptions=False)
+
+        resp = client.post("/api/search/", json={"query": "revenue growth"})
+        assert resp.status_code == 200
+        assert resp.headers.get("cache-control") == "no-store"
+
 
 # -----------------------------------------------------------------------
 # Finding #9: Search query length limit

@@ -160,7 +160,7 @@ export default function SearchPage() {
 
       {/* Results */}
       {searchResponse && !isSearching && (
-        <ResultList response={searchResponse} />
+        <ResultList response={searchResponse} query={query} />
       )}
 
       {/* Filing inventory (shown when no results yet) */}

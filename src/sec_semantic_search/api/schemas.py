@@ -333,9 +333,14 @@ class SearchRequest(BaseModel):
 
 
 class SearchResponse(BaseModel):
-    """Response for ``POST /api/search/``."""
+    """Response for ``POST /api/search/``.
 
-    query: str
+    The query is intentionally omitted from the response to avoid
+    echoing sensitive user input back over the wire (see
+    SECURITY VULNERABILITIES.md §F4).  The client already holds the
+    query in local state.
+    """
+
     results: list[SearchResultSchema]
     total_results: int = Field(..., ge=0)
     search_time_ms: float = Field(..., ge=0.0, description="Wall-clock search time in ms")
