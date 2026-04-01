@@ -63,11 +63,51 @@ class DatabaseSettings(BaseSettings):
     # SQLCipher encryption key; unset = plain sqlite3 (local dev).
     encryption_key: str | None = None
 
+    # Path to a file containing the SQLCipher encryption key (e.g. Docker
+    # secrets at ``/run/secrets/db_encryption_key``). Mutually exclusive with
+    # ``encryption_key``. Preferred in production — file contents are not
+    # visible in ``/proc/<pid>/environ``.
+    encryption_key_file: str | None = None
+
     # Task history privacy settings.
     task_history_retention_days: int = 0  # 0 = keep indefinitely
     task_history_persist_tickers: bool = False
 
     model_config = SettingsConfigDict(env_prefix="DB_")
+
+    @model_validator(mode="after")
+    def _resolve_encryption_key(self) -> "DatabaseSettings":
+        """Resolve ``encryption_key`` from ``encryption_key_file`` if set.
+
+        If both ``encryption_key`` and ``encryption_key_file`` are provided,
+        raises ``ValueError`` to prevent ambiguity. If only ``encryption_key_file``
+        is set, reads the key from that file, strips whitespace, and populates
+        ``encryption_key``. An empty or missing file raises ``ValueError``.
+        """
+        if self.encryption_key and self.encryption_key_file:
+            raise ValueError(
+                "DB_ENCRYPTION_KEY and DB_ENCRYPTION_KEY_FILE are mutually exclusive. "
+                "Set only one."
+            )
+
+        if self.encryption_key_file:
+            key_path = Path(self.encryption_key_file)
+            if not key_path.exists():
+                raise ValueError(
+                    f"DB_ENCRYPTION_KEY_FILE '{self.encryption_key_file}' does not exist."
+                )
+            if not key_path.is_file():
+                raise ValueError(
+                    f"DB_ENCRYPTION_KEY_FILE '{self.encryption_key_file}' is not a file."
+                )
+            key_content = key_path.read_text().strip()
+            if not key_content:
+                raise ValueError(
+                    f"DB_ENCRYPTION_KEY_FILE '{self.encryption_key_file}' is empty."
+                )
+            self.encryption_key = key_content
+
+        return self
 
     @model_validator(mode="after")
     def _validate_paths(self) -> "DatabaseSettings":

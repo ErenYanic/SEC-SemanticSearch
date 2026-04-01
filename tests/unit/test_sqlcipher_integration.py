@@ -426,3 +426,61 @@ class TestWalModeEncrypted:
             row = registry._conn.execute("PRAGMA journal_mode").fetchone()
         assert row[0] == "wal"
         registry.close()
+
+
+# ---------------------------------------------------------------------------
+# F5 mitigation: File-based encryption key loading
+# ---------------------------------------------------------------------------
+
+
+class TestFileBasedKeyLoading:
+    """MetadataRegistry works with encryption key loaded from a file (Docker secrets)."""
+
+    @pytest.fixture
+    def fake_sqlcipher_module(self):
+        return _make_fake_sqlcipher_module()
+
+    def test_registry_uses_key_loaded_from_file(
+        self, tmp_path, tmp_db_path, monkeypatch, fake_sqlcipher_module,
+    ):
+        """Write key to a file, load via settings, verify MetadataRegistry is encrypted.
+
+        Simulates Docker secrets workflow:
+        1. Key file exists at /run/secrets/db_encryption_key
+        2. Environment has DB_ENCRYPTION_KEY_FILE=/run/secrets/db_encryption_key
+        3. DatabaseSettings reads and resolves the key
+        4. MetadataRegistry(encryption_key=None) picks it up from settings
+        5. Verify MetadataRegistry recognises encryption is enabled
+        """
+        from sec_semantic_search.config import DatabaseSettings, reload_settings
+
+        # Create a temporary key file (simulating Docker secrets)
+        key_file = tmp_path / "db_encryption_key"
+        key_file.write_text("file-based-secret-key\n")  # Trailing newline like Docker
+
+        # Patch the environment
+        monkeypatch.setenv("DB_ENCRYPTION_KEY_FILE", str(key_file))
+        monkeypatch.delenv("DB_ENCRYPTION_KEY", raising=False)
+
+        # Reload settings to pick up the new env vars
+        reload_settings()
+
+        # Verify that DatabaseSettings resolved the key from the file
+        settings = DatabaseSettings()
+        assert settings.encryption_key == "file-based-secret-key"
+        assert settings.encryption_key_file == str(key_file)
+
+        # Create MetadataRegistry with encryption_key=None (use settings)
+        with patch(
+            "sec_semantic_search.database.metadata._get_sqlite_module",
+            return_value=fake_sqlcipher_module,
+        ):
+            registry = MetadataRegistry(
+                db_path=tmp_db_path,
+                encryption_key=None,  # Should use settings.database.encryption_key
+            )
+
+        # Verify it picked up the encrypted key — the encryption flag should be True
+        # (This proves the key was loaded from the file and encryption is active)
+        assert registry.encrypted is True
+        registry.close()
