@@ -263,7 +263,8 @@ def _build_terminal_from_state(info: TaskInfo) -> dict:
             "type": "completed",
             "results": [r.to_dict() for r in info.results],
             "summary": {
-                "ingested": len(info.results),
+                "total": len(info.results) + info.progress.filings_skipped + info.progress.filings_failed,
+                "succeeded": len(info.results),
                 "skipped": info.progress.filings_skipped,
                 "failed": info.progress.filings_failed,
             },

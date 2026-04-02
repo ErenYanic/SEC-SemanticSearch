@@ -1091,7 +1091,7 @@ class TestWebSocketTerminalFallback:
             # Terminal message should always be delivered.
             terminal = ws.receive_json()
             assert terminal["type"] == "completed"
-            assert terminal["summary"]["ingested"] == 1
+            assert terminal["summary"]["succeeded"] == 1
             assert terminal["summary"]["skipped"] == 1
 
     def test_failed_task_gets_terminal_when_queue_empty(self):
