@@ -81,17 +81,31 @@ class ChromaDBClient:
     # Migrations
     # ------------------------------------------------------------------
 
+    _MIGRATION_FLAG = "migration_filing_date_int_done"
+
     def _migrate_filing_date_int(self) -> None:
         """
         Backfill ``filing_date_int`` for chunks ingested before BF-012.
 
         Scans all documents in the collection and adds the integer
         ``YYYYMMDD`` field to any chunk that has ``filing_date`` but
-        is missing ``filing_date_int``. Runs once per client init;
-        skips quickly when no migration is needed.
+        is missing ``filing_date_int``.
+
+        A metadata flag on the collection tracks whether the migration
+        has already completed. Once set, subsequent startups skip the
+        scan entirely — reducing startup from O(N/1000) batches to a
+        single O(1) metadata check.
         """
+        collection_meta = self._collection.metadata or {}
+        if collection_meta.get(self._MIGRATION_FLAG):
+            logger.debug("filing_date_int migration already complete — skipping")
+            return
+
         total = self._collection.count()
         if total == 0:
+            self._collection.modify(
+                metadata={**collection_meta, self._MIGRATION_FLAG: True},
+            )
             return
 
         batch_size = 1000
@@ -127,6 +141,11 @@ class ChromaDBClient:
                 "Migrated %d chunk(s): added filing_date_int field",
                 migrated,
             )
+
+        # Mark migration complete only after a full successful scan.
+        self._collection.modify(
+            metadata={**collection_meta, self._MIGRATION_FLAG: True},
+        )
 
     # ------------------------------------------------------------------
     # Write operations
