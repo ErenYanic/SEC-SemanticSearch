@@ -33,7 +33,7 @@ Filing content is fetched from SEC EDGAR, parsed into structured sections, split
 - **Flexible filtering** — Search and manage by ticker, form type, or date range
 - **Duplicate detection** — Checks for existing filings before any GPU work begins
 - **Configuration-driven deployment** — Three deployment scenarios (local, team, public) controlled entirely via environment variables
-- **929 backend tests and 193 frontend tests**, all passing
+- **944 backend tests and 193 frontend tests**, all passing
 
 ---
 
@@ -97,30 +97,30 @@ The SEC requires a name and email in the User-Agent header of every EDGAR reques
 
 **Required for CLI usage:**
 
-| Variable | Description |
-|----------|-------------|
-| `EDGAR_IDENTITY_NAME` | Your name (SEC EDGAR identification) |
-| `EDGAR_IDENTITY_EMAIL` | Your email address |
+| Variable               | Description                          |
+| ---------------------- | ------------------------------------ |
+| `EDGAR_IDENTITY_NAME`  | Your name (SEC EDGAR identification) |
+| `EDGAR_IDENTITY_EMAIL` | Your email address                   |
 
 > For web deployments with `EDGAR_SESSION_REQUIRED=true`, these can remain unset — the frontend shows a session-start form where each user provides their own credentials.
 
 **Commonly used optional variables:**
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `HUGGING_FACE_TOKEN` | — | HF token for faster model downloads |
-| `EMBEDDING_MODEL_NAME` | `google/embeddinggemma-300m` | Sentence-transformer model |
-| `EMBEDDING_DEVICE` | `auto` | `cuda`, `cpu`, or `auto` |
-| `EMBEDDING_BATCH_SIZE` | `32` | Reduce for low-VRAM GPUs (e.g. `8`) |
-| `DB_CHROMA_PATH` | `./data/chroma_db` | ChromaDB storage path |
-| `DB_METADATA_DB_PATH` | `./data/metadata.sqlite` | SQLite metadata path |
-| `DB_ENCRYPTION_KEY` | unset | SQLCipher key; unset = plain SQLite |
-| `DB_MAX_FILINGS` | `2500` | Maximum filings to store |
-| `SEARCH_TOP_K` | `5` | Default number of search results |
-| `API_KEY` | unset | General API access key; unset = no authentication |
-| `ADMIN_API_KEY` | unset | Admin key for destructive operations |
-| `LOG_REDACT_QUERIES` | `false` | Hash search queries and tickers in logs |
-| `DEMO_MODE` | `false` | FIFO eviction + nightly-reset notice |
+| Variable               | Default                      | Description                                       |
+| ---------------------- | ---------------------------- | ------------------------------------------------- |
+| `HUGGING_FACE_TOKEN`   | —                            | HF token for faster model downloads               |
+| `EMBEDDING_MODEL_NAME` | `google/embeddinggemma-300m` | Sentence-transformer model                        |
+| `EMBEDDING_DEVICE`     | `auto`                       | `cuda`, `cpu`, or `auto`                          |
+| `EMBEDDING_BATCH_SIZE` | `32`                         | Reduce for low-VRAM GPUs (e.g. `8`)               |
+| `DB_CHROMA_PATH`       | `./data/chroma_db`           | ChromaDB storage path                             |
+| `DB_METADATA_DB_PATH`  | `./data/metadata.sqlite`     | SQLite metadata path                              |
+| `DB_ENCRYPTION_KEY`    | unset                        | SQLCipher key; unset = plain SQLite               |
+| `DB_MAX_FILINGS`       | `2500`                       | Maximum filings to store                          |
+| `SEARCH_TOP_K`         | `5`                          | Default number of search results                  |
+| `API_KEY`              | unset                        | General API access key; unset = no authentication |
+| `ADMIN_API_KEY`        | unset                        | Admin key for destructive operations              |
+| `LOG_REDACT_QUERIES`   | `false`                      | Hash search queries and tickers in logs           |
+| `DEMO_MODE`            | `false`                      | FIFO eviction + nightly-reset notice              |
 
 See [`.env.example`](.env.example) for the full variable list with descriptions.
 
@@ -353,25 +353,25 @@ Additional: dark/light theme, CSS-only loading skeletons, skip-to-content, keybo
 
 ### API endpoints
 
-| Method | Path | Auth | Description |
-|--------|------|------|-------------|
-| GET | `/api/health` | None | Liveness check |
-| GET | `/api/status/` | API key | Database overview |
-| GET | `/api/filings/` | API key | List filings (with filters) |
-| GET | `/api/filings/{accession}` | API key | Get single filing |
-| DELETE | `/api/filings/{accession}` | API key | Delete single filing |
-| POST | `/api/filings/delete-by-ids` | API key | Delete up to 50 selected filings by accession number |
-| POST | `/api/filings/bulk-delete` | Admin key | Bulk delete by ticker/form filter |
-| DELETE | `/api/filings/` | Admin key | Clear all filings |
-| POST | `/api/search/` | API key | Semantic search |
-| POST | `/api/ingest/add` | API key | Start single-ticker ingestion |
-| POST | `/api/ingest/batch` | API key | Start multi-ticker ingestion |
-| GET | `/api/ingest/tasks` | API key | List all ingestion tasks |
-| GET | `/api/ingest/tasks/{task_id}` | API key | Get task status and progress |
-| DELETE | `/api/ingest/tasks/{task_id}` | API key | Cancel running task |
-| GET | `/api/resources/gpu` | API key | GPU/model status |
-| DELETE | `/api/resources/gpu` | Admin key | Unload GPU model |
-| WS | `/ws/ingest/{task_id}` | API key | Real-time ingestion progress |
+| Method | Path                          | Auth      | Description                                          |
+| ------ | ----------------------------- | --------- | ---------------------------------------------------- |
+| GET    | `/api/health`                 | None      | Liveness check                                       |
+| GET    | `/api/status/`                | API key   | Database overview                                    |
+| GET    | `/api/filings/`               | API key   | List filings (with filters)                          |
+| GET    | `/api/filings/{accession}`    | API key   | Get single filing                                    |
+| DELETE | `/api/filings/{accession}`    | API key   | Delete single filing                                 |
+| POST   | `/api/filings/delete-by-ids`  | API key   | Delete up to 50 selected filings by accession number |
+| POST   | `/api/filings/bulk-delete`    | Admin key | Bulk delete by ticker/form filter                    |
+| DELETE | `/api/filings/`               | Admin key | Clear all filings                                    |
+| POST   | `/api/search/`                | API key   | Semantic search                                      |
+| POST   | `/api/ingest/add`             | API key   | Start single-ticker ingestion                        |
+| POST   | `/api/ingest/batch`           | API key   | Start multi-ticker ingestion                         |
+| GET    | `/api/ingest/tasks`           | API key   | List all ingestion tasks                             |
+| GET    | `/api/ingest/tasks/{task_id}` | API key   | Get task status and progress                         |
+| DELETE | `/api/ingest/tasks/{task_id}` | API key   | Cancel running task                                  |
+| GET    | `/api/resources/gpu`          | API key   | GPU/model status                                     |
+| DELETE | `/api/resources/gpu`          | Admin key | Unload GPU model                                     |
+| WS     | `/ws/ingest/{task_id}`        | API key   | Real-time ingestion progress                         |
 
 Full interactive documentation is available at `http://localhost:8000/docs` when the server is running.
 
@@ -459,7 +459,7 @@ python -m pytest tests/integration/
 python -m pytest tests/api/
 ```
 
-**Backend:** 929 tests, all passing.
+**Backend:** 944 tests, all passing.
 
 **Frontend:** 193 tests (Vitest + React Testing Library):
 
@@ -508,17 +508,17 @@ SEC-SemanticSearch/
 
 ## Technology stack
 
-| Component | Library | Purpose |
-|-----------|---------|---------|
-| Filing retrieval | [edgartools](https://github.com/dgunning/edgartools) | SEC EDGAR API wrapper |
-| HTML parsing | [doc2dict](https://github.com/john-friedman/doc2dict) | Structured document extraction |
-| Embeddings | [sentence-transformers](https://sbert.net/) | `google/embeddinggemma-300m` (768-dim) |
-| Vector database | [ChromaDB](https://www.trychroma.com/) | Persistent local storage, cosine similarity |
-| REST API | [FastAPI](https://fastapi.tiangolo.com/) | Backend API with WebSocket support |
-| Frontend | [Next.js](https://nextjs.org/) 16 + [React](https://react.dev/) 19 | App Router, Tailwind CSS v4, React Query |
-| CLI | [Typer](https://typer.tiangolo.com/) + [Rich](https://rich.readthedocs.io/) | CLI with formatted output |
-| SQLite encryption | pysqlcipher3 + SQLCipher | Optional encryption at rest |
-| Configuration | [pydantic-settings](https://docs.pydantic.dev/latest/concepts/pydantic_settings/) | Environment-based config management |
+| Component         | Library                                                                           | Purpose                                     |
+| ----------------- | --------------------------------------------------------------------------------- | ------------------------------------------- |
+| Filing retrieval  | [edgartools](https://github.com/dgunning/edgartools)                              | SEC EDGAR API wrapper                       |
+| HTML parsing      | [doc2dict](https://github.com/john-friedman/doc2dict)                             | Structured document extraction              |
+| Embeddings        | [sentence-transformers](https://sbert.net/)                                       | `google/embeddinggemma-300m` (768-dim)      |
+| Vector database   | [ChromaDB](https://www.trychroma.com/)                                            | Persistent local storage, cosine similarity |
+| REST API          | [FastAPI](https://fastapi.tiangolo.com/)                                          | Backend API with WebSocket support          |
+| Frontend          | [Next.js](https://nextjs.org/) 16 + [React](https://react.dev/) 19                | App Router, Tailwind CSS v4, React Query    |
+| CLI               | [Typer](https://typer.tiangolo.com/) + [Rich](https://rich.readthedocs.io/)       | CLI with formatted output                   |
+| SQLite encryption | pysqlcipher3 + SQLCipher                                                          | Optional encryption at rest                 |
+| Configuration     | [pydantic-settings](https://docs.pydantic.dev/latest/concepts/pydantic_settings/) | Environment-based config management         |
 
 ---
 
