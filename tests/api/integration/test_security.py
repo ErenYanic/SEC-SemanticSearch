@@ -1232,30 +1232,26 @@ class TestSecurityAuditLogging:
     def test_clear_all_produces_audit_log(self, caplog):
         """DELETE /api/filings/?confirm=true must produce an audit entry."""
         registry = MagicMock()
-        record = make_filing_record()
-        registry.list_filings.return_value = [record]
+        registry.clear_all.return_value = 1
         chroma = MagicMock()
+        chroma.clear_collection.return_value = 42
 
-        with patch(
-            "sec_semantic_search.api.routes.filings.delete_filings_batch",
-            return_value=record.chunk_count,
-        ):
-            app.dependency_overrides[get_registry] = lambda: registry
-            app.dependency_overrides[get_chroma] = lambda: chroma
+        app.dependency_overrides[get_registry] = lambda: registry
+        app.dependency_overrides[get_chroma] = lambda: chroma
 
-            pkg_logger = self._with_audit_capture(caplog)
-            try:
-                client = TestClient(app, raise_server_exceptions=False)
-                with caplog.at_level(logging.WARNING):
-                    resp = client.delete("/api/filings/?confirm=true")
+        pkg_logger = self._with_audit_capture(caplog)
+        try:
+            client = TestClient(app, raise_server_exceptions=False)
+            with caplog.at_level(logging.WARNING):
+                resp = client.delete("/api/filings/?confirm=true")
 
-                assert resp.status_code == 200
-                assert any(
-                    "SECURITY_AUDIT" in r.message and "clear_all" in r.message
-                    for r in caplog.records
-                )
-            finally:
-                pkg_logger.removeHandler(caplog.handler)
+            assert resp.status_code == 200
+            assert any(
+                "SECURITY_AUDIT" in r.message and "clear_all" in r.message
+                for r in caplog.records
+            )
+        finally:
+            pkg_logger.removeHandler(caplog.handler)
 
     def test_cancel_task_produces_audit_log(self, caplog):
         """DELETE /api/ingest/tasks/{id} must produce an audit entry."""
