@@ -14,13 +14,15 @@ Architecture:
 """
 
 import asyncio
+import json
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from typing import Any
 
 from fastapi import Depends, FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
-from starlette.responses import JSONResponse
+from starlette.types import ASGIApp, Receive, Scope, Send
 
 from sec_semantic_search import __version__
 from sec_semantic_search.api.dependencies import verify_api_key
@@ -41,35 +43,56 @@ _CONTENT_SECURITY_POLICY = "; ".join([
     "connect-src 'self' ws: wss:",
 ])
 
+_PERMISSIONS_POLICY = (
+    "camera=(), microphone=(), geolocation=(), "
+    "payment=(), usb=(), interest-cohort=()"
+)
+
+_SECURITY_HEADERS: list[tuple[bytes, bytes]] = [
+    (b"x-content-type-options", b"nosniff"),
+    (b"x-frame-options", b"DENY"),
+    (b"x-xss-protection", b"1; mode=block"),
+    (b"referrer-policy", b"strict-origin-when-cross-origin"),
+    (b"content-security-policy", _CONTENT_SECURITY_POLICY.encode()),
+    (b"permissions-policy", _PERMISSIONS_POLICY.encode()),
+]
+
 
 # ---------------------------------------------------------------------------
-# Security headers middleware
+# Security headers middleware (pure ASGI — no threadpool overhead)
 # ---------------------------------------------------------------------------
 
 
-class SecurityHeadersMiddleware(BaseHTTPMiddleware):
-    """Add security headers to every HTTP response."""
+class SecurityHeadersMiddleware:
+    """Add security headers to every HTTP response.
 
-    async def dispatch(
-        self, request: Request, call_next: RequestResponseEndpoint,
-    ) -> Response:
-        response = await call_next(request)
-        response.headers["X-Content-Type-Options"] = "nosniff"
-        response.headers["X-Frame-Options"] = "DENY"
-        response.headers["X-XSS-Protection"] = "1; mode=block"
-        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-        response.headers["Content-Security-Policy"] = _CONTENT_SECURITY_POLICY
-        response.headers["Permissions-Policy"] = (
-            "camera=(), microphone=(), geolocation=(), "
-            "payment=(), usb=(), interest-cohort=()"
-        )
-        return response
+    Pure ASGI implementation — intercepts the ``http.response.start``
+    message and appends headers directly, avoiding the per-request
+    ``run_in_threadpool`` overhead of ``BaseHTTPMiddleware``.
+    """
+
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        async def send_with_headers(message: dict[str, Any]) -> None:
+            if message["type"] == "http.response.start":
+                headers = list(message.get("headers", []))
+                headers.extend(_SECURITY_HEADERS)
+                message["headers"] = headers
+            await send(message)
+
+        await self.app(scope, receive, send_with_headers)
 
 
 class InsecureTransportWarningMiddleware(BaseHTTPMiddleware):
     """Log a one-time warning when protected traffic arrives over HTTP."""
 
-    def __init__(self, app) -> None:
+    def __init__(self, app: ASGIApp) -> None:
         super().__init__(app)
         self._warned = False
 
@@ -107,7 +130,7 @@ class InsecureTransportWarningMiddleware(BaseHTTPMiddleware):
 
 
 # ---------------------------------------------------------------------------
-# Request body size limit middleware
+# Request body size limit middleware (pure ASGI — no threadpool overhead)
 # ---------------------------------------------------------------------------
 
 # 1 MB — matches nginx client_max_body_size; defence in depth for
@@ -115,30 +138,41 @@ class InsecureTransportWarningMiddleware(BaseHTTPMiddleware):
 _MAX_CONTENT_LENGTH = 1 * 1024 * 1024
 
 
-class ContentSizeLimitMiddleware(BaseHTTPMiddleware):
+class ContentSizeLimitMiddleware:
     """Reject requests whose ``Content-Length`` exceeds the allowed limit.
 
-    This is a lightweight, header-based check.  It does not consume the
-    body — it simply inspects the ``Content-Length`` header and returns
-    413 if the declared size is too large.
+    Pure ASGI implementation — inspects the ``Content-Length`` header
+    from the ASGI scope and short-circuits with a 413 response before
+    the inner application is called.  Does not consume the body.
     """
 
-    async def dispatch(
-        self, request: Request, call_next: RequestResponseEndpoint,
-    ) -> Response:
-        content_length = request.headers.get("content-length")
-        if content_length is not None:
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        headers = dict(scope.get("headers", []))
+        content_length_raw = headers.get(b"content-length")
+
+        if content_length_raw is not None:
             try:
-                length = int(content_length)
-            except ValueError:
-                return JSONResponse(
-                    status_code=400,
-                    content={"detail": "Invalid Content-Length header."},
+                length = int(content_length_raw)
+            except (ValueError, UnicodeDecodeError):
+                await self._send_json(
+                    send,
+                    status=400,
+                    body={"detail": "Invalid Content-Length header."},
                 )
+                return
+
             if length > _MAX_CONTENT_LENGTH:
-                return JSONResponse(
-                    status_code=413,
-                    content={
+                await self._send_json(
+                    send,
+                    status=413,
+                    body={
                         "detail": {
                             "error": "payload_too_large",
                             "message": (
@@ -150,7 +184,26 @@ class ContentSizeLimitMiddleware(BaseHTTPMiddleware):
                         },
                     },
                 )
-        return await call_next(request)
+                return
+
+        await self.app(scope, receive, send)
+
+    @staticmethod
+    async def _send_json(send: Send, *, status: int, body: dict) -> None:
+        """Send a complete JSON response via raw ASGI messages."""
+        payload = json.dumps(body).encode()
+        await send({
+            "type": "http.response.start",
+            "status": status,
+            "headers": [
+                [b"content-type", b"application/json"],
+                [b"content-length", str(len(payload)).encode()],
+            ],
+        })
+        await send({
+            "type": "http.response.body",
+            "body": payload,
+        })
 
 
 # ---------------------------------------------------------------------------
