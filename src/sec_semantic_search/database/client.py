@@ -259,6 +259,45 @@ class ChromaDBClient:
                 details=str(e),
             ) from e
 
+    def clear_collection(self) -> int:
+        """
+        Delete all documents from the collection and recreate it.
+
+        More efficient than fetching all accession numbers and calling
+        ``delete_filings_batch()`` — avoids loading data into memory.
+        Deletes the entire collection and recreates it with the same
+        settings (cosine similarity, migration flag).
+
+        Returns:
+            Number of chunks that were in the collection before clearing.
+
+        Raises:
+            DatabaseError: If the operation fails.
+        """
+        try:
+            count = self._collection.count()
+            if count == 0:
+                return 0
+
+            self._client.delete_collection(name=COLLECTION_NAME)
+            self._collection = self._client.get_or_create_collection(
+                name=COLLECTION_NAME,
+                metadata={
+                    "hnsw:space": "cosine",
+                    self._MIGRATION_FLAG: True,
+                },
+            )
+            logger.info(
+                "Cleared ChromaDB collection: %d chunk(s) removed",
+                count,
+            )
+            return count
+        except Exception as e:
+            raise DatabaseError(
+                "Failed to clear ChromaDB collection",
+                details=str(e),
+            ) from e
+
     # ------------------------------------------------------------------
     # Read operations
     # ------------------------------------------------------------------

@@ -610,6 +610,34 @@ class MetadataRegistry:
             logger.info("Batch-removed %d filing(s) from registry", removed)
         return removed
 
+    def clear_all(self) -> int:
+        """
+        Delete all rows from the filings table.
+
+        More efficient than loading all rows via ``list_filings()`` and
+        passing them to ``remove_filings_batch()`` — executes a single
+        ``DELETE FROM filings`` without fetching any data into memory.
+
+        Returns:
+            Number of filings deleted.
+
+        Raises:
+            DatabaseError: If the delete fails.
+        """
+        sql = "DELETE FROM filings"
+        try:
+            with self._lock, self._conn:
+                cursor = self._conn.execute(sql)
+                removed = cursor.rowcount
+            if removed:
+                logger.info("Cleared all filings from registry: %d removed", removed)
+            return removed
+        except self._db_error as e:
+            raise DatabaseError(
+                "Failed to clear all filings",
+                details=str(e),
+            ) from e
+
     # ------------------------------------------------------------------
     # Read operations
     # ------------------------------------------------------------------

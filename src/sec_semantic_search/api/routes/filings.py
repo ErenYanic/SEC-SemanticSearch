@@ -27,7 +27,7 @@ from sec_semantic_search.api.schemas import (
 )
 from sec_semantic_search.config import get_settings
 from sec_semantic_search.core import DatabaseError, audit_log, get_logger
-from sec_semantic_search.database import ChromaDBClient, MetadataRegistry, delete_filings_batch
+from sec_semantic_search.database import ChromaDBClient, MetadataRegistry, clear_all_filings, delete_filings_batch
 from sec_semantic_search.database.metadata import FilingRecord
 
 logger = get_logger(__name__)
@@ -365,14 +365,9 @@ async def clear_all(
             },
         )
 
-    filings = registry.list_filings()
-
-    if not filings:
-        return ClearAllResponse(filings_deleted=0, chunks_deleted=0)
-
     try:
-        total_chunks = delete_filings_batch(
-            filings, chroma=chroma, registry=registry,
+        filings_deleted, chunks_deleted = clear_all_filings(
+            chroma=chroma, registry=registry,
         )
     except DatabaseError as exc:
         logger.error("Clear all failed: %s", exc.details)
@@ -391,9 +386,9 @@ async def clear_all(
         "clear_all",
         client_ip=client_ip,
         endpoint="DELETE /api/filings/?confirm=true",
-        detail=f"filings={len(filings)} chunks={total_chunks}",
+        detail=f"filings={filings_deleted} chunks={chunks_deleted}",
     )
     return ClearAllResponse(
-        filings_deleted=len(filings),
-        chunks_deleted=total_chunks,
+        filings_deleted=filings_deleted,
+        chunks_deleted=chunks_deleted,
     )

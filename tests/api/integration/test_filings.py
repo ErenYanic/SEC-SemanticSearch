@@ -279,28 +279,25 @@ class TestClearAll:
         assert resp.json()["detail"]["error"] == "confirmation_required"
 
     def test_confirm_empty_database(self):
-        client, *_ = _make_client()
+        client, registry, chroma = _make_client()
+        chroma.clear_collection.return_value = 0
+        registry.clear_all.return_value = 0
         resp = client.delete("/api/filings/?confirm=true")
         assert resp.status_code == 200
         assert resp.json()["filings_deleted"] == 0
 
     def test_confirm_with_filings(self):
-        filings = [
-            make_filing_record(id=1, accession_number="0000000001-24-000001", chunk_count=50),
-            make_filing_record(id=2, accession_number="0000000002-24-000002", filing_date="2024-06-01", chunk_count=50),
-        ]
-        client, registry, _ = _make_client()
-        registry.list_filings.return_value = filings
+        client, registry, chroma = _make_client()
+        chroma.clear_collection.return_value = 100
+        registry.clear_all.return_value = 2
         resp = client.delete("/api/filings/?confirm=true")
         assert resp.status_code == 200
         data = resp.json()
         assert data["filings_deleted"] == 2
-        assert data["chunks_deleted"] == 100  # 50 + 50 from FilingRecord.chunk_count
+        assert data["chunks_deleted"] == 100
 
     def test_database_error(self):
-        filings = [make_filing_record()]
         client, registry, chroma = _make_client()
-        registry.list_filings.return_value = filings
-        chroma.delete_filings_batch.side_effect = DatabaseError("fail")
+        chroma.clear_collection.side_effect = DatabaseError("fail")
         resp = client.delete("/api/filings/?confirm=true")
         assert resp.status_code == 500

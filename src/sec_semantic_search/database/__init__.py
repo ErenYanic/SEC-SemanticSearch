@@ -86,6 +86,40 @@ def delete_filings_batch(
     return total_chunks
 
 
+def clear_all_filings(
+    *,
+    chroma: ChromaDBClient,
+    registry: MetadataRegistry,
+) -> tuple[int, int]:
+    """
+    Delete every filing from both stores efficiently.
+
+    Uses ``ChromaDBClient.clear_collection()`` and
+    ``MetadataRegistry.clear_all()`` to avoid loading all records
+    into memory — O(1) memory instead of O(N).
+
+    Args:
+        chroma: ChromaDB client instance.
+        registry: Metadata registry instance.
+
+    Returns:
+        Tuple of ``(filings_deleted, chunks_deleted)``.
+
+    Raises:
+        DatabaseError: If any deletion fails.
+    """
+    # ChromaDB first (store order convention), then SQLite.
+    chunks_deleted = chroma.clear_collection()
+    filings_deleted = registry.clear_all()
+
+    logger.info(
+        "Cleared all data: %d filing(s), %d chunk(s)",
+        filings_deleted,
+        chunks_deleted,
+    )
+    return filings_deleted, chunks_deleted
+
+
 __all__ = [
     # Main classes
     "ChromaDBClient",
@@ -95,5 +129,6 @@ __all__ = [
     "FilingRecord",
     "TickerStatistics",
     # Helpers
+    "clear_all_filings",
     "delete_filings_batch",
 ]
