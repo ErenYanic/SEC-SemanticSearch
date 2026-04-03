@@ -83,6 +83,22 @@ class ChromaDBClient:
 
     _MIGRATION_FLAG = "migration_filing_date_int_done"
 
+    def _set_collection_flag(self, flag: str, value: bool = True) -> None:
+        """Set a custom metadata flag on the collection.
+
+        Filters out HNSW configuration keys (e.g. ``hnsw:space``)
+        before calling ``modify()`` — ChromaDB rejects metadata updates
+        that include distance-function settings, even if the value is
+        unchanged.
+        """
+        current = self._collection.metadata or {}
+        filtered = {
+            k: v for k, v in current.items()
+            if not k.startswith("hnsw:")
+        }
+        filtered[flag] = value
+        self._collection.modify(metadata=filtered)
+
     def _migrate_filing_date_int(self) -> None:
         """
         Backfill ``filing_date_int`` for chunks ingested before BF-012.
@@ -103,9 +119,7 @@ class ChromaDBClient:
 
         total = self._collection.count()
         if total == 0:
-            self._collection.modify(
-                metadata={**collection_meta, self._MIGRATION_FLAG: True},
-            )
+            self._set_collection_flag(self._MIGRATION_FLAG)
             return
 
         batch_size = 1000
@@ -143,9 +157,7 @@ class ChromaDBClient:
             )
 
         # Mark migration complete only after a full successful scan.
-        self._collection.modify(
-            metadata={**collection_meta, self._MIGRATION_FLAG: True},
-        )
+        self._set_collection_flag(self._MIGRATION_FLAG)
 
     # ------------------------------------------------------------------
     # Write operations
