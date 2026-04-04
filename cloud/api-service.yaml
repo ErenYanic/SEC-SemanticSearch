@@ -1,0 +1,213 @@
+# ──────────────────────────────────────────────────────────────────────
+# api-service.yaml — Cloud Run service definition for SEC Search API
+#
+# Deploy:
+#   gcloud run services replace cloud/api-service.yaml \
+#     --region=REGION
+#
+# Prerequisites:
+#   1. Artifact Registry repository (see scripts/gcloud-deploy.sh)
+#   2. Secrets in Secret Manager (see scripts/gcloud-setup-secrets.sh)
+#   3. GCS bucket for persistent data
+#   4. Service account with required IAM roles
+#
+# Requires a CUDA-enabled container image. Build with:
+#   docker build -f Dockerfile.api \
+#     --build-arg TORCH_INDEX_URL=https://download.pytorch.org/whl/cu124 \
+#     -t REGION-docker.pkg.dev/PROJECT_ID/sec-search/api:latest .
+#
+# CPU-only fallback (no GPU):
+#   Remove the run.googleapis.com/gpu-type annotation and the
+#   nvidia.com/gpu resource limit. Reduce cpu to "2" and memory to
+#   4Gi. Set EMBEDDING_DEVICE to "cpu" and EMBEDDING_BATCH_SIZE to
+#   "32". The default image (CPU-only PyTorch) is sufficient.
+#
+# See docs/DEPLOYMENT.md for full configuration reference.
+# ──────────────────────────────────────────────────────────────────────
+
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: sec-search-api
+  labels:
+    app: sec-semantic-search
+    component: api
+  annotations:
+    run.googleapis.com/description: >-
+      SEC Semantic Search API — FastAPI backend for semantic search
+      over SEC filings (8-K, 10-K, 10-Q).
+    run.googleapis.com/launch-stage: BETA
+
+spec:
+  template:
+    metadata:
+      annotations:
+        # Gen2 execution environment — required for GCS FUSE and GPU.
+        run.googleapis.com/execution-environment: gen2
+
+        # NVIDIA L4 GPU (24 GB VRAM).
+        run.googleapis.com/gpu-type: nvidia-l4
+
+        # Single instance — in-memory state (rate limiting, cooldown,
+        # task management) cannot be shared across instances (AD#22).
+        autoscaling.knative.dev/minScale: "0"
+        autoscaling.knative.dev/maxScale: "1"
+
+        # Extra CPU during cold start for faster initialisation.
+        run.googleapis.com/startup-cpu-boost: "true"
+
+    spec:
+      containerConcurrency: 80
+      timeoutSeconds: 3600
+
+      serviceAccountName: sec-search-sa@PROJECT_ID.iam.gserviceaccount.com
+
+      containers:
+        - image: REGION-docker.pkg.dev/PROJECT_ID/sec-search/api:latest
+          name: api
+
+          ports:
+            - containerPort: 8000
+              name: http1
+
+          resources:
+            limits:
+              cpu: "8"
+              memory: 32Gi
+              nvidia.com/gpu: "1"
+
+          startupProbe:
+            httpGet:
+              path: /api/health
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            failureThreshold: 12
+            timeoutSeconds: 5
+
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: 8000
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+
+          env:
+            # ── Server ──────────────────────────────────────────────
+            - name: API_HOST
+              value: "0.0.0.0"
+            - name: API_PORT
+              value: "8000"
+
+            # ── Database paths (match GCS FUSE mount) ───────────────
+            - name: DB_CHROMA_PATH
+              value: /app/data/chroma_db
+            - name: DB_METADATA_DB_PATH
+              value: /app/data/sqlite/metadata.sqlite
+
+            # ── Encryption (file-based — key never in /proc) ────────
+            - name: DB_ENCRYPTION_KEY_FILE
+              value: /secrets/db-encryption-key/latest
+
+            # ── API keys from Secret Manager ────────────────────────
+            - name: API_KEY
+              valueFrom:
+                secretKeyRef:
+                  key: latest
+                  name: sec-search-api-key
+            - name: API_ADMIN_KEY
+              valueFrom:
+                secretKeyRef:
+                  key: latest
+                  name: sec-search-admin-key
+
+            # ── Embedding (GPU) ─────────────────────────────────────
+            - name: EMBEDDING_MODEL_NAME
+              value: "google/embeddinggemma-300m"
+            - name: EMBEDDING_DEVICE
+              value: "cuda"
+            - name: EMBEDDING_BATCH_SIZE
+              value: "64"
+            - name: EMBEDDING_IDLE_TIMEOUT_MINUTES
+              value: "15"
+
+            # ── CORS ────────────────────────────────────────────────
+            # Replace after deploying the frontend service.
+            - name: API_CORS_ORIGINS
+              value: '["https://sec-search-frontend-PROJECT_HASH.REGION.run.app"]'
+
+            # ── EDGAR credentials ───────────────────────────────────
+            - name: API_EDGAR_SESSION_REQUIRED
+              value: "true"
+
+            # ── Privacy ─────────────────────────────────────────────
+            - name: LOG_REDACT_QUERIES
+              value: "true"
+            - name: DB_TASK_HISTORY_PERSIST_TICKERS
+              value: "false"
+            - name: DB_TASK_HISTORY_RETENTION_DAYS
+              value: "30"
+
+            # ── Database ────────────────────────────────────────────
+            - name: DB_MAX_FILINGS
+              value: "10000"
+
+            # ── Rate limiting (requests per minute) ─────────────────
+            - name: API_RATE_LIMIT_SEARCH
+              value: "60"
+            - name: API_RATE_LIMIT_INGEST
+              value: "30"
+            - name: API_RATE_LIMIT_DELETE
+              value: "30"
+            - name: API_RATE_LIMIT_GENERAL
+              value: "120"
+
+            # ── Logging ─────────────────────────────────────────────
+            - name: LOG_LEVEL
+              value: "INFO"
+
+            # ── Task queue ──────────────────────────────────────────
+            - name: API_MAX_TASK_QUEUE_SIZE
+              value: "5"
+
+            # ── Demo mode (Scenario C) ──────────────────────────────
+            - name: API_DEMO_MODE
+              value: "true"
+            - name: API_DEMO_EVICTION_BUFFER
+              value: "500"
+
+            # ── Abuse prevention (Scenario C) ───────────────────────
+            - name: API_MAX_TICKERS_PER_REQUEST
+              value: "100"
+            - name: API_MAX_FILINGS_PER_REQUEST
+              value: "200"
+            - name: API_INGEST_COOLDOWN_SECONDS
+              value: "60"
+            - name: API_MAX_TASK_DURATION_MINUTES
+              value: "30"
+
+          volumeMounts:
+            - name: data-volume
+              mountPath: /app/data
+            - name: db-encryption-key
+              mountPath: /secrets/db-encryption-key
+              readOnly: true
+
+      volumes:
+        # GCS FUSE — persistent storage for ChromaDB and SQLite.
+        # Single-instance constraint avoids file-locking conflicts.
+        - name: data-volume
+          csi:
+            driver: gcsfuse.run.googleapis.com
+            readOnly: false
+            volumeAttributes:
+              bucketName: PROJECT_ID-sec-search-data
+
+        # Secret Manager — encryption key mounted as a file.
+        - name: db-encryption-key
+          secret:
+            secretName: sec-search-db-encryption-key
+            items:
+              - key: latest
+                path: latest
