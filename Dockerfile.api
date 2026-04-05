@@ -96,6 +96,12 @@ ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
 # SECURITY: --workers 1 is required for rate limiting and ingest cooldown
 # to function correctly — both use in-memory state that is not shared
 # across processes.  Do not increase the worker count.
+# SECURITY: --proxy-headers enables X-Forwarded-For / X-Real-IP parsing
+# so that request.client.host reflects the real client IP (not the nginx
+# container IP).  --forwarded-allow-ips "*" is safe because all Docker
+# traffic arrives from the trusted nginx sidecar.  In Cloud Run, the
+# Google Front End terminates TLS and manages the trust boundary.
 CMD ["uvicorn", "sec_semantic_search.api.app:app", \
      "--host", "0.0.0.0", "--port", "8000", \
-     "--workers", "1", "--log-level", "info"]
+     "--workers", "1", "--log-level", "info", \
+     "--proxy-headers", "--forwarded-allow-ips", "*"]
