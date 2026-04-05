@@ -39,7 +39,7 @@ _CONTENT_SECURITY_POLICY = "; ".join([
     "img-src 'self' data: blob: https:",
     "font-src 'self' data: https:",
     "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com",
-    "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://unpkg.com",
+    "script-src 'self' https://cdn.jsdelivr.net https://unpkg.com",
     "connect-src 'self' ws: wss:",
 ])
 
