@@ -5,8 +5,10 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   ADMIN_SESSION_COOKIE,
   buildAdminSessionValue,
+  checkAdminLoginRate,
   getConfiguredAdminKey,
   hasValidAdminSession,
+  recordFailedAdminLogin,
 } from "@/lib/adminAuth";
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
@@ -23,6 +25,29 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ admin_required: false, is_admin: true });
   }
 
+  // Brute-force protection: rate limit failed login attempts per IP (F5).
+  const clientIp =
+    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
+    request.headers.get("x-real-ip") ??
+    "unknown";
+
+  const rateCheck = checkAdminLoginRate(clientIp);
+  if (!rateCheck.allowed) {
+    console.warn(
+      `[SECURITY] Admin login rate limit exceeded for IP ${clientIp}`,
+    );
+    return NextResponse.json(
+      {
+        error: "rate_limited",
+        message: `Too many login attempts. Try again in ${rateCheck.retryAfter}s.`,
+      },
+      {
+        status: 429,
+        headers: { "Retry-After": String(rateCheck.retryAfter) },
+      },
+    );
+  }
+
   const body = await request.json().catch(() => null);
   const provided = typeof body?.admin_key === "string" ? body.admin_key.trim() : "";
 
@@ -33,6 +58,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     timingSafeEqual(providedBytes, expectedBytes);
 
   if (!keysMatch) {
+    recordFailedAdminLogin(clientIp);
+    console.warn(
+      `[SECURITY] Failed admin login attempt from IP ${clientIp}`,
+    );
     return NextResponse.json(
       { error: "admin_required", message: "Invalid admin key." },
       { status: 403 },
@@ -47,6 +76,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
     path: "/",
+    maxAge: 3600,  // 1 hour — force re-authentication (F6)
   });
   return response;
 }
