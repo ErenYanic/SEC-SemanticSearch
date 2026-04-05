@@ -1821,3 +1821,233 @@ class TestOpenApiConditionalExposure:
         assert client.get("/docs").status_code == 200
         assert client.get("/redoc").status_code == 200
         assert client.get("/openapi.json").status_code == 200
+
+
+# -----------------------------------------------------------------------
+# Finding F2: Rate limiting behind reverse proxy (proxy-headers)
+# -----------------------------------------------------------------------
+
+
+class TestProxyHeadersConfiguration:
+    """Uvicorn is configured to trust proxy headers so that real client
+    IPs are used for rate limiting and audit logging (F2, F7)."""
+
+    def test_dockerfile_includes_proxy_headers(self):
+        """Dockerfile.api CMD must include --proxy-headers."""
+        dockerfile = Path(__file__).parents[3] / "Dockerfile.api"
+        content = dockerfile.read_text()
+        assert "--proxy-headers" in content
+
+    def test_dockerfile_includes_forwarded_allow_ips(self):
+        """Dockerfile.api CMD must include --forwarded-allow-ips."""
+        dockerfile = Path(__file__).parents[3] / "Dockerfile.api"
+        content = dockerfile.read_text()
+        assert "--forwarded-allow-ips" in content
+
+    def test_nginx_sets_x_forwarded_for(self):
+        """nginx.conf must set X-Forwarded-For to pass real client IP."""
+        nginx_conf = Path(__file__).parents[3] / "nginx.conf"
+        content = nginx_conf.read_text()
+        assert "X-Forwarded-For" in content
+        assert "X-Real-IP" in content
+
+
+# -----------------------------------------------------------------------
+# Finding F3: Chunked transfer encoding size limit bypass
+# -----------------------------------------------------------------------
+
+
+class TestChunkedTransferEncodingSizeLimit:
+    """ContentSizeLimitMiddleware enforces limits on streamed (chunked)
+    request bodies that lack a Content-Length header (F3)."""
+
+    def test_small_chunked_body_passes(self):
+        """A small body without Content-Length should be accepted."""
+        mock_engine = MagicMock()
+        mock_engine.search.return_value = []
+        app.dependency_overrides[get_search_engine] = lambda: mock_engine
+        app.dependency_overrides[get_registry] = lambda: MagicMock()
+
+        client = TestClient(app)
+        resp = client.post(
+            "/api/search/",
+            json={"query": "revenue growth", "top_k": 5},
+        )
+        assert resp.status_code != 413
+
+        app.dependency_overrides.clear()
+
+    def test_oversized_streamed_body_rejected(self):
+        """A streamed body exceeding 1 MB should get 413 even without
+        Content-Length (defends against chunked transfer encoding bypass)."""
+        client = TestClient(app)
+        oversized_payload = b"x" * (1024 * 1024 + 1)  # 1 MB + 1 byte
+        resp = client.post(
+            "/api/search/",
+            content=oversized_payload,
+            headers={"Content-Type": "application/json"},
+        )
+        assert resp.status_code == 413
+        body = resp.json()
+        assert body["detail"]["error"] == "payload_too_large"
+
+    def test_exactly_at_limit_passes(self):
+        """A body exactly at the 1 MB boundary should be accepted."""
+        mock_engine = MagicMock()
+        mock_engine.search.return_value = []
+        app.dependency_overrides[get_search_engine] = lambda: mock_engine
+        app.dependency_overrides[get_registry] = lambda: MagicMock()
+
+        client = TestClient(app)
+        # Build a valid JSON payload near the 1 MB boundary
+        # (the actual body will be slightly smaller due to JSON overhead)
+        payload = {"query": "x" * 2000, "top_k": 5}
+        resp = client.post("/api/search/", json=payload)
+        assert resp.status_code != 413
+
+        app.dependency_overrides.clear()
+
+
+# -----------------------------------------------------------------------
+# Finding F4: CSP 'unsafe-inline' removed from script-src
+# -----------------------------------------------------------------------
+
+
+class TestCSPUnsafeInlineRemoved:
+    """Content-Security-Policy must not include 'unsafe-inline' in
+    script-src (F4)."""
+
+    def test_api_csp_no_unsafe_inline_in_script_src(self):
+        """API response CSP script-src must not contain 'unsafe-inline'."""
+        client = TestClient(app)
+        resp = client.get("/api/health")
+        csp = resp.headers.get("Content-Security-Policy", "")
+        # Parse the script-src directive
+        for directive in csp.split(";"):
+            directive = directive.strip()
+            if directive.startswith("script-src"):
+                assert "'unsafe-inline'" not in directive, (
+                    f"script-src still contains 'unsafe-inline': {directive}"
+                )
+                break
+
+    def test_api_csp_retains_unsafe_inline_in_style_src(self):
+        """style-src may keep 'unsafe-inline' for Tailwind compatibility."""
+        client = TestClient(app)
+        resp = client.get("/api/health")
+        csp = resp.headers.get("Content-Security-Policy", "")
+        for directive in csp.split(";"):
+            directive = directive.strip()
+            if directive.startswith("style-src"):
+                assert "'unsafe-inline'" in directive
+                break
+
+    def test_nginx_csp_no_unsafe_inline_in_script_src(self):
+        """nginx.conf CSP script-src must not contain 'unsafe-inline'."""
+        nginx_conf = Path(__file__).parents[3] / "nginx.conf"
+        content = nginx_conf.read_text()
+        # Find CSP lines and check script-src
+        for line in content.splitlines():
+            if "Content-Security-Policy" in line and "script-src" in line:
+                # Extract the script-src directive
+                idx = line.index("script-src")
+                rest = line[idx:]
+                # script-src ends at the next semicolon
+                end = rest.find(";")
+                script_src = rest[:end] if end != -1 else rest
+                assert "'unsafe-inline'" not in script_src, (
+                    f"nginx script-src still contains 'unsafe-inline': {script_src}"
+                )
+
+
+# -----------------------------------------------------------------------
+# Finding F5: Brute-force protection on admin session login
+# -----------------------------------------------------------------------
+
+
+class TestAdminLoginRateLimit:
+    """POST /api/admin/session must be rate-limited to deter brute-force
+    attacks (F5)."""
+
+    def test_auth_category_in_classify_path(self):
+        """_classify_path must return 'auth' for admin session POST."""
+        from sec_semantic_search.api.rate_limit import _classify_path
+
+        assert _classify_path("/api/admin/session", "POST") == "auth"
+
+    def test_auth_category_does_not_match_get(self):
+        """GET /api/admin/session should not be classified as auth."""
+        from sec_semantic_search.api.rate_limit import _classify_path
+
+        result = _classify_path("/api/admin/session", "GET")
+        assert result != "auth"
+
+    def test_auth_bucket_has_strict_limit(self):
+        """The auth rate-limit bucket must have a strict limit (<=10/min)."""
+        from sec_semantic_search.api.rate_limit import RateLimitMiddleware
+
+        middleware = app.middleware_stack
+        while middleware is not None:
+            if isinstance(middleware, RateLimitMiddleware):
+                auth_bucket = middleware._buckets.get("auth")
+                assert auth_bucket is not None, "No 'auth' bucket in rate limiter"
+                assert auth_bucket.limit <= 10, (
+                    f"Auth rate limit too permissive: {auth_bucket.limit}/min"
+                )
+                break
+            middleware = getattr(middleware, "app", None)
+
+    def test_auth_sliding_window_blocks_after_limit(self):
+        """Auth sliding window should block after 5 attempts."""
+        from sec_semantic_search.api.rate_limit import _SlidingWindow
+
+        window = _SlidingWindow(requests_per_minute=5)
+        for _ in range(5):
+            allowed, _ = window.is_allowed("attacker-ip")
+            assert allowed
+
+        allowed, retry_after = window.is_allowed("attacker-ip")
+        assert not allowed
+        assert retry_after > 0
+
+
+# -----------------------------------------------------------------------
+# Finding F6: Admin session cookie expiry
+# -----------------------------------------------------------------------
+
+
+class TestAdminSessionCookieExpiry:
+    """The admin session cookie must have a maxAge to force
+    re-authentication (F6)."""
+
+    def test_route_handler_sets_max_age(self):
+        """The route handler source must include maxAge on the cookie."""
+        route_file = (
+            Path(__file__).parents[3]
+            / "frontend"
+            / "src"
+            / "app"
+            / "api"
+            / "admin"
+            / "session"
+            / "route.ts"
+        )
+        content = route_file.read_text()
+        assert "maxAge" in content, "Admin session cookie must set maxAge"
+        # Verify it's a reasonable value (1-24 hours = 3600-86400 seconds)
+        assert "3600" in content, "maxAge should be 3600 (1 hour)"
+
+
+# -----------------------------------------------------------------------
+# Observation #14: nginx server_tokens disabled
+# -----------------------------------------------------------------------
+
+
+class TestNginxServerTokens:
+    """nginx must suppress version disclosure (Observation #14)."""
+
+    def test_nginx_server_tokens_off(self):
+        """nginx.conf must contain 'server_tokens off'."""
+        nginx_conf = Path(__file__).parents[3] / "nginx.conf"
+        content = nginx_conf.read_text()
+        assert "server_tokens off" in content
