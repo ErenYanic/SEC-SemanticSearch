@@ -139,11 +139,16 @@ _MAX_CONTENT_LENGTH = 1 * 1024 * 1024
 
 
 class ContentSizeLimitMiddleware:
-    """Reject requests whose ``Content-Length`` exceeds the allowed limit.
+    """Reject requests whose body exceeds the allowed limit.
 
-    Pure ASGI implementation — inspects the ``Content-Length`` header
-    from the ASGI scope and short-circuits with a 413 response before
-    the inner application is called.  Does not consume the body.
+    Pure ASGI implementation with two layers of defence:
+
+    1. **Content-Length check** — short-circuits before reading the body
+       when the declared size exceeds the limit.
+    2. **Stream-counting wrapper** — intercepts ``http.request`` messages
+       and tracks bytes received so far.  Rejects mid-stream if the
+       cumulative total exceeds the limit, protecting against chunked
+       transfer encoding (which omits ``Content-Length``).
     """
 
     def __init__(self, app: ASGIApp) -> None:
@@ -186,7 +191,49 @@ class ContentSizeLimitMiddleware:
                 )
                 return
 
-        await self.app(scope, receive, send)
+        # Stream-counting wrapper — enforces the limit during body reads
+        # even when Content-Length is absent (chunked transfer encoding).
+        bytes_received = 0
+        rejected = False
+
+        async def receive_with_limit() -> dict:
+            nonlocal bytes_received, rejected
+            message = await receive()
+            if message["type"] == "http.request":
+                bytes_received += len(message.get("body", b""))
+                if bytes_received > _MAX_CONTENT_LENGTH:
+                    rejected = True
+                    # Return an empty body with more_body=False to signal
+                    # end of stream; the 413 is sent via send_with_guard.
+                    return {"type": "http.request", "body": b"", "more_body": False}
+            return message
+
+        async def send_with_guard(message: dict) -> None:
+            if rejected and message["type"] == "http.response.start":
+                # Suppress the app's response — we send our own 413.
+                return
+            if rejected and message["type"] == "http.response.body":
+                return
+            await send(message)
+
+        await self.app(scope, receive_with_limit, send_with_guard)
+
+        if rejected:
+            await self._send_json(
+                send,
+                status=413,
+                body={
+                    "detail": {
+                        "error": "payload_too_large",
+                        "message": (
+                            f"Request body too large (>{_MAX_CONTENT_LENGTH:,} bytes). "
+                            f"Maximum allowed: {_MAX_CONTENT_LENGTH:,} bytes."
+                        ),
+                        "details": None,
+                        "hint": "Reduce the request payload size.",
+                    },
+                },
+            )
 
     @staticmethod
     async def _send_json(send: Send, *, status: int, body: dict) -> None:
