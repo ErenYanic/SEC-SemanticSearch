@@ -20,6 +20,7 @@ Usage:
 """
 
 import json
+import os
 import re
 import sqlite3
 import threading
@@ -60,6 +61,41 @@ def _get_sqlite_module(encryption_key: str | None) -> types.ModuleType:
                 "Falling back to unencrypted sqlite3."
             )
     return sqlite3
+
+
+def _resolve_runtime_encryption_key(default_key: str | None) -> str | None:
+    """Resolve the current SQLCipher key from env vars without revalidating paths.
+
+    MetadataRegistry supports tests that override database paths with temporary
+    directories outside the project root. Re-instantiating DatabaseSettings()
+    would re-run path validation and fail those tests. For the registry we only
+    need the encryption key fields, so resolve them directly from the current
+    process environment and fall back to the already-loaded settings value.
+    """
+    env_key = os.environ.get("DB_ENCRYPTION_KEY")
+    env_key_file = os.environ.get("DB_ENCRYPTION_KEY_FILE")
+
+    if env_key and env_key_file:
+        raise ValueError(
+            "DB_ENCRYPTION_KEY and DB_ENCRYPTION_KEY_FILE are mutually exclusive. Set only one."
+        )
+
+    if env_key:
+        return env_key
+
+    if env_key_file:
+        key_path = Path(env_key_file)
+        if not key_path.exists():
+            raise ValueError(f"DB_ENCRYPTION_KEY_FILE '{env_key_file}' does not exist.")
+        if not key_path.is_file():
+            raise ValueError(f"DB_ENCRYPTION_KEY_FILE '{env_key_file}' is not a file.")
+
+        key_content = key_path.read_text().strip()
+        if not key_content:
+            raise ValueError(f"DB_ENCRYPTION_KEY_FILE '{env_key_file}' is empty.")
+        return key_content
+
+    return default_key
 
 
 # SEC accession number pattern: NNNNNNNNNN-NN-NNNNNN (with or without dashes).
@@ -221,7 +257,9 @@ class MetadataRegistry:
         self._db_path = db_path or settings.database.metadata_db_path
         self._max_filings = settings.database.max_filings
         self._encryption_key = (
-            encryption_key if encryption_key is not None else settings.database.encryption_key
+            encryption_key
+            if encryption_key is not None
+            else _resolve_runtime_encryption_key(settings.database.encryption_key)
         )
 
         # Ensure parent directory exists
