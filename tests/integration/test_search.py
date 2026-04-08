@@ -25,7 +25,6 @@ from sec_semantic_search.database.client import ChromaDBClient
 from sec_semantic_search.pipeline.orchestrator import ProcessedFiling
 from sec_semantic_search.search.engine import SearchEngine
 
-
 # -----------------------------------------------------------------------
 # Fixtures
 # -----------------------------------------------------------------------

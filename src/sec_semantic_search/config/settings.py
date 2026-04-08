@@ -86,8 +86,7 @@ class DatabaseSettings(BaseSettings):
         """
         if self.encryption_key and self.encryption_key_file:
             raise ValueError(
-                "DB_ENCRYPTION_KEY and DB_ENCRYPTION_KEY_FILE are mutually exclusive. "
-                "Set only one."
+                "DB_ENCRYPTION_KEY and DB_ENCRYPTION_KEY_FILE are mutually exclusive. Set only one."
             )
 
         if self.encryption_key_file:
@@ -102,9 +101,7 @@ class DatabaseSettings(BaseSettings):
                 )
             key_content = key_path.read_text().strip()
             if not key_content:
-                raise ValueError(
-                    f"DB_ENCRYPTION_KEY_FILE '{self.encryption_key_file}' is empty."
-                )
+                raise ValueError(f"DB_ENCRYPTION_KEY_FILE '{self.encryption_key_file}' is empty.")
             self.encryption_key = key_content
 
         return self

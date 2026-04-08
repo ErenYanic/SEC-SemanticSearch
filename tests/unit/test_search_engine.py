@@ -9,7 +9,7 @@ Tests the engine's own logic in isolation (no real ChromaDB):
     - Default parameter usage from settings
 """
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -53,6 +53,7 @@ class TestExceptionWrapping:
     def test_search_error_not_double_wrapped(self, engine, mock_chroma):
         """SearchError from ChromaDB should propagate without re-wrapping."""
         from sec_semantic_search.core.exceptions import DatabaseError
+
         mock_chroma.query.side_effect = DatabaseError("connection lost")
         with pytest.raises(SearchError, match="Search failed"):
             engine.search("test query")

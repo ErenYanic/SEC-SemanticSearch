@@ -6,21 +6,22 @@ We mock heavy dependencies (fetcher, databases, embedder) to keep tests
 fast while verifying exit codes, output messages, and command routing.
 """
 
+import re
 from unittest.mock import MagicMock, patch
 
-import numpy as np
-import pytest
 from typer.testing import CliRunner
 
 from sec_semantic_search.cli.main import app
 from sec_semantic_search.database import delete_filings_batch
 from sec_semantic_search.database.metadata import DatabaseStatistics
-from sec_semantic_search.config.constants import EMBEDDING_DIMENSION
-from sec_semantic_search.core.types import ContentType, IngestResult, Segment
-from sec_semantic_search.pipeline.orchestrator import ProcessedFiling
 from tests.helpers import make_filing_record
 
 runner = CliRunner()
+
+
+def _strip_ansi(text: str) -> str:
+    """Remove ANSI escape sequences from Rich-rendered CLI help output."""
+    return re.sub(r"\x1b\[[0-9;]*m", "", text)
 
 
 # -----------------------------------------------------------------------
@@ -159,9 +160,7 @@ class TestManageRemove:
             mock_registry.get_filing.return_value = record
             MockReg.return_value = mock_registry
 
-            result = runner.invoke(
-                app, ["manage", "remove", "ACC-001"], input="n\n"
-            )
+            result = runner.invoke(app, ["manage", "remove", "ACC-001"], input="n\n")
 
         assert "Cancelled" in result.output
 
@@ -190,9 +189,7 @@ class TestBulkRemove:
             mock_chroma = MagicMock()
             MockChroma.return_value = mock_chroma
 
-            result = runner.invoke(
-                app, ["manage", "remove", "--ticker", "AAPL", "--yes"]
-            )
+            result = runner.invoke(app, ["manage", "remove", "--ticker", "AAPL", "--yes"])
 
         assert result.exit_code == 0
         assert "2 filing(s) removed" in result.output
@@ -203,17 +200,13 @@ class TestBulkRemove:
             mock_registry.list_filings.return_value = []
             MockReg.return_value = mock_registry
 
-            result = runner.invoke(
-                app, ["manage", "remove", "--ticker", "ZZZZ", "--yes"]
-            )
+            result = runner.invoke(app, ["manage", "remove", "--ticker", "ZZZZ", "--yes"])
 
         assert "No filings found" in result.output
 
     def test_mutual_exclusion_accession_and_ticker(self):
         """Providing both an accession number and --ticker should fail."""
-        result = runner.invoke(
-            app, ["manage", "remove", "ACC-001", "--ticker", "AAPL"]
-        )
+        result = runner.invoke(app, ["manage", "remove", "ACC-001", "--ticker", "AAPL"])
         assert result.exit_code == 1
         assert "Cannot combine" in result.output
 
@@ -221,8 +214,10 @@ class TestBulkRemove:
         """Providing neither accession nor filters should fail."""
         result = runner.invoke(app, ["manage", "remove"])
         assert result.exit_code == 1
-        assert "Provide an accession" in result.output.lower() or \
-               "provide an accession" in result.output.lower()
+        assert (
+            "Provide an accession" in result.output.lower()
+            or "provide an accession" in result.output.lower()
+        )
 
     def test_bulk_remove_cancelled(self):
         """Answering 'n' to bulk remove confirmation should cancel."""
@@ -236,9 +231,7 @@ class TestBulkRemove:
             MockReg.return_value = mock_registry
             MockChroma.return_value = MagicMock()
 
-            result = runner.invoke(
-                app, ["manage", "remove", "--ticker", "AAPL"], input="n\n"
-            )
+            result = runner.invoke(app, ["manage", "remove", "--ticker", "AAPL"], input="n\n")
 
         assert "Cancelled" in result.output
 
@@ -332,12 +325,12 @@ class TestDeleteFilingsBatch:
         call_order = []
 
         mock_chroma = MagicMock()
-        mock_chroma.delete_filings_batch.side_effect = lambda accs: (
-            call_order.append(("chroma", accs))
+        mock_chroma.delete_filings_batch.side_effect = lambda accs: call_order.append(
+            ("chroma", accs)
         )
         mock_registry = MagicMock()
-        mock_registry.remove_filings_batch.side_effect = lambda accs: (
-            call_order.append(("registry", accs))
+        mock_registry.remove_filings_batch.side_effect = lambda accs: call_order.append(
+            ("registry", accs)
         )
 
         delete_filings_batch([record], registry=mock_registry, chroma=mock_chroma)
@@ -419,9 +412,7 @@ class TestSearchCommand:
             mock_engine.search.return_value = []
             MockEngine.return_value = mock_engine
 
-            result = runner.invoke(
-                app, ["search", "test query", "-a", "0000320193-23-000106"]
-            )
+            result = runner.invoke(app, ["search", "test query", "-a", "0000320193-23-000106"])
 
         assert result.exit_code == 0
         mock_engine.search.assert_called_once_with(
@@ -444,11 +435,16 @@ class TestSearchCommand:
             result = runner.invoke(
                 app,
                 [
-                    "search", "test query",
-                    "-k", "AAPL",
-                    "-f", "10-K",
-                    "-a", "0000320193-23-000106",
-                    "-t", "3",
+                    "search",
+                    "test query",
+                    "-k",
+                    "AAPL",
+                    "-f",
+                    "10-K",
+                    "-a",
+                    "0000320193-23-000106",
+                    "-t",
+                    "3",
                 ],
             )
 
@@ -470,9 +466,7 @@ class TestSearchCommand:
             mock_engine.search.return_value = []
             MockEngine.return_value = mock_engine
 
-            result = runner.invoke(
-                app, ["search", "test query", "-k", "AAPL", "-k", "MSFT"]
-            )
+            result = runner.invoke(app, ["search", "test query", "-k", "AAPL", "-k", "MSFT"])
 
         assert result.exit_code == 0
         mock_engine.search.assert_called_once_with(
@@ -492,9 +486,7 @@ class TestSearchCommand:
             mock_engine.search.return_value = []
             MockEngine.return_value = mock_engine
 
-            result = runner.invoke(
-                app, ["search", "test query", "-f", "10-K", "-f", "10-Q"]
-            )
+            result = runner.invoke(app, ["search", "test query", "-f", "10-K", "-f", "10-Q"])
 
         assert result.exit_code == 0
         mock_engine.search.assert_called_once_with(
@@ -517,9 +509,12 @@ class TestSearchCommand:
             result = runner.invoke(
                 app,
                 [
-                    "search", "test query",
-                    "-a", "0000320193-23-000106",
-                    "-a", "0000320193-23-000107",
+                    "search",
+                    "test query",
+                    "-a",
+                    "0000320193-23-000106",
+                    "-a",
+                    "0000320193-23-000107",
                 ],
             )
 
@@ -538,8 +533,9 @@ class TestSearchCommand:
         """--accession should appear in the search --help output."""
         result = runner.invoke(app, ["search", "--help"])
         assert result.exit_code == 0
-        assert "--accession" in result.output
-        assert "-a" in result.output
+        output = _strip_ansi(result.output)
+        assert "--accession" in output
+        assert "-a" in output
 
     def test_start_date_passed_to_engine(self):
         """--start-date passes start_date to SearchEngine.search()."""
@@ -548,9 +544,7 @@ class TestSearchCommand:
             mock_engine.search.return_value = []
             MockEngine.return_value = mock_engine
 
-            result = runner.invoke(
-                app, ["search", "test query", "--start-date", "2023-01-01"]
-            )
+            result = runner.invoke(app, ["search", "test query", "--start-date", "2023-01-01"])
 
         assert result.exit_code == 0
         mock_engine.search.assert_called_once_with(
@@ -570,9 +564,7 @@ class TestSearchCommand:
             mock_engine.search.return_value = []
             MockEngine.return_value = mock_engine
 
-            result = runner.invoke(
-                app, ["search", "test query", "--end-date", "2023-12-31"]
-            )
+            result = runner.invoke(app, ["search", "test query", "--end-date", "2023-12-31"])
 
         assert result.exit_code == 0
         mock_engine.search.assert_called_once_with(
@@ -595,9 +587,12 @@ class TestSearchCommand:
             result = runner.invoke(
                 app,
                 [
-                    "search", "test query",
-                    "--start-date", "2023-01-01",
-                    "--end-date", "2023-12-31",
+                    "search",
+                    "test query",
+                    "--start-date",
+                    "2023-01-01",
+                    "--end-date",
+                    "2023-12-31",
                 ],
             )
 
@@ -616,8 +611,9 @@ class TestSearchCommand:
         """--start-date and --end-date should appear in search --help."""
         result = runner.invoke(app, ["search", "--help"])
         assert result.exit_code == 0
-        assert "--start-date" in result.output
-        assert "--end-date" in result.output
+        output = _strip_ansi(result.output)
+        assert "--start-date" in output
+        assert "--end-date" in output
 
 
 # -----------------------------------------------------------------------
@@ -642,9 +638,7 @@ class TestIngestAddValidation:
             mock_fetcher.fetch_latest.side_effect = FetchError("No network")
             MockFetcher.return_value = mock_fetcher
 
-            result = runner.invoke(
-                app, ["ingest", "add", "AAPL", "--form", "10-K,10-Q"]
-            )
+            result = runner.invoke(app, ["ingest", "add", "AAPL", "--form", "10-K,10-Q"])
 
         # The form type validation should pass — any error is from fetching,
         # not from form type parsing.

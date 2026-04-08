@@ -36,7 +36,6 @@ Usage:
 from collections.abc import Iterator
 from dataclasses import dataclass, field
 from datetime import date, datetime
-from itertools import islice
 from typing import Any
 
 from edgar import Company, set_identity
@@ -156,10 +155,7 @@ class FilingFetcher:
                     details=str(e),
                 ) from e
         else:
-            logger.debug(
-                "EDGAR identity not configured — "
-                "per-session credentials required"
-            )
+            logger.debug("EDGAR identity not configured — per-session credentials required")
 
     def set_identity(self, name: str, email: str) -> None:
         """Set EDGAR identity for the current request (per-session credentials).
@@ -597,8 +593,12 @@ class FilingFetcher:
         for form_type in form_types:
             try:
                 available = self.list_available(
-                    ticker, form_type, count=count,
-                    year=year, start_date=start_date, end_date=end_date,
+                    ticker,
+                    form_type,
+                    count=count,
+                    year=year,
+                    start_date=start_date,
+                    end_date=end_date,
                 )
                 all_available.extend(available)
             except FetchError:
@@ -786,9 +786,7 @@ class FilingFetcher:
         fetched_count = 0
         for filing in filings_list:
             try:
-                filing_id, html_content = self._fetch_filing_content(
-                    filing, ticker, form_type
-                )
+                filing_id, html_content = self._fetch_filing_content(filing, ticker, form_type)
                 fetched_count += 1
                 logger.debug(
                     "Fetched %d/%d: %s",
@@ -860,9 +858,7 @@ class FilingFetcher:
             if self._should_skip(filing, form_type):
                 continue
             if filing.accession_no == accession_number:
-                filing_id, html_content = self._fetch_filing_content(
-                    filing, ticker, form_type
-                )
+                filing_id, html_content = self._fetch_filing_content(filing, ticker, form_type)
                 logger.info(
                     "Fetched %s %s (%s): %s characters",
                     ticker,

@@ -32,20 +32,21 @@ from sec_semantic_search.core import get_logger
 
 logger = get_logger(__name__)
 
-_CONTENT_SECURITY_POLICY = "; ".join([
-    "default-src 'self'",
-    "base-uri 'self'",
-    "frame-ancestors 'none'",
-    "img-src 'self' data: blob: https:",
-    "font-src 'self' data: https:",
-    "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com",
-    "script-src 'self' https://cdn.jsdelivr.net https://unpkg.com",
-    "connect-src 'self' ws: wss:",
-])
+_CONTENT_SECURITY_POLICY = "; ".join(
+    [
+        "default-src 'self'",
+        "base-uri 'self'",
+        "frame-ancestors 'none'",
+        "img-src 'self' data: blob: https:",
+        "font-src 'self' data: https:",
+        "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com",
+        "script-src 'self' https://cdn.jsdelivr.net https://unpkg.com",
+        "connect-src 'self' ws: wss:",
+    ]
+)
 
 _PERMISSIONS_POLICY = (
-    "camera=(), microphone=(), geolocation=(), "
-    "payment=(), usb=(), interest-cohort=()"
+    "camera=(), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=()"
 )
 
 _SECURITY_HEADERS: list[tuple[bytes, bytes]] = [
@@ -97,7 +98,9 @@ class InsecureTransportWarningMiddleware(BaseHTTPMiddleware):
         self._warned = False
 
     async def dispatch(
-        self, request: Request, call_next: RequestResponseEndpoint,
+        self,
+        request: Request,
+        call_next: RequestResponseEndpoint,
     ) -> Response:
         if not self._warned:
             self._maybe_warn(request)
@@ -105,11 +108,7 @@ class InsecureTransportWarningMiddleware(BaseHTTPMiddleware):
 
     def _maybe_warn(self, request: Request) -> None:
         settings = get_settings()
-        if not (
-            settings.api.key
-            or settings.api.admin_key
-            or settings.api.edgar_session_required
-        ):
+        if not (settings.api.key or settings.api.admin_key or settings.api.edgar_session_required):
             return
 
         forwarded_proto = request.headers.get("x-forwarded-proto")
@@ -239,18 +238,22 @@ class ContentSizeLimitMiddleware:
     async def _send_json(send: Send, *, status: int, body: dict) -> None:
         """Send a complete JSON response via raw ASGI messages."""
         payload = json.dumps(body).encode()
-        await send({
-            "type": "http.response.start",
-            "status": status,
-            "headers": [
-                [b"content-type", b"application/json"],
-                [b"content-length", str(len(payload)).encode()],
-            ],
-        })
-        await send({
-            "type": "http.response.body",
-            "body": payload,
-        })
+        await send(
+            {
+                "type": "http.response.start",
+                "status": status,
+                "headers": [
+                    [b"content-type", b"application/json"],
+                    [b"content-length", str(len(payload)).encode()],
+                ],
+            }
+        )
+        await send(
+            {
+                "type": "http.response.body",
+                "body": payload,
+            }
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -400,12 +403,22 @@ def create_app() -> FastAPI:
     from sec_semantic_search.api.websocket import router as ws_router
 
     auth = [Depends(verify_api_key)]
-    application.include_router(status_router, prefix="/api/status", tags=["status"], dependencies=auth)
-    application.include_router(filings_router, prefix="/api/filings", tags=["filings"], dependencies=auth)
-    application.include_router(search_router, prefix="/api/search", tags=["search"], dependencies=auth)
-    application.include_router(ingest_router, prefix="/api/ingest", tags=["ingest"], dependencies=auth)
+    application.include_router(
+        status_router, prefix="/api/status", tags=["status"], dependencies=auth
+    )
+    application.include_router(
+        filings_router, prefix="/api/filings", tags=["filings"], dependencies=auth
+    )
+    application.include_router(
+        search_router, prefix="/api/search", tags=["search"], dependencies=auth
+    )
+    application.include_router(
+        ingest_router, prefix="/api/ingest", tags=["ingest"], dependencies=auth
+    )
     application.include_router(ws_router, tags=["websocket"])  # WS validates key in handler
-    application.include_router(resources_router, prefix="/api/resources", tags=["resources"], dependencies=auth)
+    application.include_router(
+        resources_router, prefix="/api/resources", tags=["resources"], dependencies=auth
+    )
 
     # -- Health check -------------------------------------------------------
     @application.get("/api/health", tags=["meta"], summary="Health check")

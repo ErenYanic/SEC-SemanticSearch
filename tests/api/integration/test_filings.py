@@ -147,7 +147,9 @@ class TestDeleteByIds:
 
     def test_all_found(self):
         rec1 = make_filing_record(id=1, accession_number="0000000001-24-000001", chunk_count=50)
-        rec2 = make_filing_record(id=2, accession_number="0000000002-24-000002", filing_date="2024-06-01", chunk_count=30)
+        rec2 = make_filing_record(
+            id=2, accession_number="0000000002-24-000002", filing_date="2024-06-01", chunk_count=30
+        )
         client, registry, _ = _make_client()
         registry.get_filings_by_accessions.return_value = [rec1, rec2]
         resp = client.post(

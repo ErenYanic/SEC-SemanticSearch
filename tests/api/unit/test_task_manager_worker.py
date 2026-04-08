@@ -7,15 +7,13 @@ Covers the previously untested static/internal methods:
     - _push() — WebSocket message queuing
 """
 
-from datetime import date
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-from sec_semantic_search.api.tasks import TaskInfo, TaskManager, TaskState
+from sec_semantic_search.api.tasks import TaskManager, TaskState
 from sec_semantic_search.core.exceptions import DatabaseError
 from tests.helpers import make_task_info
-
 
 # -----------------------------------------------------------------------
 # _effective_count()
@@ -141,11 +139,9 @@ class TestRollback:
         info._stored_accessions = ["ACC-001"]
 
         call_order = []
-        manager._chroma.delete_filing.side_effect = lambda acc: (
-            call_order.append(("chroma", acc))
-        )
-        manager._registry.remove_filing.side_effect = lambda acc: (
-            call_order.append(("registry", acc))
+        manager._chroma.delete_filing.side_effect = lambda acc: call_order.append(("chroma", acc))
+        manager._registry.remove_filing.side_effect = lambda acc: call_order.append(
+            ("registry", acc)
         )
 
         manager._rollback(info)

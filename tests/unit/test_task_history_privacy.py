@@ -9,7 +9,7 @@ Covers:
 
 import json
 import sqlite3
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import patch
 
 import pytest
@@ -18,7 +18,6 @@ from sec_semantic_search.database.metadata import (
     MetadataRegistry,
     _scrub_error_message,
 )
-
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -30,6 +29,7 @@ def _reset_settings():
     """Reload settings after the test to avoid cross-test contamination."""
     yield
     from sec_semantic_search.config import reload_settings
+
     reload_settings()
 
 
@@ -40,6 +40,7 @@ def registry(tmp_path, monkeypatch, _reset_settings):
     monkeypatch.setenv("DB_CHROMA_PATH", str(tmp_path / "chroma"))
 
     from sec_semantic_search.config import reload_settings
+
     reload_settings()
 
     # Explicit empty key ensures unencrypted mode regardless of
@@ -354,7 +355,7 @@ class TestConfigurableRetention:
 
     def test_retention_keeps_recent_entries(self, registry):
         """Entries newer than retention days are kept."""
-        recent = datetime.now(timezone.utc).isoformat()
+        recent = datetime.now(UTC).isoformat()
         _save_sample_task(registry, completed_at=recent)
 
         removed = registry.prune_task_history(max_age_days=30)
@@ -382,7 +383,7 @@ class TestConfigurableRetention:
         _save_sample_task(
             registry,
             task_id="new-task",
-            completed_at=datetime.now(timezone.utc).isoformat(),
+            completed_at=datetime.now(UTC).isoformat(),
         )
 
         removed = registry.prune_task_history(max_age_days=1)

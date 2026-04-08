@@ -39,7 +39,6 @@ from sec_semantic_search.core.types import FilingIdentifier
 from sec_semantic_search.database.metadata import MetadataRegistry
 from tests.helpers import make_filing_record, make_task_info
 
-
 # -----------------------------------------------------------------------
 # Helpers
 # -----------------------------------------------------------------------
@@ -54,7 +53,7 @@ def _make_full_client(
     """Build a TestClient with all dependencies mocked."""
     registry = MagicMock()
     registry.list_filings.return_value = filings or []
-    registry.get_filing.return_value = (filings[0] if filings else None)
+    registry.get_filing.return_value = filings[0] if filings else None
     registry.get_statistics.return_value = MagicMock(
         filing_count=len(filings or []),
         tickers=["AAPL"] if filings else [],
@@ -85,7 +84,8 @@ def _make_full_client(
     app.dependency_overrides[get_embedder] = lambda: embedder
     app.dependency_overrides[get_task_manager] = lambda: manager
     app.dependency_overrides[get_edgar_identity] = lambda: EdgarIdentity(
-        name="Test", email="test@example.com",
+        name="Test",
+        email="test@example.com",
     )
 
     return TestClient(app, raise_server_exceptions=False), {
@@ -186,7 +186,8 @@ class TestEncryptedDBRoundTrip:
             return_value=mock_module,
         ):
             registry = MetadataRegistry(
-                db_path=db_path, encryption_key="test-secret-key",
+                db_path=db_path,
+                encryption_key="test-secret-key",
             )
 
         assert registry.encrypted is True
@@ -289,10 +290,13 @@ class TestSearchLogRedaction:
         """Ingest route redacts ticker symbols in log output when redaction enabled."""
         client, _ = _make_full_client()
 
-        resp = client.post("/api/ingest/add", json={
-            "tickers": ["AAPL"],
-            "form_types": ["10-K"],
-        })
+        resp = client.post(
+            "/api/ingest/add",
+            json={
+                "tickers": ["AAPL"],
+                "form_types": ["10-K"],
+            },
+        )
         assert resp.status_code == 202
 
         mock_logger.info.assert_called_once()
@@ -414,6 +418,7 @@ class TestPermissionMatrix:
     def teardown_method(self):
         app.dependency_overrides.clear()
         from sec_semantic_search.api.routes import ingest as ingest_mod
+
         with ingest_mod._cooldown_lock:
             ingest_mod._last_ingest.clear()
 
@@ -422,7 +427,8 @@ class TestPermissionMatrix:
         """Set up common mocks for all permission tests."""
         self.filings = [make_filing_record()]
         self.client, self.deps = _make_full_client(
-            filings=self.filings, chunk_count=100,
+            filings=self.filings,
+            chunk_count=100,
         )
 
     # --- Admin endpoints that should require admin key ---
@@ -441,8 +447,12 @@ class TestPermissionMatrix:
     @patch("sec_semantic_search.api.routes.filings.get_settings")
     @patch("sec_semantic_search.api.dependencies.get_settings")
     def test_admin_endpoint_rejects_no_key(
-        self, mock_dep_settings, mock_route_settings,
-        method, url, json_body,
+        self,
+        mock_dep_settings,
+        mock_route_settings,
+        method,
+        url,
+        json_body,
     ):
         """Admin endpoints reject requests with no admin key (403)."""
         mock_dep_settings.return_value.api.admin_key = "admin-secret"
@@ -463,8 +473,12 @@ class TestPermissionMatrix:
     @patch("sec_semantic_search.api.routes.filings.get_settings")
     @patch("sec_semantic_search.api.dependencies.get_settings")
     def test_admin_endpoint_rejects_regular_api_key_as_admin_key(
-        self, mock_dep_settings, mock_route_settings,
-        method, url, json_body,
+        self,
+        mock_dep_settings,
+        mock_route_settings,
+        method,
+        url,
+        json_body,
     ):
         """Sending a regular API key in X-Admin-Key header is rejected (403).
 
@@ -491,8 +505,12 @@ class TestPermissionMatrix:
     @patch("sec_semantic_search.api.routes.filings.get_settings")
     @patch("sec_semantic_search.api.dependencies.get_settings")
     def test_admin_endpoint_allows_correct_admin_key(
-        self, mock_dep_settings, mock_route_settings,
-        method, url, json_body,
+        self,
+        mock_dep_settings,
+        mock_route_settings,
+        method,
+        url,
+        json_body,
     ):
         """Admin endpoints allow requests with correct admin key."""
         mock_dep_settings.return_value.api.admin_key = "admin-secret"
@@ -537,10 +555,13 @@ class TestPermissionMatrix:
         mock_route_settings.return_value.api.max_filings_per_request = 0
         mock_route_settings.return_value.api.ingest_cooldown_seconds = 0
 
-        resp = self.client.post("/api/ingest/add", json={
-            "tickers": ["AAPL"],
-            "form_types": ["10-K"],
-        })
+        resp = self.client.post(
+            "/api/ingest/add",
+            json={
+                "tickers": ["AAPL"],
+                "form_types": ["10-K"],
+            },
+        )
         assert resp.status_code == 202
 
 
@@ -570,10 +591,13 @@ class TestEdgarCredentialPrivacy:
         app.dependency_overrides[get_task_manager] = lambda: manager
 
         client = TestClient(app, raise_server_exceptions=False)
-        resp = client.post("/api/ingest/add", json={
-            "tickers": ["AAPL"],
-            "form_types": ["10-K"],
-        })
+        resp = client.post(
+            "/api/ingest/add",
+            json={
+                "tickers": ["AAPL"],
+                "form_types": ["10-K"],
+            },
+        )
         assert resp.status_code == 401
 
         # Error body should not contain any actual credential values
@@ -595,10 +619,13 @@ class TestEdgarCredentialPrivacy:
         app.dependency_overrides[get_task_manager] = lambda: MagicMock()
 
         client = TestClient(app, raise_server_exceptions=False)
-        resp = client.post("/api/ingest/add", json={
-            "tickers": ["AAPL"],
-            "form_types": ["10-K"],
-        })
+        resp = client.post(
+            "/api/ingest/add",
+            json={
+                "tickers": ["AAPL"],
+                "form_types": ["10-K"],
+            },
+        )
         data = resp.json()
         assert "hint" in data["detail"]
         assert "X-Edgar-Name" in data["detail"]["hint"]
@@ -615,13 +642,16 @@ class TestCooldownAndCapsCombined:
     def teardown_method(self):
         app.dependency_overrides.clear()
         from sec_semantic_search.api.routes import ingest as ingest_mod
+
         with ingest_mod._cooldown_lock:
             ingest_mod._last_ingest.clear()
 
     @patch("sec_semantic_search.api.routes.ingest.get_settings")
     @patch("sec_semantic_search.api.dependencies.get_settings")
     def test_batch_endpoint_also_respects_cooldown(
-        self, mock_dep_settings, mock_route_settings,
+        self,
+        mock_dep_settings,
+        mock_route_settings,
     ):
         """Both /add and /batch share the same per-IP cooldown."""
         mock_dep_settings.return_value.api.key = None
@@ -632,23 +662,31 @@ class TestCooldownAndCapsCombined:
         client, _ = _make_full_client()
 
         # First request via /add
-        resp1 = client.post("/api/ingest/add", json={
-            "tickers": ["AAPL"],
-            "form_types": ["10-K"],
-        })
+        resp1 = client.post(
+            "/api/ingest/add",
+            json={
+                "tickers": ["AAPL"],
+                "form_types": ["10-K"],
+            },
+        )
         assert resp1.status_code == 202
 
         # Second request via /batch — same IP, should be blocked
-        resp2 = client.post("/api/ingest/batch", json={
-            "tickers": ["MSFT"],
-            "form_types": ["10-K"],
-        })
+        resp2 = client.post(
+            "/api/ingest/batch",
+            json={
+                "tickers": ["MSFT"],
+                "form_types": ["10-K"],
+            },
+        )
         assert resp2.status_code == 429
 
     @patch("sec_semantic_search.api.routes.ingest.get_settings")
     @patch("sec_semantic_search.api.dependencies.get_settings")
     def test_cooldown_error_includes_retry_hint(
-        self, mock_dep_settings, mock_route_settings,
+        self,
+        mock_dep_settings,
+        mock_route_settings,
     ):
         """Cooldown 429 response includes wait time hint."""
         mock_dep_settings.return_value.api.key = None
@@ -658,12 +696,20 @@ class TestCooldownAndCapsCombined:
 
         client, _ = _make_full_client()
 
-        client.post("/api/ingest/add", json={
-            "tickers": ["AAPL"], "form_types": ["10-K"],
-        })
-        resp = client.post("/api/ingest/add", json={
-            "tickers": ["MSFT"], "form_types": ["10-K"],
-        })
+        client.post(
+            "/api/ingest/add",
+            json={
+                "tickers": ["AAPL"],
+                "form_types": ["10-K"],
+            },
+        )
+        resp = client.post(
+            "/api/ingest/add",
+            json={
+                "tickers": ["MSFT"],
+                "form_types": ["10-K"],
+            },
+        )
         assert resp.status_code == 429
         data = resp.json()
         assert "cooldown" in data["detail"]["error"]
@@ -672,7 +718,9 @@ class TestCooldownAndCapsCombined:
     @patch("sec_semantic_search.api.routes.ingest.get_settings")
     @patch("sec_semantic_search.api.dependencies.get_settings")
     def test_request_caps_produce_structured_error(
-        self, mock_dep_settings, mock_route_settings,
+        self,
+        mock_dep_settings,
+        mock_route_settings,
     ):
         """Request cap violations return structured error with hint."""
         mock_dep_settings.return_value.api.key = None
@@ -682,10 +730,13 @@ class TestCooldownAndCapsCombined:
 
         client, _ = _make_full_client()
 
-        resp = client.post("/api/ingest/batch", json={
-            "tickers": ["AAPL", "MSFT", "GOOGL"],
-            "form_types": ["10-K"],
-        })
+        resp = client.post(
+            "/api/ingest/batch",
+            json={
+                "tickers": ["AAPL", "MSFT", "GOOGL"],
+                "form_types": ["10-K"],
+            },
+        )
         assert resp.status_code == 400
         data = resp.json()
         assert data["detail"]["error"] == "request_cap_exceeded"
@@ -734,7 +785,9 @@ class TestDemoModeCrossFeature:
     @patch("sec_semantic_search.api.routes.filings.get_settings")
     @patch("sec_semantic_search.api.dependencies.get_settings")
     def test_demo_mode_clear_all_blocked_even_scenario_a(
-        self, mock_dep_settings, mock_route_settings,
+        self,
+        mock_dep_settings,
+        mock_route_settings,
     ):
         """Clear all blocked in demo mode even when no auth keys configured (Scenario A)."""
         mock_dep_settings.return_value.api.admin_key = None
@@ -750,7 +803,10 @@ class TestDemoModeCrossFeature:
     @patch("sec_semantic_search.api.routes.status.is_admin_request")
     @patch("sec_semantic_search.api.dependencies.get_settings")
     def test_status_exposes_demo_mode_flag(
-        self, mock_dep_settings, mock_is_admin, mock_route_settings,
+        self,
+        mock_dep_settings,
+        mock_is_admin,
+        mock_route_settings,
     ):
         """Status endpoint always shows demo_mode flag regardless of auth."""
         mock_dep_settings.return_value.api.key = None
@@ -789,7 +845,8 @@ class TestAuditLogging:
         mock_settings.return_value.api.admin_key = None
 
         client, _ = _make_full_client(
-            filings=[make_filing_record()], chunk_count=100,
+            filings=[make_filing_record()],
+            chunk_count=100,
         )
         resp = client.delete("/api/filings/0000320193-24-000001")
         assert resp.status_code == 200
@@ -800,7 +857,10 @@ class TestAuditLogging:
     @patch("sec_semantic_search.api.routes.filings.get_settings")
     @patch("sec_semantic_search.api.dependencies.get_settings")
     def test_bulk_delete_produces_audit_log(
-        self, mock_dep_settings, mock_route_settings, mock_audit,
+        self,
+        mock_dep_settings,
+        mock_route_settings,
+        mock_audit,
     ):
         """Bulk delete produces a SECURITY_AUDIT log entry."""
         mock_dep_settings.return_value.api.admin_key = None
@@ -816,7 +876,9 @@ class TestAuditLogging:
     @patch("sec_semantic_search.api.dependencies.audit_log")
     @patch("sec_semantic_search.api.dependencies.get_settings")
     def test_admin_key_rejection_produces_audit_log(
-        self, mock_settings, mock_audit,
+        self,
+        mock_settings,
+        mock_audit,
     ):
         """Rejected admin key attempt produces audit trail."""
         mock_settings.return_value.api.admin_key = "secret"

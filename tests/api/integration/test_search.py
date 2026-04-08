@@ -28,17 +28,17 @@ def _make_client(search_results=None, search_error=None):
 
 def _make_result(**overrides):
     """Create a minimal SearchResult for testing."""
-    defaults = dict(
-        content="Sample content",
-        path="Part I > Item 1",
-        content_type=ContentType.TEXT,
-        ticker="AAPL",
-        form_type="10-K",
-        similarity=0.45,
-        filing_date="2024-11-01",
-        accession_number="0000320193-24-000001",
-        chunk_id="AAPL_10-K_2024-11-01_0",
-    )
+    defaults = {
+        "content": "Sample content",
+        "path": "Part I > Item 1",
+        "content_type": ContentType.TEXT,
+        "ticker": "AAPL",
+        "form_type": "10-K",
+        "similarity": 0.45,
+        "filing_date": "2024-11-01",
+        "accession_number": "0000320193-24-000001",
+        "chunk_id": "AAPL_10-K_2024-11-01_0",
+    }
     defaults.update(overrides)
     return SearchResult(**defaults)
 
@@ -140,7 +140,9 @@ class TestSearchEndpoint:
     def test_accession_number_passed(self):
         """Single-string accession is coerced to a one-element list."""
         client, engine = _make_client()
-        client.post("/api/search/", json={"query": "test", "accession_number": "0000320193-24-000001"})
+        client.post(
+            "/api/search/", json={"query": "test", "accession_number": "0000320193-24-000001"}
+        )
         _, kwargs = engine.search.call_args
         assert kwargs["accession_number"] == ["0000320193-24-000001"]
 

@@ -101,10 +101,12 @@ async def ingest_progress(websocket: WebSocket, task_id: str) -> None:
     info = task_manager.get_task(task_id)
 
     if info is None:
-        await websocket.send_json({
-            "type": "error",
-            "error": f"Task '{task_id}' not found.",
-        })
+        await websocket.send_json(
+            {
+                "type": "error",
+                "error": f"Task '{task_id}' not found.",
+            }
+        )
         await websocket.close(code=4404, reason="Task not found")
         return
 
@@ -133,7 +135,8 @@ async def ingest_progress(websocket: WebSocket, task_id: str) -> None:
         while True:
             try:
                 message = await asyncio.wait_for(
-                    info._message_queue.get(), timeout=5.0,
+                    info._message_queue.get(),
+                    timeout=5.0,
                 )
             except TimeoutError:
                 # No message within timeout — check if the task ended
@@ -149,14 +152,13 @@ async def ingest_progress(websocket: WebSocket, task_id: str) -> None:
                     # call_soon_threadsafe callbacks can execute.
                     await asyncio.sleep(0)
                     sent_terminal = await _drain_and_send(
-                        websocket, info._message_queue,
+                        websocket,
+                        info._message_queue,
                     )
                     if not sent_terminal:
                         # Queue didn't contain a terminal message —
                         # synthesise one from authoritative TaskInfo.
-                        await websocket.send_json(
-                            _build_terminal_from_state(info)
-                        )
+                        await websocket.send_json(_build_terminal_from_state(info))
                     break
                 continue
 
@@ -194,7 +196,8 @@ async def _authenticate_websocket(websocket: WebSocket) -> bool:
 
     try:
         message = await asyncio.wait_for(
-            websocket.receive_json(), timeout=_AUTH_TIMEOUT_SECONDS,
+            websocket.receive_json(),
+            timeout=_AUTH_TIMEOUT_SECONDS,
         )
     except TimeoutError:
         await websocket.close(code=4001, reason="Authentication timed out")
@@ -263,7 +266,9 @@ def _build_terminal_from_state(info: TaskInfo) -> dict:
             "type": "completed",
             "results": [r.to_dict() for r in info.results],
             "summary": {
-                "total": len(info.results) + info.progress.filings_skipped + info.progress.filings_failed,
+                "total": len(info.results)
+                + info.progress.filings_skipped
+                + info.progress.filings_failed,
                 "succeeded": len(info.results),
                 "skipped": info.progress.filings_skipped,
                 "failed": info.progress.filings_failed,

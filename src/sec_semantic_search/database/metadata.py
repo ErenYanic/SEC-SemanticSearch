@@ -95,7 +95,8 @@ def _scrub_error_message(
     if valid_tickers:
         alternatives = "|".join(re.escape(t) for t in valid_tickers)
         ticker_pattern = re.compile(
-            rf"\b(?:{alternatives})\b", re.IGNORECASE,
+            rf"\b(?:{alternatives})\b",
+            re.IGNORECASE,
         )
         scrubbed = ticker_pattern.sub("[TICKER]", scrubbed)
 
@@ -219,7 +220,9 @@ class MetadataRegistry:
         settings = get_settings()
         self._db_path = db_path or settings.database.metadata_db_path
         self._max_filings = settings.database.max_filings
-        self._encryption_key = encryption_key if encryption_key is not None else settings.database.encryption_key
+        self._encryption_key = (
+            encryption_key if encryption_key is not None else settings.database.encryption_key
+        )
 
         # Ensure parent directory exists
         Path(self._db_path).parent.mkdir(parents=True, exist_ok=True)
@@ -231,7 +234,8 @@ class MetadataRegistry:
         # check_same_thread=False allows the API's background worker
         # threads to use the same connection; the lock serialises access.
         self._conn = self._sqlite_module.connect(
-            self._db_path, check_same_thread=False,
+            self._db_path,
+            check_same_thread=False,
         )
 
         # When using SQLCipher, PRAGMA key MUST be the very first
@@ -364,7 +368,8 @@ class MetadataRegistry:
             ) from e
 
     def get_existing_accessions(
-        self, accession_numbers: list[str],
+        self,
+        accession_numbers: list[str],
     ) -> set[str]:
         """
         Return the subset of accession numbers that already exist in the registry.
@@ -386,10 +391,7 @@ class MetadataRegistry:
             return set()
 
         placeholders = ", ".join("?" for _ in accession_numbers)
-        sql = (
-            f"SELECT accession_number FROM filings "
-            f"WHERE accession_number IN ({placeholders})"
-        )
+        sql = f"SELECT accession_number FROM filings WHERE accession_number IN ({placeholders})"
         try:
             with self._lock:
                 rows = self._conn.execute(sql, accession_numbers).fetchall()
@@ -490,7 +492,8 @@ class MetadataRegistry:
         try:
             with self._lock, self._conn:
                 exists = self._conn.execute(
-                    sql_check, (filing_id.accession_number,),
+                    sql_check,
+                    (filing_id.accession_number,),
                 ).fetchone()
                 if exists is not None:
                     logger.debug(
@@ -551,13 +554,9 @@ class MetadataRegistry:
                 cursor = self._conn.execute(sql, (accession_number,))
                 removed = cursor.rowcount > 0
             if removed:
-                logger.info(
-                    "Removed filing from registry: %s", accession_number
-                )
+                logger.info("Removed filing from registry: %s", accession_number)
             else:
-                logger.warning(
-                    "Filing not found in registry: %s", accession_number
-                )
+                logger.warning("Filing not found in registry: %s", accession_number)
             return removed
         except self._db_error as e:
             raise DatabaseError(
@@ -592,10 +591,7 @@ class MetadataRegistry:
         for i in range(0, len(accession_numbers), chunk_size):
             batch = accession_numbers[i : i + chunk_size]
             placeholders = ", ".join("?" for _ in batch)
-            sql = (
-                f"DELETE FROM filings "
-                f"WHERE accession_number IN ({placeholders})"
-            )
+            sql = f"DELETE FROM filings WHERE accession_number IN ({placeholders})"
             try:
                 with self._lock, self._conn:
                     cursor = self._conn.execute(sql, batch)
@@ -698,10 +694,7 @@ class MetadataRegistry:
         for i in range(0, len(accession_numbers), chunk_size):
             batch = accession_numbers[i : i + chunk_size]
             placeholders = ", ".join("?" for _ in batch)
-            sql = (
-                f"SELECT * FROM filings "
-                f"WHERE accession_number IN ({placeholders})"
-            )
+            sql = f"SELECT * FROM filings WHERE accession_number IN ({placeholders})"
             try:
                 with self._lock:
                     rows = self._conn.execute(sql, batch).fetchall()
@@ -865,9 +858,7 @@ class MetadataRegistry:
             chunks = row["chunks"]
 
             filing_count += filings
-            form_breakdown[form_type] = (
-                form_breakdown.get(form_type, 0) + filings
-            )
+            form_breakdown[form_type] = form_breakdown.get(form_type, 0) + filings
 
             if ticker not in ticker_data:
                 ticker_data[ticker] = {"filings": 0, "chunks": 0, "forms": []}
@@ -948,19 +939,22 @@ class MetadataRegistry:
         """
         try:
             with self._lock, self._conn:
-                self._conn.execute(sql, (
-                    task_id,
-                    status,
-                    tickers_json,
-                    json.dumps(form_types),
-                    json.dumps(results),
-                    scrubbed_error,
-                    started_at,
-                    completed_at,
-                    filings_done,
-                    filings_skipped,
-                    filings_failed,
-                ))
+                self._conn.execute(
+                    sql,
+                    (
+                        task_id,
+                        status,
+                        tickers_json,
+                        json.dumps(form_types),
+                        json.dumps(results),
+                        scrubbed_error,
+                        started_at,
+                        completed_at,
+                        filings_done,
+                        filings_skipped,
+                        filings_failed,
+                    ),
+                )
             logger.debug("Persisted task history: %s", task_id[:8])
         except self._db_error as e:
             raise DatabaseError(

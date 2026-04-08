@@ -5,7 +5,7 @@ Uses FastAPI TestClient's ``websocket_connect()`` with task state
 injected directly onto ``app.state.task_manager``.
 """
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 from fastapi.testclient import TestClient
 
@@ -70,11 +70,13 @@ class TestWebSocketCompleted:
     def test_completed_task(self):
         info = make_task_info(state=TaskState.COMPLETED)
         # Push a terminal message into the queue.
-        info._message_queue.put_nowait({
-            "type": "completed",
-            "results": [],
-            "summary": {"total": 0},
-        })
+        info._message_queue.put_nowait(
+            {
+                "type": "completed",
+                "results": [],
+                "summary": {"total": 0},
+            }
+        )
 
         client = _make_client_with_task(task_info=info)
         with client.websocket_connect(f"/ws/ingest/{info.task_id}", headers=_WS_HEADERS) as ws:
@@ -90,19 +92,23 @@ class TestWebSocketStreaming:
 
     def test_step_then_terminal(self):
         info = make_task_info(state=TaskState.RUNNING)
-        info._message_queue.put_nowait({
-            "type": "step",
-            "ticker": "AAPL",
-            "form_type": "10-K",
-            "step": "Embedding",
-            "step_number": 4,
-            "total_steps": 5,
-        })
-        info._message_queue.put_nowait({
-            "type": "completed",
-            "results": [],
-            "summary": {"total": 0},
-        })
+        info._message_queue.put_nowait(
+            {
+                "type": "step",
+                "ticker": "AAPL",
+                "form_type": "10-K",
+                "step": "Embedding",
+                "step_number": 4,
+                "total_steps": 5,
+            }
+        )
+        info._message_queue.put_nowait(
+            {
+                "type": "completed",
+                "results": [],
+                "summary": {"total": 0},
+            }
+        )
 
         client = _make_client_with_task(task_info=info)
         with client.websocket_connect(f"/ws/ingest/{info.task_id}", headers=_WS_HEADERS) as ws:
@@ -118,16 +124,18 @@ class TestWebSocketStreaming:
 
     def test_filing_done_message(self):
         info = make_task_info(state=TaskState.RUNNING)
-        info._message_queue.put_nowait({
-            "type": "filing_done",
-            "ticker": "AAPL",
-            "form_type": "10-K",
-            "filing_date": "2024-11-01",
-            "accession_number": "acc-1",
-            "segments": 100,
-            "chunks": 110,
-            "time": 5.3,
-        })
+        info._message_queue.put_nowait(
+            {
+                "type": "filing_done",
+                "ticker": "AAPL",
+                "form_type": "10-K",
+                "filing_date": "2024-11-01",
+                "accession_number": "acc-1",
+                "segments": 100,
+                "chunks": 110,
+                "time": 5.3,
+            }
+        )
         info._message_queue.put_nowait({"type": "completed", "results": [], "summary": {}})
 
         client = _make_client_with_task(task_info=info)

@@ -256,13 +256,15 @@ class SearchRequest(BaseModel):
     normalised to a one-element list for uniform downstream handling.
     """
 
-    query: str = Field(..., min_length=1, max_length=2000, description="Natural language search query")
+    query: str = Field(
+        ..., min_length=1, max_length=2000, description="Natural language search query"
+    )
     top_k: int = Field(5, ge=1, le=100, description="Maximum number of results")
     ticker: list[str] | None = Field(None, description="Filter to specific ticker(s)")
-    form_type: list[str] | None = Field(None, description="Filter to form type(s) (e.g. '8-K', '10-K', '10-Q')")
-    min_similarity: float = Field(
-        0.0, ge=0.0, le=1.0, description="Minimum similarity threshold"
+    form_type: list[str] | None = Field(
+        None, description="Filter to form type(s) (e.g. '8-K', '10-K', '10-Q')"
     )
+    min_similarity: float = Field(0.0, ge=0.0, le=1.0, description="Minimum similarity threshold")
     accession_number: list[str] | None = Field(
         None, description="Restrict search to specific filing(s) by accession number"
     )
@@ -504,6 +506,4 @@ class GPUStatusResponse(BaseModel):
 class GPUUnloadResponse(BaseModel):
     """Response for ``DELETE /api/resources/gpu``."""
 
-    status: str = Field(
-        ..., description="'unloaded' or 'already_unloaded'"
-    )
+    status: str = Field(..., description="'unloaded' or 'already_unloaded'")

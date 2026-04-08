@@ -13,7 +13,6 @@ Usage:
     results = client.query(query_embeddings, n_results=5)
 """
 
-
 import chromadb
 
 from sec_semantic_search.config import get_settings
@@ -92,10 +91,7 @@ class ChromaDBClient:
         unchanged.
         """
         current = self._collection.metadata or {}
-        filtered = {
-            k: v for k, v in current.items()
-            if not k.startswith("hnsw:")
-        }
+        filtered = {k: v for k, v in current.items() if not k.startswith("hnsw:")}
         filtered[flag] = value
         self._collection.modify(metadata=filtered)
 
@@ -135,11 +131,13 @@ class ChromaDBClient:
             ids_to_update: list[str] = []
             metas_to_update: list[dict] = []
 
-            for doc_id, meta in zip(batch["ids"], batch["metadatas"]):
+            for doc_id, meta in zip(
+                batch["ids"],
+                batch["metadatas"],
+                strict=True,
+            ):
                 if "filing_date_int" not in meta and "filing_date" in meta:
-                    meta["filing_date_int"] = int(
-                        meta["filing_date"].replace("-", "")
-                    )
+                    meta["filing_date_int"] = int(meta["filing_date"].replace("-", ""))
                     ids_to_update.append(doc_id)
                     metas_to_update.append(meta)
 
@@ -266,8 +264,7 @@ class ChromaDBClient:
             )
         except Exception as e:
             raise DatabaseError(
-                f"Failed to batch-delete {len(accession_numbers)} "
-                f"filing(s) from ChromaDB",
+                f"Failed to batch-delete {len(accession_numbers)} filing(s) from ChromaDB",
                 details=str(e),
             ) from e
 
@@ -460,9 +457,7 @@ class ChromaDBClient:
         """
         conditions = []
         if ticker:
-            conditions.append(
-                ChromaDBClient._build_field_condition("ticker", ticker, upper=True)
-            )
+            conditions.append(ChromaDBClient._build_field_condition("ticker", ticker, upper=True))
         if form_type:
             conditions.append(
                 ChromaDBClient._build_field_condition("form_type", form_type, upper=True)

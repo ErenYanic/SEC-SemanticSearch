@@ -21,7 +21,6 @@ import pytest
 from sec_semantic_search.core.types import FilingIdentifier
 from sec_semantic_search.database.metadata import MetadataRegistry, _get_sqlite_module
 
-
 # ---------------------------------------------------------------------------
 # _get_sqlite_module helper
 # ---------------------------------------------------------------------------
@@ -50,18 +49,19 @@ class TestGetSqliteModule:
         fake_parent = types.ModuleType("pysqlcipher3")
         fake_parent.dbapi2 = fake_sqlcipher
 
-        with patch.dict("sys.modules", {
-            "pysqlcipher3": fake_parent,
-            "pysqlcipher3.dbapi2": fake_sqlcipher,
-        }):
+        with patch.dict(
+            "sys.modules",
+            {
+                "pysqlcipher3": fake_parent,
+                "pysqlcipher3.dbapi2": fake_sqlcipher,
+            },
+        ):
             module = _get_sqlite_module("my-secret-key")
             assert module is fake_sqlcipher
 
     def test_falls_back_with_warning_when_key_but_not_installed(self):
         """Key set but pysqlcipher3 not installed → fallback to sqlite3 with warning."""
-        with patch(
-            "sec_semantic_search.database.metadata.logger"
-        ) as mock_logger:
+        with patch("sec_semantic_search.database.metadata.logger") as mock_logger:
             with patch.dict("sys.modules", {"pysqlcipher3": None, "pysqlcipher3.dbapi2": None}):
                 module = _get_sqlite_module("my-secret-key")
                 assert module is sqlite3
@@ -253,7 +253,10 @@ class TestEncryptedMode:
         def register(i: int) -> None:
             try:
                 fid = FilingIdentifier(
-                    "AAPL", "10-K", date(2020 + i, 1, 1), f"ACC-ENC-THR-{i}",
+                    "AAPL",
+                    "10-K",
+                    date(2020 + i, 1, 1),
+                    f"ACC-ENC-THR-{i}",
                 )
                 registry.register_filing(fid, chunk_count=i)
             except Exception as exc:
@@ -303,7 +306,7 @@ class TestPragmaKeyExecution:
         # The very first execute call should be PRAGMA key with hex-encoded blob
         first_call = mock_conn.execute.call_args_list[0]
         assert "PRAGMA key" in first_call.args[0]
-        expected_hex = "my-secret-key".encode().hex()
+        expected_hex = b"my-secret-key".hex()
         assert expected_hex in first_call.args[0]
 
     def test_pragma_key_not_called_without_encryption(self, tmp_db_path):
@@ -326,9 +329,7 @@ class TestGracefulDegradation:
 
     def test_falls_back_to_unencrypted_with_warning(self, tmp_db_path):
         """Registry should still work, using plain sqlite3, with a warning."""
-        with patch(
-            "sec_semantic_search.database.metadata.logger"
-        ) as mock_logger:
+        with patch("sec_semantic_search.database.metadata.logger") as mock_logger:
             with patch.dict(
                 "sys.modules",
                 {"pysqlcipher3": None, "pysqlcipher3.dbapi2": None},
@@ -342,7 +343,8 @@ class TestGracefulDegradation:
         assert registry._sqlite_module is sqlite3
         # Verify the warning was logged
         warning_calls = [
-            call for call in mock_logger.warning.call_args_list
+            call
+            for call in mock_logger.warning.call_args_list
             if "pysqlcipher3 is not installed" in str(call)
         ]
         assert len(warning_calls) == 1
@@ -441,7 +443,11 @@ class TestFileBasedKeyLoading:
         return _make_fake_sqlcipher_module()
 
     def test_registry_uses_key_loaded_from_file(
-        self, tmp_path, tmp_db_path, monkeypatch, fake_sqlcipher_module,
+        self,
+        tmp_path,
+        tmp_db_path,
+        monkeypatch,
+        fake_sqlcipher_module,
     ):
         """Write key to a file, load via settings, verify MetadataRegistry is encrypted.
 

@@ -188,7 +188,8 @@ class TestFileHandler:
         logger = logging.getLogger(LOGGER_NAME)
         assert len(logger.handlers) == 1
         assert not isinstance(
-            logger.handlers[0], logging.handlers.RotatingFileHandler,
+            logger.handlers[0],
+            logging.handlers.RotatingFileHandler,
         )
 
     def test_file_handler_added_when_env_set(self, monkeypatch, tmp_path):
@@ -199,8 +200,7 @@ class TestFileHandler:
         logger = logging.getLogger(LOGGER_NAME)
         assert len(logger.handlers) == 2
         file_handlers = [
-            h for h in logger.handlers
-            if isinstance(h, logging.handlers.RotatingFileHandler)
+            h for h in logger.handlers if isinstance(h, logging.handlers.RotatingFileHandler)
         ]
         assert len(file_handlers) == 1
 
@@ -219,8 +219,7 @@ class TestFileHandler:
         configure_logging(level=logging.INFO, use_rich=False)
         logger = logging.getLogger(LOGGER_NAME)
         file_handler = [
-            h for h in logger.handlers
-            if isinstance(h, logging.handlers.RotatingFileHandler)
+            h for h in logger.handlers if isinstance(h, logging.handlers.RotatingFileHandler)
         ][0]
         assert file_handler.maxBytes == 5_242_880
 
@@ -232,8 +231,7 @@ class TestFileHandler:
         configure_logging(level=logging.INFO, use_rich=False)
         logger = logging.getLogger(LOGGER_NAME)
         file_handler = [
-            h for h in logger.handlers
-            if isinstance(h, logging.handlers.RotatingFileHandler)
+            h for h in logger.handlers if isinstance(h, logging.handlers.RotatingFileHandler)
         ][0]
         assert file_handler.backupCount == 7
 
@@ -246,8 +244,7 @@ class TestFileHandler:
         configure_logging(level=logging.INFO, use_rich=False)
         logger = logging.getLogger(LOGGER_NAME)
         file_handler = [
-            h for h in logger.handlers
-            if isinstance(h, logging.handlers.RotatingFileHandler)
+            h for h in logger.handlers if isinstance(h, logging.handlers.RotatingFileHandler)
         ][0]
         assert file_handler.maxBytes == 10_485_760
         assert file_handler.backupCount == 3
@@ -259,8 +256,7 @@ class TestFileHandler:
         configure_logging(level=logging.INFO, use_rich=False)
         logger = logging.getLogger(LOGGER_NAME)
         file_handler = [
-            h for h in logger.handlers
-            if isinstance(h, logging.handlers.RotatingFileHandler)
+            h for h in logger.handlers if isinstance(h, logging.handlers.RotatingFileHandler)
         ][0]
         assert "%(asctime)s" in file_handler.formatter._fmt
         assert "%(levelname)" in file_handler.formatter._fmt

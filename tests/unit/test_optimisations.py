@@ -7,18 +7,16 @@ Covers:
     - F14: ``get_filings_by_accessions()`` and ``remove_filings_batch()``
 """
 
-import sqlite3
 from datetime import date, timedelta
 from unittest.mock import MagicMock, patch
 
 import pytest
 
+from sec_semantic_search.core import DatabaseError, FilingIdentifier
 from sec_semantic_search.database import delete_filings_batch
 from sec_semantic_search.database.metadata import MetadataRegistry
-from sec_semantic_search.core import DatabaseError, FilingIdentifier
 from sec_semantic_search.pipeline.fetch import FilingFetcher, FilingInfo
 from tests.helpers import make_filing_record
-
 
 # -----------------------------------------------------------------------
 # F1: FilingInfo._filing_obj and fetch_filing_content()
@@ -141,7 +139,9 @@ class TestFetchFilingContent:
 
         assert html == "<html>fallback</html>"
         fetcher.fetch_by_accession.assert_called_once_with(
-            "AAPL", "10-K", "0000320193-24-000001",
+            "AAPL",
+            "10-K",
+            "0000320193-24-000001",
         )
 
     @patch.object(FilingFetcher, "__init__", lambda self: None)
@@ -198,13 +198,9 @@ class TestBatchedDeleteFilingsBatch:
         call_order = []
 
         chroma = MagicMock()
-        chroma.delete_filings_batch.side_effect = lambda accs: (
-            call_order.append("chroma")
-        )
+        chroma.delete_filings_batch.side_effect = lambda accs: call_order.append("chroma")
         registry = MagicMock()
-        registry.remove_filings_batch.side_effect = lambda accs: (
-            call_order.append("registry")
-        )
+        registry.remove_filings_batch.side_effect = lambda accs: call_order.append("registry")
 
         delete_filings_batch([record], chroma=chroma, registry=registry)
 

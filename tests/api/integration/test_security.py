@@ -6,7 +6,7 @@ Tests verify that the fix is in place and working correctly.
 """
 
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -124,7 +124,7 @@ class TestDemoResetScript:
 
         assert 'eval "$RESTART_CMD"' not in content
         assert 'case "$RESTART_STRATEGY" in' in content
-        assert 'RESTART_CMD is deprecated and rejected for safety' in content
+        assert "RESTART_CMD is deprecated and rejected for safety" in content
 
 
 # -----------------------------------------------------------------------
@@ -327,9 +327,7 @@ class TestAccessionNumberValidation:
     """Accession numbers must match NNNNNNNNNN-YY-NNNNNN format."""
 
     def test_valid_accession_number(self):
-        req = SearchRequest(
-            query="test", accession_number="0000320193-24-000001"
-        )
+        req = SearchRequest(query="test", accession_number="0000320193-24-000001")
         assert req.accession_number == ["0000320193-24-000001"]
 
     def test_valid_accession_number_list(self):
@@ -358,9 +356,7 @@ class TestAccessionNumberValidation:
             DeleteByIdsRequest(accession_numbers=["not-valid"])
 
     def test_delete_by_ids_valid(self):
-        req = DeleteByIdsRequest(
-            accession_numbers=["0000320193-24-000001"]
-        )
+        req = DeleteByIdsRequest(accession_numbers=["0000320193-24-000001"])
         assert len(req.accession_numbers) == 1
 
     def test_filing_path_param_validation(self):
@@ -441,9 +437,7 @@ class TestTaskQueueCap:
         from sec_semantic_search.api.dependencies import get_task_manager
 
         manager = MagicMock()
-        manager.create_task.side_effect = TaskQueueFullError(
-            "Task queue is full (5 active)."
-        )
+        manager.create_task.side_effect = TaskQueueFullError("Task queue is full (5 active).")
 
         app.dependency_overrides[get_task_manager] = lambda: manager
         client = TestClient(app, raise_server_exceptions=False)
@@ -475,9 +469,7 @@ class TestAtomicRegistration:
         # The atomic method must be used, not the non-atomic register_filing.
         assert "register_filing_if_new" in source
         # The old non-atomic pattern should not be present.
-        assert "register_filing(" not in source.replace(
-            "register_filing_if_new", ""
-        )
+        assert "register_filing(" not in source.replace("register_filing_if_new", "")
 
     def test_register_filing_if_new_holds_lock(self):
         """register_filing_if_new must hold the lock across check and insert."""
@@ -495,9 +487,7 @@ class TestAtomicRegistration:
         registry = MagicMock()
         registry.register_filing_if_new.return_value = True
         chroma = MagicMock()
-        chroma.store_filing.side_effect = DatabaseError(
-            "ChromaDB write error", details="disk full"
-        )
+        chroma.store_filing.side_effect = DatabaseError("ChromaDB write error", details="disk full")
         fetcher = MagicMock()
         orchestrator = MagicMock()
 
@@ -564,7 +554,7 @@ class TestTransportSecurityHardening:
     def test_nginx_sets_csp_header(self):
         nginx_conf = Path(__file__).parents[3] / "nginx.conf"
         content = nginx_conf.read_text()
-        assert 'Content-Security-Policy' in content
+        assert "Content-Security-Policy" in content
 
     def test_http_proxy_warning_emitted_once(self, monkeypatch):
         monkeypatch.setattr(
@@ -588,6 +578,8 @@ class TestTransportSecurityHardening:
 
     def test_deployment_docs_warn_scenarios_b_c_need_tls(self):
         deployment = Path(__file__).parents[3] / "docs" / "DEPLOYMENT.md"
+        if not deployment.exists():
+            pytest.skip("docs/DEPLOYMENT.md is intentionally gitignored")
         content = deployment.read_text()
         assert "Scenarios B and C are insecure without TLS" in content
 
@@ -835,7 +827,7 @@ class TestApiKeyAuthentication:
 
         client = TestClient(app)
         # Connection with wrong key should fail.
-        with pytest.raises(Exception):
+        with pytest.raises(WebSocketDisconnect):
             with client.websocket_connect(
                 f"/ws/ingest/{info.task_id}",
                 headers=_WS_HEADERS,
@@ -879,7 +871,7 @@ class TestApiKeyAuthentication:
         app.state.task_manager = manager
 
         client = TestClient(app)
-        with pytest.raises(Exception):
+        with pytest.raises(WebSocketDisconnect):
             with client.websocket_connect(
                 f"/ws/ingest/{info.task_id}?api_key={self.TEST_KEY}",
                 headers=_WS_HEADERS,
@@ -1247,8 +1239,7 @@ class TestSecurityAuditLogging:
 
             assert resp.status_code == 200
             assert any(
-                "SECURITY_AUDIT" in r.message and "clear_all" in r.message
-                for r in caplog.records
+                "SECURITY_AUDIT" in r.message and "clear_all" in r.message for r in caplog.records
             )
         finally:
             pkg_logger.removeHandler(caplog.handler)
@@ -1270,8 +1261,7 @@ class TestSecurityAuditLogging:
 
             assert resp.status_code == 200
             assert any(
-                "SECURITY_AUDIT" in r.message and "cancel_task" in r.message
-                for r in caplog.records
+                "SECURITY_AUDIT" in r.message and "cancel_task" in r.message for r in caplog.records
             )
         finally:
             pkg_logger.removeHandler(caplog.handler)
@@ -1294,8 +1284,7 @@ class TestSecurityAuditLogging:
 
             assert resp.status_code == 200
             assert any(
-                "SECURITY_AUDIT" in r.message and "gpu_unload" in r.message
-                for r in caplog.records
+                "SECURITY_AUDIT" in r.message and "gpu_unload" in r.message for r in caplog.records
             )
         finally:
             pkg_logger.removeHandler(caplog.handler)
@@ -1316,9 +1305,7 @@ class TestSecurityAuditLogging:
             resources.gpu_unload,
         ]:
             source = inspect.getsource(func)
-            assert "audit_log(" in source, (
-                f"{func.__name__} must call audit_log()"
-            )
+            assert "audit_log(" in source, f"{func.__name__} must call audit_log()"
 
 
 # -----------------------------------------------------------------------
@@ -1365,7 +1352,7 @@ class TestQueryLogRedaction:
 
         try:
             client = TestClient(app, raise_server_exceptions=False)
-            with caplog.at_level(logging.INFO):
+            with caplog.at_level(logging.INFO, logger="sec_semantic_search"):
                 resp = client.post(
                     "/api/search/",
                     json={"query": "revenue growth forecast"},
@@ -1394,7 +1381,7 @@ class TestQueryLogRedaction:
 
         try:
             client = TestClient(app, raise_server_exceptions=False)
-            with caplog.at_level(logging.INFO):
+            with caplog.at_level(logging.INFO, logger="sec_semantic_search"):
                 resp = client.post(
                     "/api/search/",
                     json={"query": "revenue growth forecast"},
@@ -1468,9 +1455,7 @@ class TestPinnedDependencies:
             # torch is excluded — local CUDA build suffix varies
             if dep.startswith("torch"):
                 continue
-            assert "==" in dep, (
-                f"Dependency '{dep}' is not pinned to an exact version"
-            )
+            assert "==" in dep, f"Dependency '{dep}' is not pinned to an exact version"
 
     def test_dev_dependencies_are_pinned(self):
         """Dev deps in pyproject.toml must use == pins."""
@@ -1482,9 +1467,7 @@ class TestPinnedDependencies:
 
         deps = data["project"]["optional-dependencies"]["dev"]
         for dep in deps:
-            assert "==" in dep, (
-                f"Dev dependency '{dep}' is not pinned to an exact version"
-            )
+            assert "==" in dep, f"Dev dependency '{dep}' is not pinned to an exact version"
 
 
 # -----------------------------------------------------------------------
@@ -1507,6 +1490,7 @@ class TestTaskPersistence:
         monkeypatch.setenv("DB_CHROMA_PATH", str(tmp_path / "chroma"))
 
         from sec_semantic_search.config import reload_settings
+
         reload_settings()
 
         from sec_semantic_search.database.metadata import MetadataRegistry
@@ -1516,10 +1500,9 @@ class TestTaskPersistence:
         registry = MetadataRegistry(str(tmp_path / "test.sqlite"), encryption_key="")
         try:
             import sqlite3
+
             conn = sqlite3.connect(str(tmp_path / "test.sqlite"))
-            tables = conn.execute(
-                "SELECT name FROM sqlite_master WHERE type='table'"
-            ).fetchall()
+            tables = conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
             table_names = [t[0] for t in tables]
             assert "task_history" in table_names
             conn.close()
@@ -1532,6 +1515,7 @@ class TestTaskPersistence:
         monkeypatch.setenv("DB_CHROMA_PATH", str(tmp_path / "chroma"))
 
         from sec_semantic_search.config import reload_settings
+
         reload_settings()
 
         from sec_semantic_search.database.metadata import MetadataRegistry
@@ -1543,15 +1527,17 @@ class TestTaskPersistence:
                 status="completed",
                 tickers=["AAPL"],
                 form_types=["10-K"],
-                results=[{
-                    "ticker": "AAPL",
-                    "form_type": "10-K",
-                    "filing_date": "2024-11-01",
-                    "accession_number": "0000320193-24-000001",
-                    "segment_count": 50,
-                    "chunk_count": 100,
-                    "duration_seconds": 12.5,
-                }],
+                results=[
+                    {
+                        "ticker": "AAPL",
+                        "form_type": "10-K",
+                        "filing_date": "2024-11-01",
+                        "accession_number": "0000320193-24-000001",
+                        "segment_count": 50,
+                        "chunk_count": 100,
+                        "duration_seconds": 12.5,
+                    }
+                ],
                 started_at="2024-11-15T10:00:00+00:00",
                 completed_at="2024-11-15T10:01:00+00:00",
                 filings_done=1,
@@ -1577,6 +1563,7 @@ class TestTaskPersistence:
         monkeypatch.setenv("DB_CHROMA_PATH", str(tmp_path / "chroma"))
 
         from sec_semantic_search.config import reload_settings
+
         reload_settings()
 
         from sec_semantic_search.database.metadata import MetadataRegistry
@@ -1638,7 +1625,7 @@ class TestTaskPersistence:
 
         info = make_task_info(task_id="prunable", state=TaskState.COMPLETED)
         # Set completed_at far in the past so TTL check triggers
-        info.completed_at = datetime(2020, 1, 1, tzinfo=timezone.utc)
+        info.completed_at = datetime(2020, 1, 1, tzinfo=UTC)
         mgr._tasks["prunable"] = info
 
         mgr._prune_stale_tasks()
@@ -1788,7 +1775,8 @@ class TestOpenApiConditionalExposure:
         mock_settings.api.rate_limit_general = 0
         mock_settings.api.edgar_session_required = False
         with patch(
-            "sec_semantic_search.api.app.get_settings", return_value=mock_settings,
+            "sec_semantic_search.api.app.get_settings",
+            return_value=mock_settings,
         ):
             return create_app()
 

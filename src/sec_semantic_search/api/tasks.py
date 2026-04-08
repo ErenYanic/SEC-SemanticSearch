@@ -241,8 +241,7 @@ class TaskManager:
         max_active = get_settings().api.max_task_queue_size
         with self._lock:
             active_count = sum(
-                1 for t in self._tasks.values()
-                if t.state in (TaskState.PENDING, TaskState.RUNNING)
+                1 for t in self._tasks.values() if t.state in (TaskState.PENDING, TaskState.RUNNING)
             )
             if active_count >= max_active:
                 raise TaskQueueFullError(
@@ -357,10 +356,7 @@ class TaskManager:
 
     def has_active_task(self) -> bool:
         """Return True if any task is pending or running."""
-        return any(
-            t.state in (TaskState.PENDING, TaskState.RUNNING)
-            for t in self._tasks.values()
-        )
+        return any(t.state in (TaskState.PENDING, TaskState.RUNNING) for t in self._tasks.values())
 
     def shutdown(self) -> None:
         """
@@ -490,11 +486,14 @@ class TaskManager:
             info.state = TaskState.FAILED
             info.error = str(exc)
             info.completed_at = datetime.now(UTC)
-            self._push(info, {
-                "type": "failed",
-                "error": str(exc),
-                "details": None,
-            })
+            self._push(
+                info,
+                {
+                    "type": "failed",
+                    "error": str(exc),
+                    "details": None,
+                },
+            )
             logger.exception("Task %s failed unexpectedly", info.task_id[:8])
         finally:
             # Cancel the duration timer if it hasn't fired yet.
@@ -533,9 +532,7 @@ class TaskManager:
         # instead of failing with FilingLimitExceededError.
         settings = get_settings()
         if settings.api.demo_mode:
-            new_count = sum(
-                1 for fi in work if fi.accession_number not in existing
-            )
+            new_count = sum(1 for fi in work if fi.accession_number not in existing)
             self._maybe_evict(info, new_count)
 
         # Cache the filing count to avoid N separate COUNT(*) queries.
@@ -568,13 +565,16 @@ class TaskManager:
             if filing_id.accession_number in existing:
                 info.progress.filings_skipped += 1
                 info.progress.filings_done += 1
-                self._push(info, {
-                    "type": "filing_skipped",
-                    "ticker": ticker,
-                    "form_type": form_type,
-                    "accession_number": filing_id.accession_number,
-                    "reason": "duplicate",
-                })
+                self._push(
+                    info,
+                    {
+                        "type": "filing_skipped",
+                        "ticker": ticker,
+                        "form_type": form_type,
+                        "accession_number": filing_id.accession_number,
+                        "reason": "duplicate",
+                    },
+                )
                 logger.info(
                     "Task %s: skipped duplicate %s",
                     info.task_id[:8],
@@ -593,22 +593,28 @@ class TaskManager:
                         info.state = TaskState.FAILED
                         info.error = exc.message
                         info.completed_at = datetime.now(UTC)
-                        self._push(info, {
-                            "type": "failed",
-                            "error": exc.message,
-                            "details": exc.details,
-                        })
+                        self._push(
+                            info,
+                            {
+                                "type": "failed",
+                                "error": exc.message,
+                                "details": exc.details,
+                            },
+                        )
                         return
                 else:
                     exc = FilingLimitExceededError(cached_count, max_filings)
                     info.state = TaskState.FAILED
                     info.error = exc.message
                     info.completed_at = datetime.now(UTC)
-                    self._push(info, {
-                        "type": "failed",
-                        "error": exc.message,
-                        "details": exc.details,
-                    })
+                    self._push(
+                        info,
+                        {
+                            "type": "failed",
+                            "error": exc.message,
+                            "details": exc.details,
+                        },
+                    )
                     return
 
             # --- Fetch HTML content (on demand) --------------------------
@@ -624,13 +630,16 @@ class TaskManager:
             except FetchError as exc:
                 info.progress.filings_failed += 1
                 info.progress.filings_done += 1
-                self._push(info, {
-                    "type": "filing_failed",
-                    "ticker": ticker,
-                    "form_type": form_type,
-                    "accession_number": filing_id.accession_number,
-                    "error": exc.message,
-                })
+                self._push(
+                    info,
+                    {
+                        "type": "filing_failed",
+                        "ticker": ticker,
+                        "form_type": form_type,
+                        "accession_number": filing_id.accession_number,
+                        "error": exc.message,
+                    },
+                )
                 logger.warning(
                     "Task %s: fetch failed for %s — %s",
                     info.task_id[:8],
@@ -659,14 +668,17 @@ class TaskManager:
                 _info.progress.step_index = current  # 1-based from pipeline
                 _info.progress.step_total = 5
 
-                _self._push(_info, {
-                    "type": "step",
-                    "ticker": _ticker,
-                    "form_type": _form,
-                    "step": step,
-                    "step_number": current,
-                    "total_steps": 5,
-                })
+                _self._push(
+                    _info,
+                    {
+                        "type": "step",
+                        "ticker": _ticker,
+                        "form_type": _form,
+                        "step": step,
+                        "step_number": current,
+                        "total_steps": 5,
+                    },
+                )
 
                 # Check cancellation between pipeline steps.
                 if _info.cancel_event.is_set():
@@ -677,7 +689,9 @@ class TaskManager:
 
             try:
                 result = self._orchestrator.process_filing(
-                    filing_id, html_content, progress_callback=_progress_cb,
+                    filing_id,
+                    html_content,
+                    progress_callback=_progress_cb,
                 )
             except _CancelledError:
                 self._rollback(info)
@@ -689,13 +703,16 @@ class TaskManager:
             except SECSemanticSearchError as exc:
                 info.progress.filings_failed += 1
                 info.progress.filings_done += 1
-                self._push(info, {
-                    "type": "filing_failed",
-                    "ticker": ticker,
-                    "form_type": form_type,
-                    "accession_number": filing_id.accession_number,
-                    "error": exc.message,
-                })
+                self._push(
+                    info,
+                    {
+                        "type": "filing_failed",
+                        "ticker": ticker,
+                        "form_type": form_type,
+                        "accession_number": filing_id.accession_number,
+                        "error": exc.message,
+                    },
+                )
                 logger.warning(
                     "Task %s: processing failed for %s — %s",
                     info.task_id[:8],
@@ -723,20 +740,24 @@ class TaskManager:
                 # SQLite registration is done first so that a late
                 # duplicate is caught before writing to ChromaDB.
                 registered = self._registry.register_filing_if_new(
-                    result.filing_id, result.ingest_result.chunk_count,
+                    result.filing_id,
+                    result.ingest_result.chunk_count,
                 )
                 if not registered:
                     # Another thread registered this filing between the
                     # batch duplicate check and now — treat as a skip.
                     info.progress.filings_skipped += 1
                     info.progress.filings_done += 1
-                    self._push(info, {
-                        "type": "filing_skipped",
-                        "ticker": ticker,
-                        "form_type": form_type,
-                        "accession_number": filing_id.accession_number,
-                        "reason": "duplicate",
-                    })
+                    self._push(
+                        info,
+                        {
+                            "type": "filing_skipped",
+                            "ticker": ticker,
+                            "form_type": form_type,
+                            "accession_number": filing_id.accession_number,
+                            "reason": "duplicate",
+                        },
+                    )
                     logger.info(
                         "Task %s: skipped late duplicate %s",
                         info.task_id[:8],
@@ -754,13 +775,16 @@ class TaskManager:
             except DatabaseError as exc:
                 info.progress.filings_failed += 1
                 info.progress.filings_done += 1
-                self._push(info, {
-                    "type": "filing_failed",
-                    "ticker": ticker,
-                    "form_type": form_type,
-                    "accession_number": filing_id.accession_number,
-                    "error": exc.message,
-                })
+                self._push(
+                    info,
+                    {
+                        "type": "filing_failed",
+                        "ticker": ticker,
+                        "form_type": form_type,
+                        "accession_number": filing_id.accession_number,
+                        "error": exc.message,
+                    },
+                )
                 logger.warning(
                     "Task %s: storage failed for %s — %s",
                     info.task_id[:8],
@@ -785,16 +809,19 @@ class TaskManager:
             )
             info.progress.filings_done += 1
 
-            self._push(info, {
-                "type": "filing_done",
-                "ticker": filing_id.ticker,
-                "form_type": filing_id.form_type,
-                "filing_date": filing_id.date_str,
-                "accession_number": filing_id.accession_number,
-                "segments": result.ingest_result.segment_count,
-                "chunks": result.ingest_result.chunk_count,
-                "time": round(result.ingest_result.duration_seconds, 1),
-            })
+            self._push(
+                info,
+                {
+                    "type": "filing_done",
+                    "ticker": filing_id.ticker,
+                    "form_type": filing_id.form_type,
+                    "filing_date": filing_id.date_str,
+                    "accession_number": filing_id.accession_number,
+                    "segments": result.ingest_result.segment_count,
+                    "chunks": result.ingest_result.chunk_count,
+                    "time": round(result.ingest_result.duration_seconds, 1),
+                },
+            )
 
             logger.info(
                 "Task %s: ingested %s %s (%s) — %d chunks in %.1fs",
@@ -811,16 +838,21 @@ class TaskManager:
             info.state = TaskState.COMPLETED
             info.completed_at = datetime.now(UTC)
             info.progress.step_label = "Complete"
-            self._push(info, {
-                "type": "completed",
-                "results": [r.to_dict() for r in info.results],
-                "summary": {
-                    "total": len(info.results) + info.progress.filings_skipped + info.progress.filings_failed,
-                    "succeeded": len(info.results),
-                    "skipped": info.progress.filings_skipped,
-                    "failed": info.progress.filings_failed,
+            self._push(
+                info,
+                {
+                    "type": "completed",
+                    "results": [r.to_dict() for r in info.results],
+                    "summary": {
+                        "total": len(info.results)
+                        + info.progress.filings_skipped
+                        + info.progress.filings_failed,
+                        "succeeded": len(info.results),
+                        "skipped": info.progress.filings_skipped,
+                        "failed": info.progress.filings_failed,
+                    },
                 },
-            })
+            )
             logger.info(
                 "Task %s completed: %d ingested, %d skipped, %d failed",
                 info.task_id[:8],
@@ -858,7 +890,8 @@ class TaskManager:
                 # Cross-form mode: list available across forms, pick
                 # the newest `count`.
                 filings = self._fetcher.list_available_across_forms(
-                    ticker, tuple(info.form_types),
+                    ticker,
+                    tuple(info.form_types),
                     count=info.count,
                     year=info.year,
                     start_date=info.start_date,
@@ -905,9 +938,7 @@ class TaskManager:
         if info.count_mode == "per_form" and info.count is not None:
             return info.count
         has_filters = (
-            info.year is not None
-            or info.start_date is not None
-            or info.end_date is not None
+            info.year is not None or info.start_date is not None or info.end_date is not None
         )
         if has_filters and info.count is None:
             return None  # all matching within filters
@@ -989,7 +1020,9 @@ class TaskManager:
 
         evicted_tickers = sorted({f.ticker for f in oldest})
         chunks_deleted = delete_filings_batch(
-            oldest, chroma=self._chroma, registry=self._registry,
+            oldest,
+            chroma=self._chroma,
+            registry=self._registry,
         )
 
         logger.info(
@@ -1002,12 +1035,15 @@ class TaskManager:
         )
 
         # Notify WebSocket clients of the eviction.
-        self._push(info, {
-            "type": "eviction",
-            "filings_evicted": len(oldest),
-            "chunks_evicted": chunks_deleted,
-            "tickers_affected": evicted_tickers,
-        })
+        self._push(
+            info,
+            {
+                "type": "eviction",
+                "filings_evicted": len(oldest),
+                "chunks_evicted": chunks_deleted,
+                "tickers_affected": evicted_tickers,
+            },
+        )
 
     # ------------------------------------------------------------------
     # Cleanup
@@ -1060,21 +1096,16 @@ class TaskManager:
                         form_types=info.form_types,
                         results=[r.to_history_dict() for r in info.results],
                         error=info.error,
-                        started_at=(
-                            info.started_at.isoformat()
-                            if info.started_at else None
-                        ),
-                        completed_at=(
-                            info.completed_at.isoformat()
-                            if info.completed_at else None
-                        ),
+                        started_at=(info.started_at.isoformat() if info.started_at else None),
+                        completed_at=(info.completed_at.isoformat() if info.completed_at else None),
                         filings_done=info.progress.filings_done,
                         filings_skipped=info.progress.filings_skipped,
                         filings_failed=info.progress.filings_failed,
                     )
                 except Exception:
                     logger.exception(
-                        "Failed to persist task %s to history", task_id[:8],
+                        "Failed to persist task %s to history",
+                        task_id[:8],
                     )
 
             with self._lock:

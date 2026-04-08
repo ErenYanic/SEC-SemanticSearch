@@ -107,11 +107,15 @@ class TestProcessFiling:
         orchestrator.process_filing(sample_filing_id, "<html>test</html>")
         mock_parser.parse.assert_called_once_with("<html>test</html>", sample_filing_id)
 
-    def test_calls_chunker_with_segments(self, orchestrator, sample_filing_id, mock_chunker, mock_parser):
+    def test_calls_chunker_with_segments(
+        self, orchestrator, sample_filing_id, mock_chunker, mock_parser
+    ):
         orchestrator.process_filing(sample_filing_id, "<html>test</html>")
         mock_chunker.chunk_segments.assert_called_once_with(mock_parser.parse.return_value)
 
-    def test_calls_embedder_with_chunks(self, orchestrator, sample_filing_id, mock_embedder, sample_chunks):
+    def test_calls_embedder_with_chunks(
+        self, orchestrator, sample_filing_id, mock_embedder, sample_chunks
+    ):
         orchestrator.process_filing(sample_filing_id, "<html>test</html>")
         mock_embedder.embed_chunks.assert_called_once_with(sample_chunks, show_progress=False)
 
@@ -134,6 +138,7 @@ class TestProgressCallback:
 
     def test_callback_receives_step_names(self, orchestrator, sample_filing_id):
         steps = []
+
         def capture(step, current, total):
             steps.append(step)
 

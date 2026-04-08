@@ -34,7 +34,6 @@ from sec_semantic_search.api.schemas import (
     TickerBreakdown,
 )
 
-
 # -----------------------------------------------------------------------
 # ErrorResponse
 # -----------------------------------------------------------------------
@@ -126,8 +125,12 @@ class TestFilingSchema:
     def test_chunk_count_ge_zero(self):
         with pytest.raises(ValidationError):
             FilingSchema(
-                ticker="X", form_type="10-K", filing_date="2024-01-01",
-                accession_number="x", chunk_count=-1, ingested_at="x",
+                ticker="X",
+                form_type="10-K",
+                filing_date="2024-01-01",
+                accession_number="x",
+                chunk_count=-1,
+                ingested_at="x",
             )
 
 
@@ -152,9 +155,7 @@ class TestDeleteByIdsRequest:
     """Delete-by-IDs request validation."""
 
     def test_valid(self):
-        req = DeleteByIdsRequest(
-            accession_numbers=["0000320193-24-000001", "0000320193-24-000002"]
-        )
+        req = DeleteByIdsRequest(accession_numbers=["0000320193-24-000001", "0000320193-24-000002"])
         assert len(req.accession_numbers) == 2
 
     def test_empty_list_raises(self):
@@ -179,9 +180,7 @@ class TestDeleteByIdsResponse:
         assert resp.not_found == []
 
     def test_with_not_found(self):
-        resp = DeleteByIdsResponse(
-            filings_deleted=1, chunks_deleted=50, not_found=["nope"]
-        )
+        resp = DeleteByIdsResponse(filings_deleted=1, chunks_deleted=50, not_found=["nope"])
         assert resp.not_found == ["nope"]
 
 
@@ -236,22 +235,34 @@ class TestSearchResultSchema:
 
     def test_valid(self):
         r = SearchResultSchema(
-            content="text", path="Part I", content_type="text",
-            ticker="AAPL", form_type="10-K", similarity=0.5,
+            content="text",
+            path="Part I",
+            content_type="text",
+            ticker="AAPL",
+            form_type="10-K",
+            similarity=0.5,
         )
         assert r.similarity == 0.5
 
     def test_similarity_range(self):
         with pytest.raises(ValidationError):
             SearchResultSchema(
-                content="x", path="x", content_type="text",
-                ticker="X", form_type="10-K", similarity=1.5,
+                content="x",
+                path="x",
+                content_type="text",
+                ticker="X",
+                form_type="10-K",
+                similarity=1.5,
             )
 
     def test_optional_fields_default_none(self):
         r = SearchResultSchema(
-            content="x", path="x", content_type="text",
-            ticker="X", form_type="10-K", similarity=0.1,
+            content="x",
+            path="x",
+            content_type="text",
+            ticker="X",
+            form_type="10-K",
+            similarity=0.1,
         )
         assert r.filing_date is None
         assert r.accession_number is None
@@ -372,14 +383,18 @@ class TestSearchResponse:
 
     def test_valid(self):
         resp = SearchResponse(
-            results=[], total_results=0, search_time_ms=1.5,
+            results=[],
+            total_results=0,
+            search_time_ms=1.5,
         )
         assert resp.search_time_ms == 1.5
 
     def test_query_not_in_response(self):
         """Query must not be echoed in the response (§F4)."""
         resp = SearchResponse(
-            results=[], total_results=0, search_time_ms=1.0,
+            results=[],
+            total_results=0,
+            search_time_ms=1.0,
         )
         assert "query" not in resp.model_dump()
 
@@ -468,8 +483,12 @@ class TestIngestResultSchema:
 
     def test_valid(self):
         r = IngestResultSchema(
-            ticker="AAPL", form_type="10-K", filing_date="2024-11-01",
-            accession_number="x", segment_count=100, chunk_count=110,
+            ticker="AAPL",
+            form_type="10-K",
+            filing_date="2024-11-01",
+            accession_number="x",
+            segment_count=100,
+            chunk_count=110,
             duration_seconds=5.3,
         )
         assert r.segment_count == 100
@@ -480,8 +499,10 @@ class TestTaskStatus:
 
     def test_defaults(self):
         ts = TaskStatus(
-            task_id="abc", status="pending",
-            tickers=["AAPL"], form_types=["10-K"],
+            task_id="abc",
+            status="pending",
+            tickers=["AAPL"],
+            form_types=["10-K"],
             progress=TaskProgress(),
         )
         assert ts.results == []
@@ -517,15 +538,18 @@ class TestGPUStatusResponse:
 
     def test_not_loaded(self):
         resp = GPUStatusResponse(
-            model_loaded=False, model_name="test-model",
+            model_loaded=False,
+            model_name="test-model",
         )
         assert resp.device is None
         assert resp.approximate_vram_mb is None
 
     def test_loaded(self):
         resp = GPUStatusResponse(
-            model_loaded=True, device="cuda",
-            model_name="test-model", approximate_vram_mb=1200,
+            model_loaded=True,
+            device="cuda",
+            model_name="test-model",
+            approximate_vram_mb=1200,
         )
         assert resp.device == "cuda"
         assert resp.approximate_vram_mb == 1200

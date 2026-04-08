@@ -33,7 +33,7 @@ Filing content is fetched from SEC EDGAR, parsed into structured sections, split
 - **Flexible filtering** — Search and manage by ticker, form type, or date range
 - **Duplicate detection** — Checks for existing filings before any GPU work begins
 - **Configuration-driven deployment** — Three deployment scenarios (local, team, public) controlled entirely via environment variables
-- **1094 backend tests and 199 frontend tests**, all passing
+- **1095 backend tests and 199 frontend tests**, all passing
 
 ---
 

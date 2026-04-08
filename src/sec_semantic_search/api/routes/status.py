@@ -49,12 +49,8 @@ async def status(
     # The frontend needs to know whether to show the Welcome screen.
     # Session is required when the server has no EDGAR identity AND
     # the setting explicitly mandates per-session credentials.
-    has_server_identity = bool(
-        settings.edgar.identity_name and settings.edgar.identity_email
-    )
-    edgar_session_required = (
-        settings.api.edgar_session_required and not has_server_identity
-    )
+    has_server_identity = bool(settings.edgar.identity_name and settings.edgar.identity_email)
+    edgar_session_required = settings.api.edgar_session_required and not has_server_identity
 
     return StatusResponse(
         filing_count=stats.filing_count,

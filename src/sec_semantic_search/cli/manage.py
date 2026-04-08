@@ -54,9 +54,7 @@ def status() -> None:
             Text(f"{len(stats.tickers)} ({ticker_list})", style="cyan"),
         )
 
-        breakdown = "  |  ".join(
-            f"{form}: {count}" for form, count in stats.form_breakdown.items()
-        )
+        breakdown = "  |  ".join(f"{form}: {count}" for form, count in stats.form_breakdown.items())
         table.add_row("Forms", Text(breakdown))
     else:
         table.add_row("Tickers", Text("—", style="dim"))
@@ -168,9 +166,7 @@ def remove(
         raise typer.Exit(code=1)
 
     if accession_number is not None and has_filters:
-        console.print(
-            "[red]Cannot combine an accession number with --ticker/--form filters.[/red]"
-        )
+        console.print("[red]Cannot combine an accession number with --ticker/--form filters.[/red]")
         raise typer.Exit(code=1)
 
     registry = MetadataRegistry()
@@ -226,10 +222,12 @@ def remove(
 
     if not filings:
         filter_desc = " and ".join(
-            part for part in [
+            part
+            for part in [
                 f"ticker={ticker.upper()}" if ticker else None,
                 f"form={form.upper()}" if form else None,
-            ] if part
+            ]
+            if part
         )
         console.print(f"[yellow]No filings found matching {filter_desc}.[/yellow]")
         return
@@ -250,16 +248,13 @@ def remove(
 
     for f in filings:
         console.print(
-            f"  [dim]•[/dim] {f.ticker} {f.form_type} ({f.filing_date}) "
-            f"— {f.chunk_count} chunks"
+            f"  [dim]•[/dim] {f.ticker} {f.form_type} ({f.filing_date}) — {f.chunk_count} chunks"
         )
 
     console.print()
 
     if not yes:
-        confirmed = typer.confirm(
-            f"{len(filings)} filing(s) will be deleted. Are you sure?"
-        )
+        confirmed = typer.confirm(f"{len(filings)} filing(s) will be deleted. Are you sure?")
         if not confirmed:
             console.print("[dim]Cancelled.[/dim]")
             raise typer.Exit(code=0)
@@ -267,18 +262,17 @@ def remove(
     try:
         chroma = ChromaDBClient()
         total_deleted = delete_filings_batch(
-            filings, registry=registry, chroma=chroma,
+            filings,
+            registry=registry,
+            chroma=chroma,
         )
     except DatabaseError as e:
         console.print(f"[red]Removal failed:[/red] {e.message}")
-        console.print(
-            "  [dim italic]Hint: Check that the data directory is writable.[/dim italic]"
-        )
+        console.print("  [dim italic]Hint: Check that the data directory is writable.[/dim italic]")
         raise typer.Exit(code=1) from None
 
     console.print(
-        f"\n[green]Done:[/green] {len(filings)} filing(s) removed, "
-        f"{total_deleted} chunks deleted"
+        f"\n[green]Done:[/green] {len(filings)} filing(s) removed, {total_deleted} chunks deleted"
     )
 
 
@@ -315,9 +309,7 @@ def clear(
     )
 
     if not yes:
-        confirmed = typer.confirm(
-            f"ALL {len(filings)} filing(s) will be deleted. Are you sure?"
-        )
+        confirmed = typer.confirm(f"ALL {len(filings)} filing(s) will be deleted. Are you sure?")
         if not confirmed:
             console.print("[dim]Cancelled.[/dim]")
             raise typer.Exit(code=0)
@@ -325,13 +317,13 @@ def clear(
     try:
         chroma = ChromaDBClient()
         total_deleted = delete_filings_batch(
-            filings, registry=registry, chroma=chroma,
+            filings,
+            registry=registry,
+            chroma=chroma,
         )
     except DatabaseError as e:
         console.print(f"[red]Clear failed:[/red] {e.message}")
-        console.print(
-            "  [dim italic]Hint: Check that the data directory is writable.[/dim italic]"
-        )
+        console.print("  [dim italic]Hint: Check that the data directory is writable.[/dim italic]")
         raise typer.Exit(code=1) from None
 
     console.print(

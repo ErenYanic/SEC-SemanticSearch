@@ -48,7 +48,7 @@ class TestBaseException:
 
     def test_is_exception(self):
         """Must be catchable as a standard Exception."""
-        with pytest.raises(Exception):
+        with pytest.raises(SECSemanticSearchError):
             raise SECSemanticSearchError("test")
 
 

@@ -37,9 +37,7 @@ def parse_form_types(form_input: str) -> tuple[str, ...]:
     raw = [part.strip().upper() for part in form_input.split(",") if part.strip()]
 
     if not raw:
-        raise ValueError(
-            f"Empty form type. Supported: {', '.join(SUPPORTED_FORMS)}"
-        )
+        raise ValueError(f"Empty form type. Supported: {', '.join(SUPPORTED_FORMS)}")
 
     invalid = [f for f in raw if f not in SUPPORTED_FORMS]
     if invalid:
@@ -49,6 +47,7 @@ def parse_form_types(form_input: str) -> tuple[str, ...]:
         )
 
     return tuple(sorted(set(raw)))
+
 
 # Embedding model parameters
 EMBEDDING_DIMENSION = 768  # Dimension of google/embeddinggemma-300m

@@ -253,7 +253,7 @@ class TestCiFrontendJob:
 
 
 class TestCiLintJob:
-    """Lint job must run ruff check and ruff format --check."""
+    """Lint job must run blocking Ruff check and format verification."""
 
     def test_installs_pinned_ruff(self, ci_workflow):
         """Ruff version must match the dev extra pin for reproducibility."""
@@ -263,16 +263,17 @@ class TestCiLintJob:
     def test_runs_ruff_check(self, ci_workflow):
         run_blocks = "\n".join(step.get("run", "") for step in _steps_of(ci_workflow, "lint"))
         assert re.search(r"\bruff check\b", run_blocks)
+        assert "ruff check src tests" in run_blocks
 
-    def test_lint_is_advisory(self, ci_workflow):
-        """Lint is advisory (continue-on-error) until the backlog is cleared.
+    def test_runs_ruff_format_check(self, ci_workflow):
+        run_blocks = "\n".join(step.get("run", "") for step in _steps_of(ci_workflow, "lint"))
+        assert "ruff format --check src tests" in run_blocks
 
-        See TODO.md §4.3 — pre-existing ruff violations in src/ need
-        to be resolved before the lint job can become a required check.
-        """
+    def test_lint_is_blocking(self, ci_workflow):
+        """Lint is a required check once the backlog in TODO.md §4.3 is cleared."""
         lint_job = ci_workflow["jobs"]["lint"]
-        assert lint_job.get("continue-on-error") is True, (
-            "lint job must be advisory until pre-existing violations are fixed"
+        assert lint_job.get("continue-on-error") is not True, (
+            "lint job must block merges once the Ruff backlog is cleared"
         )
 
 

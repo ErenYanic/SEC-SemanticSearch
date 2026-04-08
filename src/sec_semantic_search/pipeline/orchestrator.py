@@ -268,9 +268,7 @@ class PipelineOrchestrator:
         if progress_callback:
             progress_callback("Fetching", 0, 4)
 
-        filing_id, html_content = self.fetcher.fetch_one(
-            ticker, form_type, index=index, year=year
-        )
+        filing_id, html_content = self.fetcher.fetch_one(ticker, form_type, index=index, year=year)
 
         return self.process_filing(filing_id, html_content, progress_callback)
 
