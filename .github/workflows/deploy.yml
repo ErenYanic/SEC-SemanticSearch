@@ -1,0 +1,324 @@
+# ──────────────────────────────────────────────────────────────────────
+# deploy.yml — Automated Cloud Run deployment for SEC Semantic Search
+#
+# Two triggers:
+#
+#   1. `workflow_dispatch`  — manual deploy from the Actions tab.
+#        Inputs: environment (defaults to `production`), whether to
+#        skip the test gate (defaults to false).
+#
+#   2. `push` of a `v*` tag  — tagged releases deploy automatically
+#        (e.g. `git tag v0.2.0 && git push origin v0.2.0`).
+#
+# The workflow:
+#   1. Waits for the CI workflow to succeed on the same SHA (unless
+#      `skip_ci_check` is true).
+#   2. Authenticates to GCP via Workload Identity Federation — no
+#      long-lived JSON service account keys live in GitHub secrets.
+#   3. Builds both container images via `gcloud builds submit`, which
+#      runs on Google infrastructure close to Artifact Registry (much
+#      faster than building 6+ GB CUDA images on a GitHub runner).
+#   4. Reuses `scripts/gcloud-deploy.sh deploy` and `scheduler` to
+#      apply the Knative YAML manifests — single source of truth for
+#      placeholder substitution.
+#
+# Required repository secrets:
+#   - GCP_WORKLOAD_IDENTITY_PROVIDER
+#       projects/NUMBER/locations/global/workloadIdentityPools/POOL/
+#       providers/PROVIDER
+#   - GCP_SERVICE_ACCOUNT
+#       sec-search-deployer@PROJECT_ID.iam.gserviceaccount.com
+#       (must hold roles: run.admin, iam.serviceAccountUser,
+#        artifactregistry.writer, cloudbuild.builds.editor,
+#        storage.admin, secretmanager.admin)
+#   - GCP_PROJECT_ID
+#   - GCP_REGION (e.g. us-central1)
+#
+# Setup guide: see docs/DEPLOYMENT.md §6.
+# ──────────────────────────────────────────────────────────────────────
+
+name: Deploy to Cloud Run
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment"
+        required: true
+        default: "production"
+        type: choice
+        options:
+          - production
+      skip_ci_check:
+        description: "Skip waiting for CI to succeed"
+        required: false
+        default: false
+        type: boolean
+  push:
+    tags:
+      - "v*"
+
+concurrency:
+  # Serialise deploys — never let two deployments race for the same
+  # Cloud Run revision (and the in-memory task state on max-instances=1).
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  # Required by google-github-actions/auth@v2 for Workload Identity
+  # Federation (OIDC token exchange).
+  id-token: write
+
+jobs:
+  # ────────────────────────────────────────────────────────────────────
+  # Gate: block deploy until CI has succeeded on the same commit.
+  # Skipped when triggered manually with `skip_ci_check=true`.
+  # ────────────────────────────────────────────────────────────────────
+  await-ci:
+    name: Await CI success
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'push' || inputs.skip_ci_check != true }}
+    timeout-minutes: 30
+    steps:
+      - name: Wait for backend tests
+        uses: lewagon/wait-on-check-action@v1.3.4
+        with:
+          ref: ${{ github.sha }}
+          check-name: "Backend tests (Python 3.12)"
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          wait-interval: 20
+          allowed-conclusions: success
+
+      - name: Wait for frontend tests
+        uses: lewagon/wait-on-check-action@v1.3.4
+        with:
+          ref: ${{ github.sha }}
+          check-name: "Frontend tests (Node 22)"
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          wait-interval: 20
+          allowed-conclusions: success
+
+      - name: Wait for lint
+        uses: lewagon/wait-on-check-action@v1.3.4
+        with:
+          ref: ${{ github.sha }}
+          check-name: "Ruff lint & format check"
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          wait-interval: 20
+          allowed-conclusions: success
+
+  # ────────────────────────────────────────────────────────────────────
+  # Build: push API (CUDA) + frontend images to Artifact Registry.
+  # ────────────────────────────────────────────────────────────────────
+  build:
+    name: Build & push images
+    runs-on: ubuntu-latest
+    needs: [await-ci]
+    # Run the build step even when the CI gate was skipped.
+    if: ${{ always() && (needs.await-ci.result == 'success' || needs.await-ci.result == 'skipped') }}
+    timeout-minutes: 60
+
+    env:
+      PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+      REGION: ${{ secrets.GCP_REGION }}
+      REPO_NAME: sec-search
+      TORCH_INDEX_URL: https://download.pytorch.org/whl/cu124
+
+    outputs:
+      api_image: ${{ steps.image-tags.outputs.api_image }}
+      frontend_image: ${{ steps.image-tags.outputs.frontend_image }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - name: Set up gcloud CLI
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Resolve image tags
+        id: image-tags
+        run: |
+          # Derive a short SHA-based tag plus the conventional `latest`
+          # tag so the Knative YAML (which references `:latest`) picks up
+          # the new image. The short SHA tag is useful for rollbacks.
+          short_sha="${GITHUB_SHA:0:7}"
+          api_base="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO_NAME}/api"
+          fe_base="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO_NAME}/frontend"
+          {
+            echo "api_image=${api_base}:latest"
+            echo "api_image_sha=${api_base}:${short_sha}"
+            echo "frontend_image=${fe_base}:latest"
+            echo "frontend_image_sha=${fe_base}:${short_sha}"
+          } >> "$GITHUB_OUTPUT"
+
+      # Cloud Build runs on Google infrastructure — building the ~6 GB
+      # CUDA image on a GitHub runner would consume significant minutes
+      # and egress. Cloud Build is also already part of the deployment's
+      # trusted boundary (same project, same IAM).
+      #
+      # We write an inline cloudbuild.yaml because `--tag` alone does
+      # not support `--build-arg` (needed for TORCH_INDEX_URL). The
+      # heredoc uses 'EOF' (quoted) so no shell expansion happens inside
+      # the file — all substitutions are Cloud Build's own `$_VAR`.
+      - name: Build API image (CUDA) via Cloud Build
+        run: |
+          cat > /tmp/cloudbuild-api.yaml <<'EOF'
+          steps:
+            - name: gcr.io/cloud-builders/docker
+              args:
+                - build
+                - -f
+                - Dockerfile.api
+                - --build-arg
+                - TORCH_INDEX_URL=${_TORCH_INDEX_URL}
+                - -t
+                - ${_IMAGE}
+                - .
+          images:
+            - ${_IMAGE}
+          options:
+            machineType: E2_HIGHCPU_8
+          timeout: 3600s
+          EOF
+          gcloud builds submit \
+            --project="${PROJECT_ID}" \
+            --config=/tmp/cloudbuild-api.yaml \
+            --substitutions=_IMAGE="${{ steps.image-tags.outputs.api_image }}",_TORCH_INDEX_URL="${TORCH_INDEX_URL}" \
+            .
+
+      - name: Tag API image with commit SHA
+        run: |
+          gcloud artifacts docker tags add \
+            "${{ steps.image-tags.outputs.api_image }}" \
+            "${{ steps.image-tags.outputs.api_image_sha }}" \
+            --quiet
+
+      - name: Build frontend image via Cloud Build
+        run: |
+          cat > /tmp/cloudbuild-frontend.yaml <<'EOF'
+          steps:
+            - name: gcr.io/cloud-builders/docker
+              args:
+                - build
+                - -f
+                - Dockerfile.frontend
+                - -t
+                - ${_IMAGE}
+                - .
+          images:
+            - ${_IMAGE}
+          timeout: 1800s
+          EOF
+          gcloud builds submit \
+            --project="${PROJECT_ID}" \
+            --config=/tmp/cloudbuild-frontend.yaml \
+            --substitutions=_IMAGE="${{ steps.image-tags.outputs.frontend_image }}" \
+            .
+
+      - name: Tag frontend image with commit SHA
+        run: |
+          gcloud artifacts docker tags add \
+            "${{ steps.image-tags.outputs.frontend_image }}" \
+            "${{ steps.image-tags.outputs.frontend_image_sha }}" \
+            --quiet
+
+  # ────────────────────────────────────────────────────────────────────
+  # Deploy: apply Knative manifests via scripts/gcloud-deploy.sh.
+  # ────────────────────────────────────────────────────────────────────
+  deploy:
+    name: Deploy to Cloud Run
+    runs-on: ubuntu-latest
+    needs: [build]
+    environment:
+      name: ${{ inputs.environment || 'production' }}
+    timeout-minutes: 30
+
+    env:
+      PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+      REGION: ${{ secrets.GCP_REGION }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - name: Set up gcloud CLI
+        uses: google-github-actions/setup-gcloud@v2
+
+      # Reuse the existing deployment script. It already handles sed
+      # placeholder substitution, CORS/URL wiring between services,
+      # and the Cloud Run Job for demo reset.
+      - name: Deploy services
+        run: ./scripts/gcloud-deploy.sh deploy
+
+      - name: Configure Cloud Scheduler (demo reset)
+        run: ./scripts/gcloud-deploy.sh scheduler
+
+      - name: Show deployment status
+        run: ./scripts/gcloud-deploy.sh status
+
+  # ────────────────────────────────────────────────────────────────────
+  # Smoke test: hit /api/health on the freshly deployed API.
+  # ────────────────────────────────────────────────────────────────────
+  smoke-test:
+    name: Post-deploy smoke test
+    runs-on: ubuntu-latest
+    needs: [deploy]
+    timeout-minutes: 10
+
+    env:
+      PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+      REGION: ${{ secrets.GCP_REGION }}
+
+    steps:
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - name: Set up gcloud CLI
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Resolve API URL
+        id: api-url
+        run: |
+          url=$(gcloud run services describe sec-search-api \
+            --project="${PROJECT_ID}" \
+            --region="${REGION}" \
+            --format='value(status.url)')
+          if [ -z "$url" ]; then
+            echo "Failed to resolve API URL" >&2
+            exit 1
+          fi
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+
+      - name: Health check
+        run: |
+          api_url="${{ steps.api-url.outputs.url }}"
+          # /api/health is the unauthenticated liveness probe — no API
+          # key required. Give the revision up to 60s to go ready.
+          for attempt in 1 2 3 4 5 6; do
+            if curl --fail --silent --show-error "${api_url}/api/health"; then
+              echo ""
+              echo "Smoke test passed on attempt ${attempt}."
+              exit 0
+            fi
+            echo "Attempt ${attempt} failed; retrying in 10s..."
+            sleep 10
+          done
+          echo "Smoke test failed after 6 attempts." >&2
+          exit 1
