@@ -75,9 +75,7 @@ def _add_file_handler(
         encoding="utf-8",
     )
     file_handler.setLevel(log_level)
-    file_handler.setFormatter(
-        logging.Formatter(DEFAULT_FORMAT, datefmt=DEFAULT_DATE_FORMAT)
-    )
+    file_handler.setFormatter(logging.Formatter(DEFAULT_FORMAT, datefmt=DEFAULT_DATE_FORMAT))
     logger.addHandler(file_handler)
 
 
@@ -128,9 +126,7 @@ def configure_logging(
     else:
         # Standard handler for non-interactive environments
         handler = logging.StreamHandler(sys.stderr)
-        handler.setFormatter(
-            logging.Formatter(DEFAULT_FORMAT, datefmt=DEFAULT_DATE_FORMAT)
-        )
+        handler.setFormatter(logging.Formatter(DEFAULT_FORMAT, datefmt=DEFAULT_DATE_FORMAT))
 
     handler.setLevel(log_level)
     logger.addHandler(handler)

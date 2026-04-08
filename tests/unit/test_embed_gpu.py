@@ -5,11 +5,8 @@ Tests is_loaded, approximate_vram_mb, and unload() — the properties
 used by the GPU resource endpoints (GET/DELETE /api/resources/gpu).
 """
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
-import numpy as np
-
-from sec_semantic_search.config.constants import EMBEDDING_DIMENSION
 from sec_semantic_search.pipeline.embed import EmbeddingGenerator
 
 

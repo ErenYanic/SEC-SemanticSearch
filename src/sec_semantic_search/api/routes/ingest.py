@@ -82,7 +82,8 @@ def _check_cooldown(client_ip: str) -> None:
         # evict the oldest half before recording the next request.
         if len(_last_ingest) >= _MAX_COOLDOWN_ENTRIES:
             oldest_entries = sorted(
-                _last_ingest.items(), key=lambda item: item[1],
+                _last_ingest.items(),
+                key=lambda item: item[1],
             )
             prune_count = max(len(oldest_entries) // 2, 1)
             for ip, _ in oldest_entries[:prune_count]:
@@ -103,13 +104,10 @@ def _check_cooldown(client_ip: str) -> None:
                     detail={
                         "error": "cooldown",
                         "message": (
-                            f"Please wait {remaining}s before submitting "
-                            "another ingest request."
+                            f"Please wait {remaining}s before submitting another ingest request."
                         ),
                         "details": None,
-                        "hint": (
-                            f"Ingest cooldown is {cooldown}s between requests."
-                        ),
+                        "hint": (f"Ingest cooldown is {cooldown}s between requests."),
                     },
                 )
 
@@ -159,8 +157,11 @@ def _task_info_to_status(info: TaskInfo) -> TaskStatus:
 
 
 def _create_task(
-    body: IngestRequest, manager: TaskManager, identity: EdgarIdentity,
-    *, client_ip: str = "unknown",
+    body: IngestRequest,
+    manager: TaskManager,
+    identity: EdgarIdentity,
+    *,
+    client_ip: str = "unknown",
 ) -> TaskResponse:
     """Shared logic for both add and batch endpoints."""
     settings = get_settings()
@@ -173,8 +174,7 @@ def _create_task(
             detail={
                 "error": "request_cap_exceeded",
                 "message": (
-                    f"Too many tickers: {len(body.tickers)} "
-                    f"(maximum {max_tickers} per request)."
+                    f"Too many tickers: {len(body.tickers)} (maximum {max_tickers} per request)."
                 ),
                 "details": None,
                 "hint": f"Submit at most {max_tickers} tickers per request.",
@@ -182,18 +182,13 @@ def _create_task(
         )
 
     max_filings = settings.api.max_filings_per_request
-    if (
-        max_filings > 0
-        and body.count is not None
-        and body.count > max_filings
-    ):
+    if max_filings > 0 and body.count is not None and body.count > max_filings:
         raise HTTPException(
             status_code=400,
             detail={
                 "error": "request_cap_exceeded",
                 "message": (
-                    f"Too many filings requested: {body.count} "
-                    f"(maximum {max_filings} per request)."
+                    f"Too many filings requested: {body.count} (maximum {max_filings} per request)."
                 ),
                 "details": None,
                 "hint": f"Request at most {max_filings} filings per request.",

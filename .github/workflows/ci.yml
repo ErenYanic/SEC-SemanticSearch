@@ -128,21 +128,16 @@ jobs:
         run: npm run build
 
   # ────────────────────────────────────────────────────────────────────
-  # Lint: advisory ruff check (reports only — does not block)
+  # Lint: blocking Ruff check + format verification
   #
-  # The existing codebase has a handful of pre-existing ruff violations
-  # (3 `ruff check src/` errors and ~22 files that would be reformatted
-  # by `ruff format`). Cleaning them up is tracked as a follow-up in
-  # TODO.md §4.3 — once clear, flip `continue-on-error` to false so
-  # the job becomes a required status check.
+  # The historical lint backlog tracked in TODO.md §4.3 is cleared, so
+  # this job now acts as a required status check alongside backend and
+  # frontend tests.
   # ────────────────────────────────────────────────────────────────────
   lint:
-    name: Ruff lint (advisory)
+    name: Ruff lint & format check
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    # Advisory: surfaces violations without blocking merges until the
-    # pre-existing backlog is cleared.
-    continue-on-error: true
 
     steps:
       - name: Check out repository
@@ -160,5 +155,8 @@ jobs:
       - name: Install ruff
         run: pip install ruff==0.15.5
 
-      - name: ruff check src
-        run: ruff check src
+      - name: ruff check src tests
+        run: ruff check src tests
+
+      - name: ruff format --check src tests
+        run: ruff format --check src tests

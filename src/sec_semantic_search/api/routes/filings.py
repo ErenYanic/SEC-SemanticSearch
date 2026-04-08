@@ -27,7 +27,12 @@ from sec_semantic_search.api.schemas import (
 )
 from sec_semantic_search.config import get_settings
 from sec_semantic_search.core import DatabaseError, audit_log, get_logger
-from sec_semantic_search.database import ChromaDBClient, MetadataRegistry, clear_all_filings, delete_filings_batch
+from sec_semantic_search.database import (
+    ChromaDBClient,
+    MetadataRegistry,
+    clear_all_filings,
+    delete_filings_batch,
+)
 from sec_semantic_search.database.metadata import FilingRecord
 
 logger = get_logger(__name__)
@@ -196,9 +201,7 @@ async def delete_by_ids(
     # Batch lookup: single SQL query instead of N individual get_filing() calls.
     found = registry.get_filings_by_accessions(body.accession_numbers)
     found_accessions = {r.accession_number for r in found}
-    not_found = [
-        a for a in body.accession_numbers if a not in found_accessions
-    ]
+    not_found = [a for a in body.accession_numbers if a not in found_accessions]
 
     if not found:
         return DeleteByIdsResponse(
@@ -209,7 +212,9 @@ async def delete_by_ids(
 
     try:
         total_chunks = delete_filings_batch(
-            found, chroma=chroma, registry=registry,
+            found,
+            chroma=chroma,
+            registry=registry,
         )
     except DatabaseError as exc:
         logger.error("Delete by IDs failed: %s", exc.details)
@@ -287,7 +292,9 @@ async def bulk_delete(
 
     try:
         total_chunks = delete_filings_batch(
-            filings, chroma=chroma, registry=registry,
+            filings,
+            chroma=chroma,
+            registry=registry,
         )
     except DatabaseError as exc:
         logger.error("Bulk delete failed: %s", exc.details)
@@ -330,9 +337,7 @@ async def bulk_delete(
 )
 async def clear_all(
     request: Request,
-    confirm: bool = Query(
-        False, description="Safety flag — must be true to proceed"
-    ),
+    confirm: bool = Query(False, description="Safety flag — must be true to proceed"),
     registry: MetadataRegistry = Depends(get_registry),
     chroma: ChromaDBClient = Depends(get_chroma),
 ) -> ClearAllResponse:
@@ -367,7 +372,8 @@ async def clear_all(
 
     try:
         filings_deleted, chunks_deleted = clear_all_filings(
-            chroma=chroma, registry=registry,
+            chroma=chroma,
+            registry=registry,
         )
     except DatabaseError as exc:
         logger.error("Clear all failed: %s", exc.details)

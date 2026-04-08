@@ -39,7 +39,6 @@ from sec_semantic_search.config.settings import (
     reload_settings,
 )
 
-
 # -----------------------------------------------------------------------
 # Constants
 # -----------------------------------------------------------------------
@@ -286,6 +285,7 @@ class TestEdgarSettingsW5:
         s = EdgarSettings()
         assert s.identity_name == "Test User"
         assert s.identity_email == "test@example.com"
+
 
 class TestDatabaseSettingsW5:
     """New privacy fields on DatabaseSettings."""

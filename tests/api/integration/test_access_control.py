@@ -24,12 +24,11 @@ from sec_semantic_search.api.dependencies import (
     get_registry,
     get_task_manager,
     is_admin_request,
-    verify_api_key,
     verify_admin_key,
+    verify_api_key,
 )
-from sec_semantic_search.api.tasks import TaskInfo, TaskState
+from sec_semantic_search.api.tasks import TaskState
 from tests.helpers import make_filing_record, make_task_info
-
 
 # -----------------------------------------------------------------------
 # Helpers
@@ -198,7 +197,9 @@ class TestDemoMode:
     @patch("sec_semantic_search.api.routes.filings.get_settings")
     @patch("sec_semantic_search.api.dependencies.get_settings")
     def test_clear_all_returns_403_in_demo_mode(
-        self, mock_dep_settings, mock_route_settings,
+        self,
+        mock_dep_settings,
+        mock_route_settings,
     ):
         """Clear all returns 403 for everyone in DEMO_MODE, even with admin key."""
         mock_dep_settings.return_value.api.admin_key = None
@@ -214,7 +215,9 @@ class TestDemoMode:
     @patch("sec_semantic_search.api.routes.filings.get_settings")
     @patch("sec_semantic_search.api.dependencies.get_settings")
     def test_clear_all_returns_403_in_demo_mode_with_admin(
-        self, mock_dep_settings, mock_route_settings,
+        self,
+        mock_dep_settings,
+        mock_route_settings,
     ):
         """Even an admin cannot clear all in demo mode."""
         mock_dep_settings.return_value.api.admin_key = "secret"
@@ -231,7 +234,9 @@ class TestDemoMode:
     @patch("sec_semantic_search.api.routes.filings.get_settings")
     @patch("sec_semantic_search.api.dependencies.get_settings")
     def test_bulk_delete_still_works_in_demo_mode_with_admin(
-        self, mock_dep_settings, mock_route_settings,
+        self,
+        mock_dep_settings,
+        mock_route_settings,
     ):
         """Bulk delete (not clear all) works in demo mode with admin key."""
         mock_dep_settings.return_value.api.admin_key = "secret"
@@ -263,7 +268,10 @@ class TestStatusFlags:
     @patch("sec_semantic_search.api.routes.status.is_admin_request")
     @patch("sec_semantic_search.api.dependencies.get_settings")
     def test_status_includes_is_admin_true(
-        self, mock_dep_settings, mock_is_admin, mock_route_settings,
+        self,
+        mock_dep_settings,
+        mock_is_admin,
+        mock_route_settings,
     ):
         """Status includes is_admin=true when admin key matches."""
         mock_dep_settings.return_value.api.key = None
@@ -286,7 +294,10 @@ class TestStatusFlags:
     @patch("sec_semantic_search.api.routes.status.is_admin_request")
     @patch("sec_semantic_search.api.dependencies.get_settings")
     def test_status_includes_demo_mode_true(
-        self, mock_dep_settings, mock_is_admin, mock_route_settings,
+        self,
+        mock_dep_settings,
+        mock_is_admin,
+        mock_route_settings,
     ):
         """Status includes demo_mode=true when DEMO_MODE is set."""
         mock_dep_settings.return_value.api.key = None
@@ -359,7 +370,9 @@ class TestConstantTimeSecretComparison:
     @patch("sec_semantic_search.api.dependencies.hmac.compare_digest")
     @patch("sec_semantic_search.api.dependencies.get_settings")
     async def test_verify_api_key_uses_compare_digest(
-        self, mock_settings, mock_compare_digest,
+        self,
+        mock_settings,
+        mock_compare_digest,
     ):
         """API key validation should use constant-time comparison."""
         mock_settings.return_value.api.key = "secret-api-key"
@@ -368,14 +381,17 @@ class TestConstantTimeSecretComparison:
         await verify_api_key(api_key="secret-api-key")
 
         mock_compare_digest.assert_called_once_with(
-            "secret-api-key", "secret-api-key",
+            "secret-api-key",
+            "secret-api-key",
         )
 
     @pytest.mark.anyio
     @patch("sec_semantic_search.api.dependencies.hmac.compare_digest")
     @patch("sec_semantic_search.api.dependencies.get_settings")
     async def test_verify_admin_key_uses_compare_digest(
-        self, mock_settings, mock_compare_digest,
+        self,
+        mock_settings,
+        mock_compare_digest,
     ):
         """Admin key validation should use constant-time comparison."""
         mock_settings.return_value.api.admin_key = "secret-admin-key"
@@ -388,13 +404,16 @@ class TestConstantTimeSecretComparison:
         await verify_admin_key(request, admin_key="secret-admin-key")
 
         mock_compare_digest.assert_called_once_with(
-            "secret-admin-key", "secret-admin-key",
+            "secret-admin-key",
+            "secret-admin-key",
         )
 
     @patch("sec_semantic_search.api.dependencies.hmac.compare_digest")
     @patch("sec_semantic_search.api.dependencies.get_settings")
     def test_is_admin_request_uses_compare_digest(
-        self, mock_settings, mock_compare_digest,
+        self,
+        mock_settings,
+        mock_compare_digest,
     ):
         """Status admin detection should use constant-time comparison."""
         mock_settings.return_value.api.admin_key = "secret-admin-key"
@@ -404,7 +423,8 @@ class TestConstantTimeSecretComparison:
 
         assert is_admin_request(request) is True
         mock_compare_digest.assert_called_once_with(
-            "secret-admin-key", "secret-admin-key",
+            "secret-admin-key",
+            "secret-admin-key",
         )
 
 
@@ -421,18 +441,22 @@ class TestRequestCaps:
 
     def _make_ingest_client(self):
         """Build a client with mocked ingest dependencies."""
-        from sec_semantic_search.api.dependencies import get_edgar_identity, EdgarIdentity
+        from sec_semantic_search.api.dependencies import EdgarIdentity, get_edgar_identity
 
         manager = MagicMock()
         manager.create_task.return_value = "test-task-id"
         app.dependency_overrides[get_task_manager] = lambda: manager
         app.dependency_overrides[get_edgar_identity] = lambda: EdgarIdentity(
-            name="Test", email="test@example.com",
+            name="Test",
+            email="test@example.com",
         )
         # Also mock registry/chroma so the app doesn't complain
         registry = MagicMock()
         registry.get_statistics.return_value = MagicMock(
-            filing_count=0, tickers=[], form_breakdown={}, ticker_breakdown=[],
+            filing_count=0,
+            tickers=[],
+            form_breakdown={},
+            ticker_breakdown=[],
         )
         chroma = MagicMock()
         chroma.collection_count.return_value = 0
@@ -451,10 +475,13 @@ class TestRequestCaps:
         mock_route_settings.return_value.api.ingest_cooldown_seconds = 0
 
         client, _ = self._make_ingest_client()
-        resp = client.post("/api/ingest/batch", json={
-            "tickers": ["AAPL", "MSFT", "GOOGL"],
-            "form_types": ["10-K"],
-        })
+        resp = client.post(
+            "/api/ingest/batch",
+            json={
+                "tickers": ["AAPL", "MSFT", "GOOGL"],
+                "form_types": ["10-K"],
+            },
+        )
         assert resp.status_code == 400
         assert "Too many tickers" in resp.json()["detail"]["message"]
 
@@ -468,10 +495,13 @@ class TestRequestCaps:
         mock_route_settings.return_value.api.ingest_cooldown_seconds = 0
 
         client, _ = self._make_ingest_client()
-        resp = client.post("/api/ingest/batch", json={
-            "tickers": ["AAPL", "MSFT"],
-            "form_types": ["10-K"],
-        })
+        resp = client.post(
+            "/api/ingest/batch",
+            json={
+                "tickers": ["AAPL", "MSFT"],
+                "form_types": ["10-K"],
+            },
+        )
         assert resp.status_code == 202
 
     @patch("sec_semantic_search.api.routes.ingest.get_settings")
@@ -484,12 +514,15 @@ class TestRequestCaps:
         mock_route_settings.return_value.api.ingest_cooldown_seconds = 0
 
         client, _ = self._make_ingest_client()
-        resp = client.post("/api/ingest/add", json={
-            "tickers": ["AAPL"],
-            "form_types": ["10-K"],
-            "count_mode": "total",
-            "count": 50,
-        })
+        resp = client.post(
+            "/api/ingest/add",
+            json={
+                "tickers": ["AAPL"],
+                "form_types": ["10-K"],
+                "count_mode": "total",
+                "count": 50,
+            },
+        )
         assert resp.status_code == 400
         assert "Too many filings" in resp.json()["detail"]["message"]
 
@@ -503,12 +536,15 @@ class TestRequestCaps:
         mock_route_settings.return_value.api.ingest_cooldown_seconds = 0
 
         client, _ = self._make_ingest_client()
-        resp = client.post("/api/ingest/add", json={
-            "tickers": ["AAPL"],
-            "form_types": ["10-K"],
-            "count_mode": "total",
-            "count": 9999,
-        })
+        resp = client.post(
+            "/api/ingest/add",
+            json={
+                "tickers": ["AAPL"],
+                "form_types": ["10-K"],
+                "count_mode": "total",
+                "count": 9999,
+            },
+        )
         assert resp.status_code == 202
 
 
@@ -524,18 +560,20 @@ class TestIngestCooldown:
         app.dependency_overrides.clear()
         # Reset the module-level cooldown state
         from sec_semantic_search.api.routes import ingest as ingest_mod
+
         with ingest_mod._cooldown_lock:
             ingest_mod._last_ingest.clear()
             ingest_mod._last_cooldown_prune = 0.0
 
     def _make_ingest_client(self):
-        from sec_semantic_search.api.dependencies import get_edgar_identity, EdgarIdentity
+        from sec_semantic_search.api.dependencies import EdgarIdentity, get_edgar_identity
 
         manager = MagicMock()
         manager.create_task.return_value = "test-task-id"
         app.dependency_overrides[get_task_manager] = lambda: manager
         app.dependency_overrides[get_edgar_identity] = lambda: EdgarIdentity(
-            name="Test", email="test@example.com",
+            name="Test",
+            email="test@example.com",
         )
         registry = MagicMock()
         chroma = MagicMock()
@@ -592,12 +630,14 @@ class TestIngestCooldown:
         with patch("sec_semantic_search.api.routes.ingest.time.monotonic", return_value=1000.0):
             with ingest_mod._cooldown_lock:
                 ingest_mod._last_ingest.clear()
-                ingest_mod._last_ingest.update({
-                    "1.1.1.1": 10.0,
-                    "2.2.2.2": 20.0,
-                    "3.3.3.3": 30.0,
-                    "4.4.4.4": 40.0,
-                })
+                ingest_mod._last_ingest.update(
+                    {
+                        "1.1.1.1": 10.0,
+                        "2.2.2.2": 20.0,
+                        "3.3.3.3": 30.0,
+                        "4.4.4.4": 40.0,
+                    }
+                )
                 ingest_mod._last_cooldown_prune = 1000.0
 
             ingest_mod._check_cooldown("5.5.5.5")

@@ -33,30 +33,37 @@ class TestReExports:
 
     def test_filing_identifier(self):
         from sec_semantic_search import FilingIdentifier
+
         assert FilingIdentifier is not None
 
     def test_chunk(self):
         from sec_semantic_search import Chunk
+
         assert Chunk is not None
 
     def test_search_result(self):
         from sec_semantic_search import SearchResult
+
         assert SearchResult is not None
 
     def test_content_type(self):
         from sec_semantic_search import ContentType
+
         assert ContentType is not None
 
     def test_segment(self):
         from sec_semantic_search import Segment
+
         assert Segment is not None
 
     def test_ingest_result(self):
         from sec_semantic_search import IngestResult
+
         assert IngestResult is not None
 
     def test_base_exception(self):
         from sec_semantic_search import SECSemanticSearchError
+
         assert issubclass(SECSemanticSearchError, Exception)
 
 
@@ -71,8 +78,12 @@ class TestAllExports:
 
     def test_all_contains_types(self):
         expected = {
-            "ContentType", "FilingIdentifier", "Segment",
-            "Chunk", "SearchResult", "IngestResult",
+            "ContentType",
+            "FilingIdentifier",
+            "Segment",
+            "Chunk",
+            "SearchResult",
+            "IngestResult",
             "SECSemanticSearchError",
         }
         assert expected.issubset(set(sec_semantic_search.__all__))

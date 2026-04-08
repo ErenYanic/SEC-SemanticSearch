@@ -49,15 +49,23 @@ def search(
     ] = None,
     accession: Annotated[
         list[str] | None,
-        typer.Option("--accession", "-a", help="Restrict search to specific filing(s) by accession number. Repeat for multiple."),
+        typer.Option(
+            "--accession",
+            "-a",
+            help="Restrict search to specific filing(s) by accession number. Repeat for multiple.",
+        ),
     ] = None,
     start_date: Annotated[
         str | None,
-        typer.Option("--start-date", help="Filter results to filings on or after this date (YYYY-MM-DD)."),
+        typer.Option(
+            "--start-date", help="Filter results to filings on or after this date (YYYY-MM-DD)."
+        ),
     ] = None,
     end_date: Annotated[
         str | None,
-        typer.Option("--end-date", help="Filter results to filings on or before this date (YYYY-MM-DD)."),
+        typer.Option(
+            "--end-date", help="Filter results to filings on or before this date (YYYY-MM-DD)."
+        ),
     ] = None,
 ) -> None:
     """
@@ -81,12 +89,8 @@ def search(
         try:
             engine = SearchEngine()
             # Normalise ticker(s) to uppercase; pass list or None.
-            ticker_filter: list[str] | None = (
-                [t.upper() for t in ticker] if ticker else None
-            )
-            form_filter: list[str] | None = (
-                [f.upper() for f in form] if form else None
-            )
+            ticker_filter: list[str] | None = [t.upper() for t in ticker] if ticker else None
+            form_filter: list[str] | None = [f.upper() for f in form] if form else None
             results = engine.search(
                 query=query,
                 top_k=top,

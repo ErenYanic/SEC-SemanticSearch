@@ -17,7 +17,6 @@ import pytest
 from sec_semantic_search.core.exceptions import FetchError
 from sec_semantic_search.pipeline.fetch import FilingFetcher, FilingInfo
 
-
 # -----------------------------------------------------------------------
 # FilingInfo dataclass
 # -----------------------------------------------------------------------
@@ -110,9 +109,7 @@ class TestFormatDateFilter:
         assert result is None
 
     def test_date_objects(self, fetcher):
-        result = fetcher._format_date_filter(
-            date(2020, 1, 1), date(2024, 12, 31)
-        )
+        result = fetcher._format_date_filter(date(2020, 1, 1), date(2024, 12, 31))
         assert result == "2020-01-01:2024-12-31"
 
 
@@ -173,8 +170,9 @@ class TestGetCompanyError:
 # -----------------------------------------------------------------------
 
 
-def _make_mock_filing(accession_no, filing_date, *, html_content="<html></html>",
-                      html_side_effect=None, form="10-K"):
+def _make_mock_filing(
+    accession_no, filing_date, *, html_content="<html></html>", html_side_effect=None, form="10-K"
+):
     """Create a mock filing object with the given properties."""
     filing = MagicMock()
     filing.accession_no = accession_no
@@ -202,12 +200,11 @@ class TestFetchGeneratorFaultTolerance:
     def test_skips_failed_filing_continues(self, fetcher):
         """If one filing fails, the others should still be yielded."""
         filings = [
-            _make_mock_filing("ACC-001", date(2024, 1, 1),
-                              html_content="<html>1</html>"),
-            _make_mock_filing("ACC-002", date(2024, 2, 1),
-                              html_side_effect=Exception("Network error")),
-            _make_mock_filing("ACC-003", date(2024, 3, 1),
-                              html_content="<html>3</html>"),
+            _make_mock_filing("ACC-001", date(2024, 1, 1), html_content="<html>1</html>"),
+            _make_mock_filing(
+                "ACC-002", date(2024, 2, 1), html_side_effect=Exception("Network error")
+            ),
+            _make_mock_filing("ACC-003", date(2024, 3, 1), html_content="<html>3</html>"),
         ]
         mock_company = MagicMock()
         mock_company.get_filings.return_value = _make_mock_filings(filings)
@@ -222,10 +219,8 @@ class TestFetchGeneratorFaultTolerance:
     def test_all_filings_fail_yields_nothing(self, fetcher):
         """If every filing fails, the generator should yield nothing."""
         filings = [
-            _make_mock_filing("ACC-001", date(2024, 1, 1),
-                              html_side_effect=Exception("Fail 1")),
-            _make_mock_filing("ACC-002", date(2024, 2, 1),
-                              html_side_effect=Exception("Fail 2")),
+            _make_mock_filing("ACC-001", date(2024, 1, 1), html_side_effect=Exception("Fail 1")),
+            _make_mock_filing("ACC-002", date(2024, 2, 1), html_side_effect=Exception("Fail 2")),
         ]
         mock_company = MagicMock()
         mock_company.get_filings.return_value = _make_mock_filings(filings)
@@ -239,9 +234,7 @@ class TestFetchGeneratorFaultTolerance:
 class TestFetchLimitingLog:
     """fetch() should log when limiting results (regression test for F1 bug)."""
 
-    def test_logs_limiting_message_when_count_less_than_available(
-        self, fetcher, caplog
-    ):
+    def test_logs_limiting_message_when_count_less_than_available(self, fetcher, caplog):
         """With 5 available filings and count=2, the limiting log should fire.
 
         Regression: previously the generator was consumed twice — once by
@@ -263,9 +256,7 @@ class TestFetchLimitingLog:
         pkg_logger.propagate = True
         try:
             with patch.object(fetcher, "_get_company", return_value=mock_company):
-                with caplog.at_level(
-                    logging.INFO, logger="sec_semantic_search"
-                ):
+                with caplog.at_level(logging.INFO, logger="sec_semantic_search"):
                     results = list(fetcher.fetch("AAPL", "10-K", count=2))
         finally:
             pkg_logger.propagate = False
@@ -290,9 +281,7 @@ class TestFetchLimitingLog:
         pkg_logger.propagate = True
         try:
             with patch.object(fetcher, "_get_company", return_value=mock_company):
-                with caplog.at_level(
-                    logging.INFO, logger="sec_semantic_search"
-                ):
+                with caplog.at_level(logging.INFO, logger="sec_semantic_search"):
                     results = list(fetcher.fetch("AAPL", "10-K", count=3))
         finally:
             pkg_logger.propagate = False
@@ -308,8 +297,9 @@ class TestFetchCountNone:
         """With 10 available filings and max_filings=5, only 5 should be yielded."""
         fetcher.max_filings = 5
         filings = [
-            _make_mock_filing(f"ACC-{i:03d}", date(2024, 1, i + 1),
-                              html_content=f"<html>{i}</html>")
+            _make_mock_filing(
+                f"ACC-{i:03d}", date(2024, 1, i + 1), html_content=f"<html>{i}</html>"
+            )
             for i in range(10)
         ]
         mock_company = MagicMock()
@@ -417,10 +407,12 @@ class TestAmendmentFilteringInFetch:
     def test_amendments_excluded_from_fetch(self, fetcher):
         """Amendments should not be yielded by fetch()."""
         filings = [
-            _make_mock_filing("ACC-001", date(2024, 2, 1), form="10-K/A",
-                              html_content="<html>amendment</html>"),
-            _make_mock_filing("ACC-002", date(2024, 1, 1), form="10-K",
-                              html_content="<html>original</html>"),
+            _make_mock_filing(
+                "ACC-001", date(2024, 2, 1), form="10-K/A", html_content="<html>amendment</html>"
+            ),
+            _make_mock_filing(
+                "ACC-002", date(2024, 1, 1), form="10-K", html_content="<html>original</html>"
+            ),
         ]
         mock_company = MagicMock()
         mock_company.get_filings.return_value = _make_mock_filings(filings)
@@ -439,12 +431,15 @@ class TestAmendmentFilteringInFetchOne:
     def test_index_counts_non_amendments_only(self, fetcher):
         """Index should refer to the position among non-amendment filings."""
         filings = [
-            _make_mock_filing("ACC-001", date(2024, 3, 1), form="10-K/A",
-                              html_content="<html>amendment</html>"),
-            _make_mock_filing("ACC-002", date(2024, 2, 1), form="10-K",
-                              html_content="<html>first</html>"),
-            _make_mock_filing("ACC-003", date(2024, 1, 1), form="10-K",
-                              html_content="<html>second</html>"),
+            _make_mock_filing(
+                "ACC-001", date(2024, 3, 1), form="10-K/A", html_content="<html>amendment</html>"
+            ),
+            _make_mock_filing(
+                "ACC-002", date(2024, 2, 1), form="10-K", html_content="<html>first</html>"
+            ),
+            _make_mock_filing(
+                "ACC-003", date(2024, 1, 1), form="10-K", html_content="<html>second</html>"
+            ),
         ]
         mock_company = MagicMock()
         mock_company.get_filings.return_value = _make_mock_filings(filings)
@@ -463,10 +458,12 @@ class TestAmendmentFilteringInFetchByAccession:
     def test_amendment_accession_not_found(self, fetcher):
         """Requesting an amendment's accession number should raise FetchError."""
         filings = [
-            _make_mock_filing("ACC-001", date(2024, 1, 1), form="10-K/A",
-                              html_content="<html>amendment</html>"),
-            _make_mock_filing("ACC-002", date(2024, 1, 1), form="10-K",
-                              html_content="<html>original</html>"),
+            _make_mock_filing(
+                "ACC-001", date(2024, 1, 1), form="10-K/A", html_content="<html>amendment</html>"
+            ),
+            _make_mock_filing(
+                "ACC-002", date(2024, 1, 1), form="10-K", html_content="<html>original</html>"
+            ),
         ]
         mock_company = MagicMock()
         mock_company.get_filings.return_value = _make_mock_filings(filings)

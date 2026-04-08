@@ -7,13 +7,12 @@ actual background threads from spawning — we test the manager's own
 bookkeeping logic, not the ingestion pipeline.
 """
 
-import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-from sec_semantic_search.api.tasks import TaskManager, TaskState, _TASK_TTL_SECONDS
+from sec_semantic_search.api.tasks import TaskManager, TaskState
 from tests.helpers import make_task_info
 
 
@@ -197,14 +196,14 @@ class TestTaskCleanup:
 
     def test_old_completed_task_pruned(self, manager):
         info = make_task_info(state=TaskState.COMPLETED)
-        info.completed_at = datetime(2020, 1, 1, tzinfo=timezone.utc)
+        info.completed_at = datetime(2020, 1, 1, tzinfo=UTC)
         manager._tasks[info.task_id] = info
         manager._prune_stale_tasks()
         assert manager.get_task(info.task_id) is None
 
     def test_recent_completed_task_kept(self, manager):
         info = make_task_info(state=TaskState.COMPLETED)
-        info.completed_at = datetime.now(timezone.utc)
+        info.completed_at = datetime.now(UTC)
         manager._tasks[info.task_id] = info
         manager._prune_stale_tasks()
         assert manager.get_task(info.task_id) is not None
@@ -217,7 +216,7 @@ class TestTaskCleanup:
 
     def test_failed_task_pruned_after_ttl(self, manager):
         info = make_task_info(state=TaskState.FAILED)
-        info.completed_at = datetime(2020, 1, 1, tzinfo=timezone.utc)
+        info.completed_at = datetime(2020, 1, 1, tzinfo=UTC)
         manager._tasks[info.task_id] = info
         manager._prune_stale_tasks()
         assert manager.get_task(info.task_id) is None
@@ -250,7 +249,7 @@ class TestShutdown:
     def test_cleanup_loop_noop_after_shutdown(self, manager):
         """_cleanup_loop should return early without rescheduling."""
         info = make_task_info(state=TaskState.COMPLETED)
-        info.completed_at = datetime(2020, 1, 1, tzinfo=timezone.utc)
+        info.completed_at = datetime(2020, 1, 1, tzinfo=UTC)
         manager._tasks[info.task_id] = info
         manager.shutdown()
         # _cleanup_loop should skip pruning and not reschedule.

@@ -12,7 +12,6 @@ Usage:
     results = engine.search("revenue and financial performance")
 """
 
-
 from sec_semantic_search.config import get_settings
 from sec_semantic_search.core import SearchError, SearchResult, get_logger
 from sec_semantic_search.database import ChromaDBClient

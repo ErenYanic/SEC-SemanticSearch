@@ -103,13 +103,20 @@ def _fetch_filings(
         yield fetcher.fetch_latest(ticker, form_type)
     elif count == 1 and has_filters:
         yield fetcher.fetch_one(
-            ticker, form_type,
-            year=year, start_date=start_date, end_date=end_date,
+            ticker,
+            form_type,
+            year=year,
+            start_date=start_date,
+            end_date=end_date,
         )
     else:
         yield from fetcher.fetch(
-            ticker, form_type,
-            count=count, year=year, start_date=start_date, end_date=end_date,
+            ticker,
+            form_type,
+            count=count,
+            year=year,
+            start_date=start_date,
+            end_date=end_date,
         )
 
 
@@ -164,8 +171,13 @@ def _ingest_one_form(
     )
     try:
         filings_iter = _fetch_filings(
-            fetcher, ticker, form_type,
-            count=count, year=year, start_date=start_date, end_date=end_date,
+            fetcher,
+            ticker,
+            form_type,
+            count=count,
+            year=year,
+            start_date=start_date,
+            end_date=end_date,
         )
         # Materialise in advance so FetchError surfaces here, not mid-loop.
         filings = list(filings_iter)
@@ -182,8 +194,7 @@ def _ingest_one_form(
     if not filings:
         progress.stop()
         console.print(
-            f"[yellow]No filings found[/yellow] for {ticker} {form_type} "
-            f"with the given filters."
+            f"[yellow]No filings found[/yellow] for {ticker} {form_type} with the given filters."
         )
         return 0, 0, 0
 
@@ -199,9 +210,7 @@ def _ingest_one_form(
 
     # Batch duplicate check — single SQL query instead of N individual
     # is_duplicate() calls, reducing SQLite round-trips from O(N) to O(1).
-    existing = registry.get_existing_accessions(
-        [fid.accession_number for fid, _ in filings]
-    )
+    existing = registry.get_existing_accessions([fid.accession_number for fid, _ in filings])
 
     for filing_idx, (filing_id, html_content) in enumerate(filings):
         filing_num = f" [{filing_idx + 1}/{len(filings)}]" if multi else ""
@@ -242,7 +251,10 @@ def _ingest_one_form(
 
         # --- Process: parse → chunk → embed ----------------------------------
         def _on_progress(
-            step: str, _current: int, _total: int, _fnum: str = filing_num,
+            step: str,
+            _current: int,
+            _total: int,
+            _fnum: str = filing_num,
         ) -> None:
             if step != "Complete":
                 progress.update(
@@ -253,13 +265,13 @@ def _ingest_one_form(
 
         try:
             result = orchestrator.process_filing(
-                filing_id, html_content, progress_callback=_on_progress,
+                filing_id,
+                html_content,
+                progress_callback=_on_progress,
             )
         except SECSemanticSearchError as e:
             if multi:
-                progress.console.print(
-                    f"  [red]Processing failed{filing_num}:[/red] {e.message}"
-                )
+                progress.console.print(f"  [red]Processing failed{filing_num}:[/red] {e.message}")
             else:
                 progress.stop()
                 _print_error(
@@ -281,13 +293,12 @@ def _ingest_one_form(
         try:
             chroma.store_filing(result)
             registry.register_filing(
-                result.filing_id, result.ingest_result.chunk_count,
+                result.filing_id,
+                result.ingest_result.chunk_count,
             )
         except DatabaseError as e:
             if multi:
-                progress.console.print(
-                    f"  [red]Storage failed{filing_num}:[/red] {e.message}"
-                )
+                progress.console.print(f"  [red]Storage failed{filing_num}:[/red] {e.message}")
             else:
                 progress.stop()
                 _print_error(
@@ -350,19 +361,18 @@ def _ingest_across_forms(
         Tuple of (succeeded, skipped, failed) counts.
     """
     # --- List available filings across form types ----------------------------
-    console.print(
-        f"Listing available {ticker} filings across "
-        f"{', '.join(form_types)}..."
-    )
+    console.print(f"Listing available {ticker} filings across {', '.join(form_types)}...")
     selected = fetcher.list_available_across_forms(
-        ticker, form_types,
-        count=count, year=year, start_date=start_date, end_date=end_date,
+        ticker,
+        form_types,
+        count=count,
+        year=year,
+        start_date=start_date,
+        end_date=end_date,
     )
 
     if not selected:
-        console.print(
-            f"[yellow]No filings found[/yellow] for {ticker} with the given filters."
-        )
+        console.print(f"[yellow]No filings found[/yellow] for {ticker} with the given filters.")
         return 0, 0, 0
 
     console.print(
@@ -376,16 +386,16 @@ def _ingest_across_forms(
 
     # Batch duplicate check — single SQL query instead of N individual
     # is_duplicate() calls, reducing SQLite round-trips from O(N) to O(1).
-    existing = registry.get_existing_accessions(
-        [fi.accession_number for fi in selected]
-    )
+    existing = registry.get_existing_accessions([fi.accession_number for fi in selected])
 
     with _make_progress() as progress:
         filing_task = progress.add_task(
-            f"{ticker}: 0/{len(selected)} filings", total=len(selected),
+            f"{ticker}: 0/{len(selected)} filings",
+            total=len(selected),
         )
         step_task = progress.add_task(
-            "Fetching...", total=len(_STEPS),
+            "Fetching...",
+            total=len(_STEPS),
         )
 
         for filing_idx, fi in enumerate(selected):
@@ -405,15 +415,15 @@ def _ingest_across_forms(
 
             # Reset step bar for each filing.
             progress.update(
-                step_task, completed=0,
+                step_task,
+                completed=0,
                 description=f"Fetching {label}{filing_num}...",
             )
 
             # Duplicate check (before expensive fetch).
             if fi.accession_number in existing:
                 progress.console.print(
-                    f"  [yellow]Already ingested{filing_num}:[/yellow] "
-                    f"{label} ({fi.filing_date})"
+                    f"  [yellow]Already ingested{filing_num}:[/yellow] {label} ({fi.filing_date})"
                 )
                 skipped += 1
                 progress.advance(filing_task)
@@ -422,12 +432,12 @@ def _ingest_across_forms(
             # Fetch HTML content for this specific filing.
             try:
                 filing_id, html_content = fetcher.fetch_by_accession(
-                    fi.ticker, fi.form_type, fi.accession_number,
+                    fi.ticker,
+                    fi.form_type,
+                    fi.accession_number,
                 )
             except FetchError as e:
-                progress.console.print(
-                    f"  [red]Fetch failed{filing_num}:[/red] {e.message}"
-                )
+                progress.console.print(f"  [red]Fetch failed{filing_num}:[/red] {e.message}")
                 failed += 1
                 progress.advance(filing_task)
                 continue
@@ -436,8 +446,11 @@ def _ingest_across_forms(
 
             # Process: parse → chunk → embed.
             def _on_progress(
-                step: str, _current: int, _total: int,
-                _label: str = label, _fnum: str = filing_num,
+                step: str,
+                _current: int,
+                _total: int,
+                _label: str = label,
+                _fnum: str = filing_num,
             ) -> None:
                 if step != "Complete":
                     progress.update(
@@ -448,12 +461,12 @@ def _ingest_across_forms(
 
             try:
                 result = orchestrator.process_filing(
-                    filing_id, html_content, progress_callback=_on_progress,
+                    filing_id,
+                    html_content,
+                    progress_callback=_on_progress,
                 )
             except SECSemanticSearchError as e:
-                progress.console.print(
-                    f"  [red]Processing failed{filing_num}:[/red] {e.message}"
-                )
+                progress.console.print(f"  [red]Processing failed{filing_num}:[/red] {e.message}")
                 failed += 1
                 progress.advance(filing_task)
                 continue
@@ -466,12 +479,11 @@ def _ingest_across_forms(
             try:
                 chroma.store_filing(result)
                 registry.register_filing(
-                    result.filing_id, result.ingest_result.chunk_count,
+                    result.filing_id,
+                    result.ingest_result.chunk_count,
                 )
             except DatabaseError as e:
-                progress.console.print(
-                    f"  [red]Storage failed{filing_num}:[/red] {e.message}"
-                )
+                progress.console.print(f"  [red]Storage failed{filing_num}:[/red] {e.message}")
                 failed += 1
                 progress.advance(filing_task)
                 continue
@@ -497,14 +509,16 @@ def add(
     form: Annotated[
         str,
         typer.Option(
-            "--form", "-f",
+            "--form",
+            "-f",
             help="SEC form type(s), comma-separated (e.g. 8-K, 10-K, 10-Q).",
         ),
     ] = DEFAULT_FORM_TYPES,
     total: Annotated[
         int | None,
         typer.Option(
-            "--total", "-t",
+            "--total",
+            "-t",
             help="Total number of filings to ingest (across all form types, newest first).",
             min=1,
         ),
@@ -512,7 +526,8 @@ def add(
     number: Annotated[
         int | None,
         typer.Option(
-            "--number", "-n",
+            "--number",
+            "-n",
             help="Number of filings to ingest per form type.",
             min=1,
         ),
@@ -570,11 +585,16 @@ def add(
     # --- Cross-form mode: -t (total across form types) -----------------------
     if total is not None:
         succeeded, skipped, failed = _ingest_across_forms(
-            ticker, form_types,
-            count=total, year=year,
-            start_date=start_date, end_date=end_date,
-            fetcher=fetcher, orchestrator=orchestrator,
-            registry=registry, chroma=chroma,
+            ticker,
+            form_types,
+            count=total,
+            year=year,
+            start_date=start_date,
+            end_date=end_date,
+            fetcher=fetcher,
+            orchestrator=orchestrator,
+            registry=registry,
+            chroma=chroma,
         )
 
         if total > 1:
@@ -626,12 +646,18 @@ def add(
                     total=len(_STEPS),
                 )
                 s, sk, f = _ingest_one_form(
-                    ticker, form_type,
-                    count=1, year=year,
-                    start_date=start_date, end_date=end_date,
-                    fetcher=fetcher, orchestrator=orchestrator,
-                    registry=registry, chroma=chroma,
-                    progress=progress, step_task_id=step_task,
+                    ticker,
+                    form_type,
+                    count=1,
+                    year=year,
+                    start_date=start_date,
+                    end_date=end_date,
+                    fetcher=fetcher,
+                    orchestrator=orchestrator,
+                    registry=registry,
+                    chroma=chroma,
+                    progress=progress,
+                    step_task_id=step_task,
                     form_label=form_label,
                 )
             else:
@@ -648,12 +674,18 @@ def add(
                     total=len(_STEPS),
                 )
                 s, sk, f = _ingest_one_form(
-                    ticker, form_type,
-                    count=effective_per_form, year=year,
-                    start_date=start_date, end_date=end_date,
-                    fetcher=fetcher, orchestrator=orchestrator,
-                    registry=registry, chroma=chroma,
-                    progress=progress, step_task_id=step_task,
+                    ticker,
+                    form_type,
+                    count=effective_per_form,
+                    year=year,
+                    start_date=start_date,
+                    end_date=end_date,
+                    fetcher=fetcher,
+                    orchestrator=orchestrator,
+                    registry=registry,
+                    chroma=chroma,
+                    progress=progress,
+                    step_task_id=step_task,
                     filing_task_id=filing_task,
                     form_label=form_label,
                 )
@@ -684,14 +716,16 @@ def batch(
     form: Annotated[
         str,
         typer.Option(
-            "--form", "-f",
+            "--form",
+            "-f",
             help="SEC form type(s), comma-separated (e.g. 8-K, 10-K, 10-Q).",
         ),
     ] = DEFAULT_FORM_TYPES,
     total: Annotated[
         int | None,
         typer.Option(
-            "--total", "-t",
+            "--total",
+            "-t",
             help="Total filings per ticker (across form types, newest first).",
             min=1,
         ),
@@ -699,7 +733,8 @@ def batch(
     number: Annotated[
         int | None,
         typer.Option(
-            "--number", "-n",
+            "--number",
+            "-n",
             help="Number of filings per ticker per form type.",
             min=1,
         ),
@@ -759,11 +794,16 @@ def batch(
         for ticker in tickers:
             console.print(f"\n[bold]{ticker}[/bold]")
             s, sk, f = _ingest_across_forms(
-                ticker, form_types,
-                count=total, year=year,
-                start_date=start_date, end_date=end_date,
-                fetcher=fetcher, orchestrator=orchestrator,
-                registry=registry, chroma=chroma,
+                ticker,
+                form_types,
+                count=total,
+                year=year,
+                start_date=start_date,
+                end_date=end_date,
+                fetcher=fetcher,
+                orchestrator=orchestrator,
+                registry=registry,
+                chroma=chroma,
             )
             total_succeeded += s
             total_skipped += sk
@@ -790,9 +830,7 @@ def batch(
     work_items = [(t, f) for t in tickers for f in form_types]
 
     with _make_progress() as progress:
-        overall = progress.add_task(
-            f"Batch: 0/{len(work_items)}", total=len(work_items)
-        )
+        overall = progress.add_task(f"Batch: 0/{len(work_items)}", total=len(work_items))
         step_task = progress.add_task("Waiting...", total=len(_STEPS), visible=False)
 
         for i, (ticker, form_type) in enumerate(work_items):
@@ -810,9 +848,7 @@ def batch(
                 )
                 break
 
-            progress.update(
-                overall, description=f"Batch: {i + 1}/{len(work_items)} — {label}"
-            )
+            progress.update(overall, description=f"Batch: {i + 1}/{len(work_items)} — {label}")
             progress.update(
                 step_task,
                 description=f"Fetching {label}...",
@@ -822,11 +858,17 @@ def batch(
 
             # Fetch all filings for this work item.
             try:
-                filings = list(_fetch_filings(
-                    fetcher, ticker, form_type,
-                    count=effective_per_form, year=year,
-                    start_date=start_date, end_date=end_date,
-                ))
+                filings = list(
+                    _fetch_filings(
+                        fetcher,
+                        ticker,
+                        form_type,
+                        count=effective_per_form,
+                        year=year,
+                        start_date=start_date,
+                        end_date=end_date,
+                    )
+                )
             except FetchError as e:
                 progress.console.print(f"  [red]{label}: Fetch failed —[/red] {e.message}")
                 total_failed += 1
@@ -878,8 +920,11 @@ def batch(
 
                 # Process — wire orchestrator callback to progress bar.
                 def _on_progress(
-                    step: str, _current: int, _total: int,
-                    _label: str = label, _filing_num: str = filing_num,
+                    step: str,
+                    _current: int,
+                    _total: int,
+                    _label: str = label,
+                    _filing_num: str = filing_num,
                 ) -> None:
                     if step != "Complete":
                         progress.update(
@@ -890,7 +935,9 @@ def batch(
 
                 try:
                     result = orchestrator.process_filing(
-                        filing_id, html_content, progress_callback=_on_progress,
+                        filing_id,
+                        html_content,
+                        progress_callback=_on_progress,
                     )
                 except SECSemanticSearchError as e:
                     progress.console.print(
@@ -904,7 +951,8 @@ def batch(
                 try:
                     chroma.store_filing(result)
                     registry.register_filing(
-                        result.filing_id, result.ingest_result.chunk_count,
+                        result.filing_id,
+                        result.ingest_result.chunk_count,
                     )
                 except DatabaseError as e:
                     progress.console.print(

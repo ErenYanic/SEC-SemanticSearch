@@ -28,7 +28,6 @@ from sec_semantic_search.pipeline.chunk import TextChunker
 from sec_semantic_search.pipeline.orchestrator import ProcessedFiling
 from sec_semantic_search.pipeline.parse import FilingParser
 
-
 # -----------------------------------------------------------------------
 # Parse → Chunk pipeline
 # -----------------------------------------------------------------------
@@ -195,9 +194,9 @@ class TestChromaDBClient:
 
         # Query with a random embedding (results won't be semantically
         # meaningful, but we verify the query pipeline works)
-        query_emb = np.random.default_rng(99).random(
-            (1, EMBEDDING_DIMENSION), dtype=np.float32
-        ).tolist()
+        query_emb = (
+            np.random.default_rng(99).random((1, EMBEDDING_DIMENSION), dtype=np.float32).tolist()
+        )
         results = client.query(query_emb, n_results=2)
 
         assert len(results) > 0
@@ -210,9 +209,9 @@ class TestChromaDBClient:
         pf = _make_processed_filing(sample_chunks, sample_filing_id)
         client.store_filing(pf)
 
-        query_emb = np.random.default_rng(99).random(
-            (1, EMBEDDING_DIMENSION), dtype=np.float32
-        ).tolist()
+        query_emb = (
+            np.random.default_rng(99).random((1, EMBEDDING_DIMENSION), dtype=np.float32).tolist()
+        )
         results = client.query(query_emb, n_results=5, ticker="MSFT")
         assert len(results) == 0
 
@@ -244,6 +243,7 @@ class TestFilingDateIntMigration:
     ):
         """Chunks stored without filing_date_int get it added on next init."""
         import chromadb
+
         from sec_semantic_search.config.constants import COLLECTION_NAME
 
         # Step 1: Store chunks directly via raw ChromaDB (no filing_date_int)
@@ -270,7 +270,9 @@ class TestFilingDateIntMigration:
             }
             for c in sample_chunks
         ]
-        collection.add(ids=ids, embeddings=embeddings.tolist(), documents=documents, metadatas=metadatas)
+        collection.add(
+            ids=ids, embeddings=embeddings.tolist(), documents=documents, metadatas=metadatas
+        )
 
         # Verify filing_date_int is NOT present before migration
         pre = collection.get(include=["metadatas"])
@@ -310,6 +312,7 @@ class TestFilingDateIntMigration:
     ):
         """After migration, date-range queries should match backfilled data."""
         import chromadb
+
         from sec_semantic_search.config.constants import COLLECTION_NAME
 
         # Store without filing_date_int (pre-BF-012)
@@ -334,25 +337,31 @@ class TestFilingDateIntMigration:
             }
             for c in sample_chunks
         ]
-        collection.add(ids=ids, embeddings=embeddings.tolist(), documents=documents, metadatas=metadatas)
+        collection.add(
+            ids=ids, embeddings=embeddings.tolist(), documents=documents, metadatas=metadatas
+        )
 
         # Init triggers migration
         client = ChromaDBClient(chroma_path=tmp_chroma_path)
 
         # Query with date range covering 2024-11-01
-        query_emb = np.random.default_rng(99).random(
-            (1, EMBEDDING_DIMENSION), dtype=np.float32
-        ).tolist()
+        query_emb = (
+            np.random.default_rng(99).random((1, EMBEDDING_DIMENSION), dtype=np.float32).tolist()
+        )
         results = client.query(
-            query_emb, n_results=5,
-            start_date="2024-01-01", end_date="2024-12-31",
+            query_emb,
+            n_results=5,
+            start_date="2024-01-01",
+            end_date="2024-12-31",
         )
         assert len(results) > 0
 
         # Query with date range NOT covering 2024-11-01
         results_empty = client.query(
-            query_emb, n_results=5,
-            start_date="2025-01-01", end_date="2025-12-31",
+            query_emb,
+            n_results=5,
+            start_date="2025-01-01",
+            end_date="2025-12-31",
         )
         assert len(results_empty) == 0
 

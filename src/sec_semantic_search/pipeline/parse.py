@@ -156,18 +156,14 @@ class FilingParser:
         if "title" in dct and isinstance(dct["title"], str):
             title = dct["title"].strip()
             if title:
-                current_path = (
-                    f"{path}{self.PATH_SEPARATOR}{title}" if path else title
-                )
+                current_path = f"{path}{self.PATH_SEPARATOR}{title}" if path else title
 
         # Extract text content
         for key in ("text", "textsmall"):
             if key in dct and isinstance(dct[key], str):
                 content = dct[key].strip()
                 if content:
-                    content_type = (
-                        ContentType.TEXT if key == "text" else ContentType.TEXTSMALL
-                    )
+                    content_type = ContentType.TEXT if key == "text" else ContentType.TEXTSMALL
                     segments.append(
                         Segment(
                             path=current_path or "(root)",

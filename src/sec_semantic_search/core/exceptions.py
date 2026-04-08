@@ -17,7 +17,6 @@ Exception hierarchy:
 """
 
 
-
 class SECSemanticSearchError(Exception):
     """
     Base exception for all SEC-SemanticSearch errors.

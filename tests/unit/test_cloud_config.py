@@ -297,9 +297,7 @@ class TestDemoResetJobYaml:
 
     def test_lightweight_container_image(self, demo_reset_job):
         """Reset job should use a lightweight image, not the full API image."""
-        containers = (
-            demo_reset_job["spec"]["template"]["spec"]["template"]["spec"]["containers"]
-        )
+        containers = demo_reset_job["spec"]["template"]["spec"]["template"]["spec"]["containers"]
         image = containers[0]["image"]
         assert "alpine" in image
 
@@ -309,16 +307,12 @@ class TestDemoResetJobYaml:
         assert data_vol["csi"]["driver"] == "gcsfuse.run.googleapis.com"
 
     def test_max_retries(self, demo_reset_job):
-        max_retries = (
-            demo_reset_job["spec"]["template"]["spec"]["template"]["spec"]["maxRetries"]
-        )
+        max_retries = demo_reset_job["spec"]["template"]["spec"]["template"]["spec"]["maxRetries"]
         assert max_retries <= 3
 
     def test_no_gpu_resources(self, demo_reset_job):
         """Demo reset does not need GPU."""
-        containers = (
-            demo_reset_job["spec"]["template"]["spec"]["template"]["spec"]["containers"]
-        )
+        containers = demo_reset_job["spec"]["template"]["spec"]["template"]["spec"]["containers"]
         limits = containers[0]["resources"]["limits"]
         assert "nvidia.com/gpu" not in limits
 
@@ -341,21 +335,22 @@ class TestServiceConsistency:
     def test_gcs_bucket_matches_between_api_and_job(self, api_service, demo_reset_job):
         """API and demo reset job must use the same GCS bucket."""
         api_volumes = api_service["spec"]["template"]["spec"]["volumes"]
-        api_bucket = next(
-            v for v in api_volumes if v["name"] == "data-volume"
-        )["csi"]["volumeAttributes"]["bucketName"]
+        api_bucket = next(v for v in api_volumes if v["name"] == "data-volume")["csi"][
+            "volumeAttributes"
+        ]["bucketName"]
 
-        job_volumes = (
-            demo_reset_job["spec"]["template"]["spec"]["template"]["spec"]["volumes"]
-        )
-        job_bucket = next(
-            v for v in job_volumes if v["name"] == "data-volume"
-        )["csi"]["volumeAttributes"]["bucketName"]
+        job_volumes = demo_reset_job["spec"]["template"]["spec"]["template"]["spec"]["volumes"]
+        job_bucket = next(v for v in job_volumes if v["name"] == "data-volume")["csi"][
+            "volumeAttributes"
+        ]["bucketName"]
 
         assert api_bucket == job_bucket
 
     def test_all_services_share_app_label(
-        self, api_service, frontend_service, demo_reset_job,
+        self,
+        api_service,
+        frontend_service,
+        demo_reset_job,
     ):
         """All resources should share the 'sec-semantic-search' app label."""
         assert api_service["metadata"]["labels"]["app"] == "sec-semantic-search"
@@ -369,11 +364,13 @@ class TestServiceConsistency:
 class TestPlaceholders:
     """Verify placeholder tokens are consistent and replaceable."""
 
-    @pytest.fixture(params=[
-        "cloud/api-service.yaml",
-        "cloud/frontend-service.yaml",
-        "cloud/demo-reset-job.yaml",
-    ])
+    @pytest.fixture(
+        params=[
+            "cloud/api-service.yaml",
+            "cloud/frontend-service.yaml",
+            "cloud/demo-reset-job.yaml",
+        ]
+    )
     def yaml_content(self, request):
         path = PROJECT_ROOT / request.param
         return path.read_text(), request.param
@@ -381,9 +378,7 @@ class TestPlaceholders:
     def test_uses_project_id_placeholder(self, yaml_content):
         """All YAML files must use PROJECT_ID as the placeholder."""
         content, filename = yaml_content
-        assert "PROJECT_ID" in content, (
-            f"{filename} does not contain PROJECT_ID placeholder"
-        )
+        assert "PROJECT_ID" in content, f"{filename} does not contain PROJECT_ID placeholder"
 
     def test_no_hardcoded_project_ids(self, yaml_content):
         """YAML files must not contain actual GCP project IDs."""
@@ -409,11 +404,13 @@ class TestPlaceholders:
 class TestShellScripts:
     """Validate shell script syntax without executing them."""
 
-    @pytest.fixture(params=[
-        "scripts/gcloud-deploy.sh",
-        "scripts/gcloud-setup-secrets.sh",
-        "scripts/demo-reset.sh",
-    ])
+    @pytest.fixture(
+        params=[
+            "scripts/gcloud-deploy.sh",
+            "scripts/gcloud-setup-secrets.sh",
+            "scripts/demo-reset.sh",
+        ]
+    )
     def script_path(self, request):
         return PROJECT_ROOT / request.param
 
@@ -421,15 +418,11 @@ class TestShellScripts:
         assert script_path.exists(), f"{script_path} not found"
 
     def test_script_is_executable(self, script_path):
-        assert script_path.stat().st_mode & 0o111, (
-            f"{script_path} is not executable"
-        )
+        assert script_path.stat().st_mode & 0o111, f"{script_path} is not executable"
 
     def test_script_has_shebang(self, script_path):
         first_line = script_path.read_text().split("\n")[0]
-        assert first_line.startswith("#!"), (
-            f"{script_path} missing shebang line"
-        )
+        assert first_line.startswith("#!"), f"{script_path} missing shebang line"
 
     def test_bash_syntax_valid(self, script_path):
         """Run bash -n to check syntax without executing the script."""
@@ -438,9 +431,7 @@ class TestShellScripts:
             capture_output=True,
             text=True,
         )
-        assert result.returncode == 0, (
-            f"Syntax error in {script_path.name}: {result.stderr}"
-        )
+        assert result.returncode == 0, f"Syntax error in {script_path.name}: {result.stderr}"
 
     def test_uses_set_euo_pipefail(self, script_path):
         """Scripts should use strict mode for safety."""

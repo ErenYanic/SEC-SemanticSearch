@@ -6,7 +6,7 @@ cancellation. The ``TaskManager`` is mocked — these tests exercise
 route-level validation, delegation, and response formatting.
 """
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 from fastapi.testclient import TestClient
 
@@ -67,13 +67,16 @@ class TestIngestAdd:
 
     def test_custom_parameters_passed(self):
         client, manager = _make_client()
-        client.post("/api/ingest/add", json={
-            "tickers": ["AAPL"],
-            "form_types": ["10-K"],
-            "count_mode": "per_form",
-            "count": 3,
-            "year": 2023,
-        })
+        client.post(
+            "/api/ingest/add",
+            json={
+                "tickers": ["AAPL"],
+                "form_types": ["10-K"],
+                "count_mode": "per_form",
+                "count": 3,
+                "year": 2023,
+            },
+        )
         call_kwargs = manager.create_task.call_args[1]
         assert call_kwargs["form_types"] == ["10-K"]
         assert call_kwargs["count_mode"] == "per_form"

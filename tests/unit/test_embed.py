@@ -7,7 +7,7 @@ device detection, lazy loading, input validation, error wrapping,
 and the embed_query_for_chromadb() format conversion.
 """
 
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pytest
@@ -24,9 +24,7 @@ def mock_model():
     model = MagicMock()
 
     def fake_encode(texts, **kwargs):
-        return np.random.default_rng(42).random(
-            (len(texts), EMBEDDING_DIMENSION), dtype=np.float32
-        )
+        return np.random.default_rng(42).random((len(texts), EMBEDDING_DIMENSION), dtype=np.float32)
 
     model.encode.side_effect = fake_encode
     return model

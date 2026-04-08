@@ -17,7 +17,6 @@ from sec_semantic_search.api.tasks import TaskManager, TaskState
 from sec_semantic_search.core.exceptions import FilingLimitExceededError
 from tests.helpers import make_filing_record, make_task_info
 
-
 # -----------------------------------------------------------------------
 # Fixtures
 # -----------------------------------------------------------------------
@@ -302,7 +301,8 @@ class TestDemoModeFilingLimitFallback:
         mock_filing_info = MagicMock()
         mock_filing_info.accession_number = "0000000000-24-000001"
         mock_filing_info.to_identifier.return_value = MagicMock(
-            ticker="AAPL", form_type="10-K",
+            ticker="AAPL",
+            form_type="10-K",
             accession_number="0000000000-24-000001",
         )
 
@@ -327,7 +327,8 @@ class TestDemoModeFilingLimitFallback:
         mock_filing_info = MagicMock()
         mock_filing_info.accession_number = "0000000000-24-000001"
         mock_id = MagicMock(
-            ticker="AAPL", form_type="10-K",
+            ticker="AAPL",
+            form_type="10-K",
             accession_number="0000000000-24-000001",
             date_str="2024-01-01",
         )
@@ -390,7 +391,8 @@ class TestPreLoopEviction:
         filings = [MagicMock(accession_number=f"ACC-{i}") for i in range(3)]
         for f in filings:
             f.to_identifier.return_value = MagicMock(
-                ticker="AAPL", form_type="10-K",
+                ticker="AAPL",
+                form_type="10-K",
                 accession_number=f.accession_number,
             )
 
@@ -423,7 +425,8 @@ class TestPreLoopEviction:
 
         filings = [MagicMock(accession_number="ACC-0")]
         filings[0].to_identifier.return_value = MagicMock(
-            ticker="AAPL", form_type="10-K",
+            ticker="AAPL",
+            form_type="10-K",
             accession_number="ACC-0",
         )
 

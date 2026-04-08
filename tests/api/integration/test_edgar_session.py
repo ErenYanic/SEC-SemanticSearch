@@ -47,7 +47,10 @@ def _make_status_client():
     """Build a TestClient for the status endpoint with mocked stores."""
     registry = MagicMock()
     registry.get_statistics.return_value = DatabaseStatistics(
-        filing_count=0, tickers=[], form_breakdown={}, ticker_breakdown=[],
+        filing_count=0,
+        tickers=[],
+        form_breakdown={},
+        ticker_breakdown=[],
     )
     chroma = MagicMock()
     chroma.collection_count.return_value = 0
@@ -80,9 +83,7 @@ class TestGetEdgarIdentity:
             "X-Edgar-Email": "header@example.com",
         }
 
-        with patch(
-            "sec_semantic_search.api.dependencies.get_settings"
-        ) as mock_settings:
+        with patch("sec_semantic_search.api.dependencies.get_settings") as mock_settings:
             s = mock_settings.return_value
             s.edgar.identity_name = "Server Name"
             s.edgar.identity_email = "server@example.com"
@@ -98,9 +99,7 @@ class TestGetEdgarIdentity:
         request = MagicMock()
         request.headers = {}
 
-        with patch(
-            "sec_semantic_search.api.dependencies.get_settings"
-        ) as mock_settings:
+        with patch("sec_semantic_search.api.dependencies.get_settings") as mock_settings:
             s = mock_settings.return_value
             s.edgar.identity_name = "Server Name"
             s.edgar.identity_email = "server@example.com"
@@ -118,9 +117,7 @@ class TestGetEdgarIdentity:
         request = MagicMock()
         request.headers = {}
 
-        with patch(
-            "sec_semantic_search.api.dependencies.get_settings"
-        ) as mock_settings:
+        with patch("sec_semantic_search.api.dependencies.get_settings") as mock_settings:
             s = mock_settings.return_value
             s.edgar.identity_name = None
             s.edgar.identity_email = None
@@ -139,9 +136,7 @@ class TestGetEdgarIdentity:
         request = MagicMock()
         request.headers = {}
 
-        with patch(
-            "sec_semantic_search.api.dependencies.get_settings"
-        ) as mock_settings:
+        with patch("sec_semantic_search.api.dependencies.get_settings") as mock_settings:
             s = mock_settings.return_value
             s.edgar.identity_name = None
             s.edgar.identity_email = None
@@ -160,9 +155,7 @@ class TestGetEdgarIdentity:
 
         from fastapi import HTTPException
 
-        with patch(
-            "sec_semantic_search.api.dependencies.get_settings"
-        ) as mock_settings:
+        with patch("sec_semantic_search.api.dependencies.get_settings") as mock_settings:
             s = mock_settings.return_value
             s.edgar.identity_name = "Env Name"
             s.edgar.identity_email = "env@example.com"
@@ -182,9 +175,7 @@ class TestGetEdgarIdentity:
             "X-Edgar-Email": "  jane@example.com  ",
         }
 
-        with patch(
-            "sec_semantic_search.api.dependencies.get_settings"
-        ) as mock_settings:
+        with patch("sec_semantic_search.api.dependencies.get_settings") as mock_settings:
             s = mock_settings.return_value
             s.edgar.identity_name = None
             s.edgar.identity_email = None
@@ -205,9 +196,7 @@ class TestGetEdgarIdentity:
             "X-Edgar-Email": "valid@example.com",
         }
 
-        with patch(
-            "sec_semantic_search.api.dependencies.get_settings"
-        ) as mock_settings:
+        with patch("sec_semantic_search.api.dependencies.get_settings") as mock_settings:
             s = mock_settings.return_value
             s.edgar.identity_name = None
             s.edgar.identity_email = None
@@ -229,9 +218,7 @@ class TestGetEdgarIdentity:
             "X-Edgar-Email": "not-an-email",
         }
 
-        with patch(
-            "sec_semantic_search.api.dependencies.get_settings"
-        ) as mock_settings:
+        with patch("sec_semantic_search.api.dependencies.get_settings") as mock_settings:
             s = mock_settings.return_value
             s.edgar.identity_name = None
             s.edgar.identity_email = None
@@ -250,9 +237,7 @@ class TestGetEdgarIdentity:
         request = MagicMock()
         request.headers = {}
 
-        with patch(
-            "sec_semantic_search.api.dependencies.get_settings"
-        ) as mock_settings:
+        with patch("sec_semantic_search.api.dependencies.get_settings") as mock_settings:
             s = mock_settings.return_value
             s.edgar.identity_name = "Server Name"
             s.edgar.identity_email = "invalid"
@@ -291,7 +276,8 @@ class TestIngestIdentityPassthrough:
         identity = EdgarIdentity(name="Batch User", email="batch@example.com")
         client, manager = _make_ingest_client(override_identity=identity)
         resp = client.post(
-            "/api/ingest/batch", json={"tickers": ["AAPL", "MSFT"]},
+            "/api/ingest/batch",
+            json={"tickers": ["AAPL", "MSFT"]},
         )
         assert resp.status_code == 202
 
@@ -303,7 +289,10 @@ class TestIngestIdentityPassthrough:
         """Search, filings, status routes should not need EDGAR headers."""
         registry = MagicMock()
         registry.get_statistics.return_value = DatabaseStatistics(
-            filing_count=0, tickers=[], form_breakdown={}, ticker_breakdown=[],
+            filing_count=0,
+            tickers=[],
+            form_breakdown={},
+            ticker_breakdown=[],
         )
         chroma = MagicMock()
         chroma.collection_count.return_value = 0
@@ -331,9 +320,7 @@ class TestStatusEdgarSessionRequired:
     def test_false_when_server_has_identity(self):
         """Should be false when server-side EDGAR vars are set."""
         client = _make_status_client()
-        with patch(
-            "sec_semantic_search.api.routes.status.get_settings"
-        ) as mock_settings:
+        with patch("sec_semantic_search.api.routes.status.get_settings") as mock_settings:
             s = mock_settings.return_value
             s.edgar.identity_name = "Name"
             s.edgar.identity_email = "email@example.com"
@@ -346,9 +333,7 @@ class TestStatusEdgarSessionRequired:
     def test_true_when_no_server_identity_and_required(self):
         """Should be true when no server-side vars and setting is true."""
         client = _make_status_client()
-        with patch(
-            "sec_semantic_search.api.routes.status.get_settings"
-        ) as mock_settings:
+        with patch("sec_semantic_search.api.routes.status.get_settings") as mock_settings:
             s = mock_settings.return_value
             s.edgar.identity_name = None
             s.edgar.identity_email = None
@@ -361,9 +346,7 @@ class TestStatusEdgarSessionRequired:
     def test_false_when_not_required(self):
         """Should be false when setting is false regardless of env vars."""
         client = _make_status_client()
-        with patch(
-            "sec_semantic_search.api.routes.status.get_settings"
-        ) as mock_settings:
+        with patch("sec_semantic_search.api.routes.status.get_settings") as mock_settings:
             s = mock_settings.return_value
             s.edgar.identity_name = None
             s.edgar.identity_email = None
@@ -384,9 +367,7 @@ class TestEdgarCredentialsNeverLogged:
 
     def test_set_identity_does_not_log_email(self):
         """FilingFetcher.set_identity() must not log name or email."""
-        with patch(
-            "sec_semantic_search.pipeline.fetch.logger"
-        ) as mock_logger:
+        with patch("sec_semantic_search.pipeline.fetch.logger") as mock_logger:
             from sec_semantic_search.pipeline.fetch import FilingFetcher
 
             with patch.object(FilingFetcher, "__init__", lambda self: None):
@@ -403,12 +384,10 @@ class TestEdgarCredentialsNeverLogged:
 
     def test_configure_identity_does_not_log_email(self):
         """FilingFetcher._configure_identity() must not log email."""
-        with patch(
-            "sec_semantic_search.pipeline.fetch.logger"
-        ) as mock_logger, patch(
-            "sec_semantic_search.pipeline.fetch.get_settings"
-        ) as mock_settings, patch(
-            "sec_semantic_search.pipeline.fetch.set_identity"
+        with (
+            patch("sec_semantic_search.pipeline.fetch.logger") as mock_logger,
+            patch("sec_semantic_search.pipeline.fetch.get_settings") as mock_settings,
+            patch("sec_semantic_search.pipeline.fetch.set_identity"),
         ):
             s = mock_settings.return_value
             s.edgar.identity_name = "Secret Name"

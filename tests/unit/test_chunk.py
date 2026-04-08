@@ -14,7 +14,7 @@ machine.
 import pytest
 
 from sec_semantic_search.core.exceptions import ChunkingError
-from sec_semantic_search.core.types import ContentType, FilingIdentifier, Segment
+from sec_semantic_search.core.types import ContentType, Segment
 from sec_semantic_search.pipeline.chunk import TextChunker
 
 
@@ -74,9 +74,7 @@ class TestLongSegments:
 
     def test_chunks_within_limit_plus_tolerance(self, chunker, sample_filing_id):
         """Each chunk should respect token_limit + tolerance."""
-        long_text = " ".join(
-            f"Sentence number {i} about some financial topic." for i in range(20)
-        )
+        long_text = " ".join(f"Sentence number {i} about some financial topic." for i in range(20))
         segment = Segment(
             path="Part I",
             content_type=ContentType.TEXT,
@@ -172,9 +170,7 @@ class TestTokenCount:
 
     def test_long_segment_token_counts(self, chunker, sample_filing_id):
         """All chunks from a long segment should have non-zero token_count."""
-        long_text = " ".join(
-            f"Sentence number {i} about some financial topic." for i in range(20)
-        )
+        long_text = " ".join(f"Sentence number {i} about some financial topic." for i in range(20))
         segment = Segment(
             path="Part I",
             content_type=ContentType.TEXT,

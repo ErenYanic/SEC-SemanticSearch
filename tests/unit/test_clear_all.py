@@ -16,7 +16,6 @@ from sec_semantic_search.core.types import FilingIdentifier
 from sec_semantic_search.database import clear_all_filings
 from sec_semantic_search.database.metadata import MetadataRegistry
 
-
 # ── MetadataRegistry.clear_all() ────────────────────────────────────
 
 
@@ -30,17 +29,20 @@ def sample_ids() -> list[FilingIdentifier]:
     """Three distinct filing identifiers."""
     return [
         FilingIdentifier(
-            ticker="AAPL", form_type="10-K",
+            ticker="AAPL",
+            form_type="10-K",
             filing_date=date(2023, 1, 15),
             accession_number="0000320193-23-000077",
         ),
         FilingIdentifier(
-            ticker="MSFT", form_type="10-Q",
+            ticker="MSFT",
+            form_type="10-Q",
             filing_date=date(2023, 3, 20),
             accession_number="0000789019-23-000010",
         ),
         FilingIdentifier(
-            ticker="GOOGL", form_type="10-K",
+            ticker="GOOGL",
+            form_type="10-K",
             filing_date=date(2023, 6, 30),
             accession_number="0001652044-23-000099",
         ),
@@ -110,6 +112,7 @@ class TestChromaDBClearCollection:
         ):
             mock_chromadb.PersistentClient.return_value = mock_client
             from sec_semantic_search.database.client import ChromaDBClient
+
             client = ChromaDBClient(chroma_path="/tmp/test")
 
             result = client.clear_collection()
@@ -132,7 +135,7 @@ class TestChromaDBClearCollection:
         mock_client = MagicMock()
         mock_client.get_or_create_collection.side_effect = [
             mock_collection,  # __init__
-            new_collection,   # clear_collection recreate
+            new_collection,  # clear_collection recreate
         ]
 
         mock_settings = MagicMock()
@@ -199,7 +202,8 @@ class TestClearAllFilings:
         mock_registry.clear_all.return_value = 30
 
         filings_deleted, chunks_deleted = clear_all_filings(
-            chroma=mock_chroma, registry=mock_registry,
+            chroma=mock_chroma,
+            registry=mock_registry,
         )
 
         assert filings_deleted == 30

@@ -11,6 +11,7 @@ from datetime import date
 
 import pytest
 
+from sec_semantic_search.core.exceptions import DatabaseError
 from sec_semantic_search.core.types import FilingIdentifier
 from sec_semantic_search.database.metadata import MetadataRegistry
 
@@ -139,9 +140,7 @@ class TestGetExistingAccessions:
 
     def test_all_duplicates(self, registry, stored_filing):
         """All accession numbers exist — should return all of them."""
-        result = registry.get_existing_accessions(
-            [stored_filing.accession_number]
-        )
+        result = registry.get_existing_accessions([stored_filing.accession_number])
         assert result == {stored_filing.accession_number}
 
     def test_some_duplicates(self, registry):
@@ -151,16 +150,12 @@ class TestGetExistingAccessions:
         registry.register_filing(fid1, chunk_count=10)
         registry.register_filing(fid2, chunk_count=20)
 
-        result = registry.get_existing_accessions(
-            ["ACC-1", "ACC-MISSING", "ACC-2", "ACC-NOPE"]
-        )
+        result = registry.get_existing_accessions(["ACC-1", "ACC-MISSING", "ACC-2", "ACC-NOPE"])
         assert result == {"ACC-1", "ACC-2"}
 
     def test_sql_injection_safety(self, registry, stored_filing):
         """Malicious accession numbers should not break the query."""
-        result = registry.get_existing_accessions(
-            ["' OR '1'='1", "'; DROP TABLE filings; --"]
-        )
+        result = registry.get_existing_accessions(["' OR '1'='1", "'; DROP TABLE filings; --"])
         assert result == set()
         # Table should still be intact.
         assert registry.count() == 1
@@ -249,7 +244,10 @@ class TestRegisterFilingIfNew:
         def register(i: int) -> None:
             try:
                 fid = FilingIdentifier(
-                    "AAPL", "10-K", date(2020 + i, 1, 1), f"ACC-ATOMIC-{i}",
+                    "AAPL",
+                    "10-K",
+                    date(2020 + i, 1, 1),
+                    f"ACC-ATOMIC-{i}",
                 )
                 registered = registry.register_filing_if_new(fid, chunk_count=i)
                 results.append(registered)
@@ -273,7 +271,7 @@ class TestPersistentConnection:
     def test_close_prevents_further_operations(self, registry):
         """After close(), operations should raise (connection is closed)."""
         registry.close()
-        with pytest.raises(Exception):
+        with pytest.raises(DatabaseError, match="Failed to count filings"):
             registry.count()
 
     def test_thread_safety(self, registry, sample_filing_id):
@@ -287,7 +285,10 @@ class TestPersistentConnection:
                 from datetime import date as _date
 
                 fid = FilingIdentifier(
-                    "AAPL", "10-K", _date(2020 + i, 1, 1), f"ACC-THREAD-{i}",
+                    "AAPL",
+                    "10-K",
+                    _date(2020 + i, 1, 1),
+                    f"ACC-THREAD-{i}",
                 )
                 registry.register_filing(fid, chunk_count=i)
             except Exception as exc:

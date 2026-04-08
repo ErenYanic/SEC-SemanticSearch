@@ -43,7 +43,10 @@ class TestMigrationFlagEmptyCollection:
     """Empty collections are flagged as migrated immediately."""
 
     def test_empty_collection_sets_flag(
-        self, mock_settings, mock_chroma_client, mock_collection,
+        self,
+        mock_settings,
+        mock_chroma_client,
+        mock_collection,
     ):
         mock_collection.count.return_value = 0
 
@@ -65,7 +68,10 @@ class TestMigrationFlagSkipsWhenDone:
     """Subsequent startups skip the migration scan."""
 
     def test_skips_scan_when_flag_set(
-        self, mock_settings, mock_chroma_client, mock_collection,
+        self,
+        mock_settings,
+        mock_chroma_client,
+        mock_collection,
     ):
         mock_collection.metadata = {
             "hnsw:space": "cosine",
@@ -87,7 +93,10 @@ class TestMigrationFlagSkipsWhenDone:
         mock_collection.modify.assert_not_called()
 
     def test_does_not_scan_when_flag_true(
-        self, mock_settings, mock_chroma_client, mock_collection,
+        self,
+        mock_settings,
+        mock_chroma_client,
+        mock_collection,
     ):
         """Even with many chunks, the scan is skipped when flagged."""
         mock_collection.metadata = {
@@ -112,7 +121,10 @@ class TestMigrationFlagSetAfterScan:
     """The flag is set after a successful migration scan."""
 
     def test_flag_set_after_migrating_chunks(
-        self, mock_settings, mock_chroma_client, mock_collection,
+        self,
+        mock_settings,
+        mock_chroma_client,
+        mock_collection,
     ):
         mock_collection.count.return_value = 2
         mock_collection.get.return_value = {
@@ -143,7 +155,10 @@ class TestMigrationFlagSetAfterScan:
         assert call_kwargs["metadata"][ChromaDBClient._MIGRATION_FLAG] is True
 
     def test_flag_set_even_when_no_chunks_need_migration(
-        self, mock_settings, mock_chroma_client, mock_collection,
+        self,
+        mock_settings,
+        mock_chroma_client,
+        mock_collection,
     ):
         """All chunks already have filing_date_int — flag still gets set."""
         mock_collection.count.return_value = 1
@@ -174,7 +189,10 @@ class TestMigrationFlagNoneMetadata:
     """Handle collections with None metadata gracefully."""
 
     def test_none_metadata_does_not_crash(
-        self, mock_settings, mock_chroma_client, mock_collection,
+        self,
+        mock_settings,
+        mock_chroma_client,
+        mock_collection,
     ):
         mock_collection.metadata = None
         mock_collection.count.return_value = 0

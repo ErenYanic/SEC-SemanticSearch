@@ -77,9 +77,7 @@ class EmbeddingGenerator:
         self._model: SentenceTransformer | None = None
 
         # Idle timeout — auto-unload model after inactivity.
-        self._idle_timeout_seconds: float = (
-            settings.embedding.idle_timeout_minutes * 60.0
-        )
+        self._idle_timeout_seconds: float = settings.embedding.idle_timeout_minutes * 60.0
         self._idle_timer: threading.Timer | None = None
 
         logger.debug(
@@ -168,9 +166,7 @@ class EmbeddingGenerator:
         if self._idle_timeout_seconds <= 0:
             return
         self._cancel_idle_timer()
-        self._idle_timer = threading.Timer(
-            self._idle_timeout_seconds, self._on_idle_timeout
-        )
+        self._idle_timer = threading.Timer(self._idle_timeout_seconds, self._on_idle_timeout)
         self._idle_timer.daemon = True
         self._idle_timer.start()
 

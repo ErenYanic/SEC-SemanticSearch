@@ -63,9 +63,7 @@ class TestHierarchicalPaths:
         # so we just verify the separator is used if nesting occurs
         for seg in nested:
             parts = seg.path.split(FilingParser.PATH_SEPARATOR)
-            assert all(part.strip() for part in parts), (
-                f"Path has empty parts: {seg.path!r}"
-            )
+            assert all(part.strip() for part in parts), f"Path has empty parts: {seg.path!r}"
 
     def test_no_empty_path(self, parser, sample_html, sample_filing_id):
         """No segment should have a completely empty path."""

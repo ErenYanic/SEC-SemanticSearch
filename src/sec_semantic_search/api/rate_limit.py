@@ -92,10 +92,7 @@ class _SlidingWindow:
     def _prune(self, now: float) -> None:
         """Remove keys whose most recent request is older than the window."""
         cutoff = now - self._window
-        stale_keys = [
-            k for k, v in self._requests.items()
-            if not v or v[-1] <= cutoff
-        ]
+        stale_keys = [k for k, v in self._requests.items() if not v or v[-1] <= cutoff]
         for k in stale_keys:
             del self._requests[k]
 
@@ -103,6 +100,7 @@ class _SlidingWindow:
 # ---------------------------------------------------------------------------
 # Endpoint category classification
 # ---------------------------------------------------------------------------
+
 
 def _classify_path(path: str, method: str) -> str | None:
     """Map a request path + method to a rate-limit category.
@@ -165,7 +163,9 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             bucket.reset()
 
     async def dispatch(
-        self, request: Request, call_next: RequestResponseEndpoint,
+        self,
+        request: Request,
+        call_next: RequestResponseEndpoint,
     ) -> Response:
         category = _classify_path(request.url.path, request.method)
 

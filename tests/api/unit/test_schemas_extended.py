@@ -50,9 +50,7 @@ class TestIngestRequestDates:
         assert req.end_date == "2024-12-31"
 
     def test_both_dates_accepted(self):
-        req = IngestRequest(
-            tickers=["AAPL"], start_date="2023-01-01", end_date="2024-12-31"
-        )
+        req = IngestRequest(tickers=["AAPL"], start_date="2023-01-01", end_date="2024-12-31")
         assert req.start_date == "2023-01-01"
         assert req.end_date == "2024-12-31"
 
@@ -98,28 +96,44 @@ class TestSearchResultSchemaBoundary:
 
     def test_similarity_zero(self):
         r = SearchResultSchema(
-            content="x", path="x", content_type="text",
-            ticker="X", form_type="10-K", similarity=0.0,
+            content="x",
+            path="x",
+            content_type="text",
+            ticker="X",
+            form_type="10-K",
+            similarity=0.0,
         )
         assert r.similarity == 0.0
 
     def test_similarity_one(self):
         r = SearchResultSchema(
-            content="x", path="x", content_type="text",
-            ticker="X", form_type="10-K", similarity=1.0,
+            content="x",
+            path="x",
+            content_type="text",
+            ticker="X",
+            form_type="10-K",
+            similarity=1.0,
         )
         assert r.similarity == 1.0
 
     def test_similarity_negative_raises(self):
         with pytest.raises(ValidationError):
             SearchResultSchema(
-                content="x", path="x", content_type="text",
-                ticker="X", form_type="10-K", similarity=-0.01,
+                content="x",
+                path="x",
+                content_type="text",
+                ticker="X",
+                form_type="10-K",
+                similarity=-0.01,
             )
 
     def test_similarity_above_one_raises(self):
         with pytest.raises(ValidationError):
             SearchResultSchema(
-                content="x", path="x", content_type="text",
-                ticker="X", form_type="10-K", similarity=1.01,
+                content="x",
+                path="x",
+                content_type="text",
+                ticker="X",
+                form_type="10-K",
+                similarity=1.01,
             )

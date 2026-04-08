@@ -7,7 +7,7 @@ is for fixtures only — plain helpers must be in a regular module to
 be importable via standard Python imports.
 """
 
-from sec_semantic_search.api.tasks import TaskInfo, TaskProgress, TaskState
+from sec_semantic_search.api.tasks import TaskInfo, TaskState
 from sec_semantic_search.database.metadata import FilingRecord
 
 
