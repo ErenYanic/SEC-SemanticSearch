@@ -219,15 +219,24 @@ class EmbeddingGenerator:
                 model_kwargs=model_kwargs,
             )
 
-            # Log GPU info if using CUDA
+            # GPU info logging is best-effort only. Tests and CI often use a
+            # CPU-only torch build while still mocking a CUDA device path.
             if self.device == "cuda":
-                gpu_name = torch.cuda.get_device_name(0)
-                vram_mb = int(torch.cuda.memory_allocated(0) / (1024 * 1024))
-                logger.info(
-                    "Loaded on GPU: %s (VRAM allocated: %d MB)",
-                    gpu_name,
-                    vram_mb,
-                )
+                try:
+                    if torch.cuda.is_available():
+                        gpu_name = torch.cuda.get_device_name(0)
+                        vram_mb = int(torch.cuda.memory_allocated(0) / (1024 * 1024))
+                        logger.info(
+                            "Loaded on GPU: %s (VRAM allocated: %d MB)",
+                            gpu_name,
+                            vram_mb,
+                        )
+                    else:
+                        logger.debug(
+                            "CUDA device requested but torch.cuda is unavailable; skipping GPU info logging"
+                        )
+                except Exception as exc:
+                    logger.debug("Failed to read CUDA device info: %s", exc)
 
             return model
 
