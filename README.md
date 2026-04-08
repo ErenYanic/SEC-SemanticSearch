@@ -33,7 +33,7 @@ Filing content is fetched from SEC EDGAR, parsed into structured sections, split
 - **Flexible filtering** — Search and manage by ticker, form type, or date range
 - **Duplicate detection** — Checks for existing filings before any GPU work begins
 - **Configuration-driven deployment** — Three deployment scenarios (local, team, public) controlled entirely via environment variables
-- **1032 backend tests and 199 frontend tests**, all passing
+- **1094 backend tests and 199 frontend tests**, all passing
 
 ---
 
@@ -459,7 +459,7 @@ python -m pytest tests/integration/
 python -m pytest tests/api/
 ```
 
-**Backend:** 1032 tests, all passing.
+**Backend:** 1094 tests, all passing.
 
 **Frontend:** 199 tests (Vitest + React Testing Library):
 

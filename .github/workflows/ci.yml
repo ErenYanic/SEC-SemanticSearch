@@ -1,0 +1,164 @@
+# ──────────────────────────────────────────────────────────────────────
+# ci.yml — Continuous integration for SEC Semantic Search
+#
+# Runs on every push and pull request targeting `main`. Executes three
+# independent jobs in parallel:
+#
+#   1. backend-tests   — pytest suite (unit + integration + api)
+#   2. frontend-tests  — Vitest suite + production build
+#   3. lint            — ruff check/format + ESLint
+#
+# No deployment happens here. See deploy.yml for Cloud Run deployment.
+#
+# Concurrency cancels stale runs when newer commits land on the same ref
+# to keep Actions minutes bounded.
+#
+# Secrets required: none (tests run without real SEC EDGAR or GCP access).
+# ──────────────────────────────────────────────────────────────────────
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# Principle of least privilege — only read access to the repository.
+permissions:
+  contents: read
+
+jobs:
+  # ────────────────────────────────────────────────────────────────────
+  # Backend: Python 3.12 + CPU-only torch + pytest
+  # ────────────────────────────────────────────────────────────────────
+  backend-tests:
+    name: Backend tests (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12"]
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      # CPU-only PyTorch wheel keeps the install small (~800 MB vs ~8 GB
+      # for CUDA). GPU tests are mocked (see tests/unit/test_embed_gpu.py)
+      # so this is sufficient for the full suite.
+      - name: Install backend dependencies (CPU torch)
+        run: |
+          python -m pip install --upgrade pip
+          pip install --extra-index-url https://download.pytorch.org/whl/cpu \
+              "torch>=2.10.0"
+          pip install --extra-index-url https://download.pytorch.org/whl/cpu \
+              ".[dev]"
+
+      # The `encryption` extra (pysqlcipher3) is intentionally not
+      # installed: SQLCipher tests mock the module via sys.modules,
+      # which works with or without the real dependency.
+      - name: Run pytest
+        env:
+          # Prevent settings from failing on missing EDGAR identity.
+          EDGAR_IDENTITY_NAME: CI Runner
+          EDGAR_IDENTITY_EMAIL: ci@example.com
+          # Keep logs concise in CI.
+          LOG_LEVEL: WARNING
+        run: |
+          pytest tests/ -q --maxfail=5 --durations=10
+
+  # ────────────────────────────────────────────────────────────────────
+  # Frontend: Node.js 22 + Vitest + Next.js build
+  # ────────────────────────────────────────────────────────────────────
+  frontend-tests:
+    name: Frontend tests (Node ${{ matrix.node-version }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    defaults:
+      run:
+        working-directory: frontend
+
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: ["22"]
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Run ESLint
+        run: npm run lint
+
+      - name: Run Vitest suite
+        run: npm run test
+
+      # Verify the production build succeeds. Next.js standalone output
+      # is what the Dockerfile.frontend runtime stage copies, so a broken
+      # build would also break the deployment pipeline.
+      - name: Build production bundle
+        env:
+          NEXT_TELEMETRY_DISABLED: "1"
+        run: npm run build
+
+  # ────────────────────────────────────────────────────────────────────
+  # Lint: advisory ruff check (reports only — does not block)
+  #
+  # The existing codebase has a handful of pre-existing ruff violations
+  # (3 `ruff check src/` errors and ~22 files that would be reformatted
+  # by `ruff format`). Cleaning them up is tracked as a follow-up in
+  # TODO.md §4.3 — once clear, flip `continue-on-error` to false so
+  # the job becomes a required status check.
+  # ────────────────────────────────────────────────────────────────────
+  lint:
+    name: Ruff lint (advisory)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # Advisory: surfaces violations without blocking merges until the
+    # pre-existing backlog is cleared.
+    continue-on-error: true
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      # Install only ruff — no need for the full dev environment here.
+      # Pin matches pyproject.toml dev extra.
+      - name: Install ruff
+        run: pip install ruff==0.15.5
+
+      - name: ruff check src
+        run: ruff check src
