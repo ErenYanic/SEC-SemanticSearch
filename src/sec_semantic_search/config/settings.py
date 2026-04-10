@@ -53,6 +53,39 @@ class ChunkingSettings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="CHUNKING_")
 
 
+def resolve_encryption_key_from_values(key: str | None, key_file: str | None) -> str | None:
+    """Resolve an encryption key from a direct value or file path.
+
+    Enforces mutual exclusion between the two sources and validates the
+    file when ``key_file`` is used. Returns the resolved key string, or
+    ``None`` if neither source is set.
+
+    Used by both ``DatabaseSettings`` (Pydantic validation) and
+    ``MetadataRegistry`` (runtime resolution without re-instantiating
+    settings).
+    """
+    if key and key_file:
+        raise ValueError(
+            "DB_ENCRYPTION_KEY and DB_ENCRYPTION_KEY_FILE are mutually exclusive. Set only one."
+        )
+
+    if key:
+        return key
+
+    if key_file:
+        key_path = Path(key_file)
+        if not key_path.exists():
+            raise ValueError(f"DB_ENCRYPTION_KEY_FILE '{key_file}' does not exist.")
+        if not key_path.is_file():
+            raise ValueError(f"DB_ENCRYPTION_KEY_FILE '{key_file}' is not a file.")
+        key_content = key_path.read_text().strip()
+        if not key_content:
+            raise ValueError(f"DB_ENCRYPTION_KEY_FILE '{key_file}' is empty.")
+        return key_content
+
+    return None
+
+
 class DatabaseSettings(BaseSettings):
     """Database configuration."""
 
@@ -79,31 +112,13 @@ class DatabaseSettings(BaseSettings):
     def _resolve_encryption_key(self) -> "DatabaseSettings":
         """Resolve ``encryption_key`` from ``encryption_key_file`` if set.
 
-        If both ``encryption_key`` and ``encryption_key_file`` are provided,
-        raises ``ValueError`` to prevent ambiguity. If only ``encryption_key_file``
-        is set, reads the key from that file, strips whitespace, and populates
-        ``encryption_key``. An empty or missing file raises ``ValueError``.
+        Delegates to :func:`resolve_encryption_key_from_values` for the
+        actual validation and file reading. See that function's docstring
+        for the mutual-exclusion and file-validation rules.
         """
-        if self.encryption_key and self.encryption_key_file:
-            raise ValueError(
-                "DB_ENCRYPTION_KEY and DB_ENCRYPTION_KEY_FILE are mutually exclusive. Set only one."
-            )
-
-        if self.encryption_key_file:
-            key_path = Path(self.encryption_key_file)
-            if not key_path.exists():
-                raise ValueError(
-                    f"DB_ENCRYPTION_KEY_FILE '{self.encryption_key_file}' does not exist."
-                )
-            if not key_path.is_file():
-                raise ValueError(
-                    f"DB_ENCRYPTION_KEY_FILE '{self.encryption_key_file}' is not a file."
-                )
-            key_content = key_path.read_text().strip()
-            if not key_content:
-                raise ValueError(f"DB_ENCRYPTION_KEY_FILE '{self.encryption_key_file}' is empty.")
-            self.encryption_key = key_content
-
+        self.encryption_key = resolve_encryption_key_from_values(
+            self.encryption_key, self.encryption_key_file
+        )
         return self
 
     @model_validator(mode="after")
