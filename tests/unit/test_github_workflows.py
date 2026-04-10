@@ -435,9 +435,10 @@ class TestDeployWorkflowJobs:
 
 
 class TestActionPinning:
-    """Third-party actions must be pinned to tag versions — never `main`."""
+    """Third-party actions must be pinned to full commit SHAs."""
 
     _FORBIDDEN_REFS = {"@main", "@master", "@latest"}
+    _SHA_RE = re.compile(r"@[0-9a-f]{40}\b")
 
     @pytest.mark.parametrize("workflow_path", [CI_WORKFLOW, DEPLOY_WORKFLOW])
     def test_no_floating_action_refs(self, workflow_path):
@@ -460,6 +461,25 @@ class TestActionPinning:
             if ref.startswith("./"):
                 continue
             assert "@" in ref, f"{workflow_path.name}: action {ref!r} has no version pin"
+
+    @pytest.mark.parametrize("workflow_path", [CI_WORKFLOW, DEPLOY_WORKFLOW])
+    def test_actions_pinned_to_full_sha(self, workflow_path):
+        """Every third-party action must be pinned to a full 40-char SHA.
+
+        Tag-only pins (e.g. ``@v4``) are mutable — a compromised upstream
+        can silently change what they point to. SHA pinning is the only
+        immutable reference. Version comments (``# v4.2.2``) are allowed
+        alongside the SHA for readability.
+        """
+        workflow = _load_workflow(workflow_path)
+        uses = _collect_uses(workflow)
+        for ref in uses:
+            if ref.startswith("./"):
+                continue
+            assert self._SHA_RE.search(ref), (
+                f"{workflow_path.name}: action {ref!r} is not pinned to a "
+                f"full commit SHA — use owner/repo@<sha> # <tag> format"
+            )
 
 
 # ── Script-injection protection ──────────────────────────────────────
@@ -503,6 +523,27 @@ class TestScriptInjection:
                         f"inlines {unsafe} into a run: block. "
                         "Pass it through `env:` instead."
                     )
+
+    @pytest.mark.parametrize("workflow_path", [CI_WORKFLOW, DEPLOY_WORKFLOW])
+    def test_no_step_outputs_in_run_blocks(self, workflow_path):
+        """Step outputs must be passed via env:, not inlined in run: scripts.
+
+        Even when the source is trusted (e.g. gcloud output), inlining
+        ``${{ steps.*.outputs.* }}`` in ``run:`` blocks is fragile — values
+        containing shell metacharacters can break the script. The ``env:``
+        indirection is both safer and consistent with the project's
+        script-injection guard (AGENT.md rule #41).
+        """
+        workflow = _load_workflow(workflow_path)
+        step_output_re = re.compile(r"\$\{\{\s*steps\.[^}]+\.outputs\.")
+        for job_name, job in workflow["jobs"].items():
+            for i, step in enumerate(job.get("steps", [])):
+                run_script = step.get("run", "")
+                assert not step_output_re.search(run_script), (
+                    f"{workflow_path.name}::{job_name}::step[{i}] "
+                    f"inlines steps.*.outputs.* into a run: block. "
+                    "Pass it through `env:` instead."
+                )
 
 
 # ── Cross-workflow consistency ───────────────────────────────────────

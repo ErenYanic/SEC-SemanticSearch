@@ -581,7 +581,7 @@ class TestTransportSecurityHardening:
         if not deployment.exists():
             pytest.skip("docs/DEPLOYMENT.md is intentionally gitignored")
         content = deployment.read_text()
-        assert "Scenarios B and C are insecure without TLS" in content
+        assert "Scenarios B/C are insecure without TLS" in content
 
 
 # -----------------------------------------------------------------------

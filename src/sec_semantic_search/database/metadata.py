@@ -72,28 +72,14 @@ def _resolve_runtime_encryption_key(default_key: str | None) -> str | None:
     need the encryption key fields, so resolve them directly from the current
     process environment and fall back to the already-loaded settings value.
     """
+    from sec_semantic_search.config.settings import resolve_encryption_key_from_values
+
     env_key = os.environ.get("DB_ENCRYPTION_KEY")
     env_key_file = os.environ.get("DB_ENCRYPTION_KEY_FILE")
 
-    if env_key and env_key_file:
-        raise ValueError(
-            "DB_ENCRYPTION_KEY and DB_ENCRYPTION_KEY_FILE are mutually exclusive. Set only one."
-        )
-
-    if env_key:
-        return env_key
-
-    if env_key_file:
-        key_path = Path(env_key_file)
-        if not key_path.exists():
-            raise ValueError(f"DB_ENCRYPTION_KEY_FILE '{env_key_file}' does not exist.")
-        if not key_path.is_file():
-            raise ValueError(f"DB_ENCRYPTION_KEY_FILE '{env_key_file}' is not a file.")
-
-        key_content = key_path.read_text().strip()
-        if not key_content:
-            raise ValueError(f"DB_ENCRYPTION_KEY_FILE '{env_key_file}' is empty.")
-        return key_content
+    # If either env var is set, resolve from them (ignoring default_key).
+    if env_key or env_key_file:
+        return resolve_encryption_key_from_values(env_key, env_key_file)
 
     return default_key
 
