@@ -7,12 +7,11 @@
  * sans-serif nav links, and a cluster of session/theme controls.
  */
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { FormEvent, useState } from "react";
 import {
-  Github,
-  Linkedin,
   LayoutDashboard,
   Search,
   Upload,
@@ -181,7 +180,13 @@ export function Navbar({ isTaskActive = false }: NavbarProps) {
             className={ICON_BUTTON}
             aria-label="GitHub profile"
           >
-            <Github className="h-4 w-4" />
+            <Image
+              src="/GitHub_Invertocat_White.png"
+              alt=""
+              width={18}
+              height={18}
+              className="h-[18px] w-[18px] object-contain brightness-0 dark:brightness-100"
+            />
           </a>
           <a
             href="https://www.linkedin.com/in/erenyanic/"
@@ -190,7 +195,13 @@ export function Navbar({ isTaskActive = false }: NavbarProps) {
             className={ICON_BUTTON}
             aria-label="LinkedIn profile"
           >
-            <Linkedin className="h-4 w-4" />
+            <Image
+              src="/LI-In-Bug.png"
+              alt=""
+              width={20}
+              height={20}
+              className="h-[18px] w-[18px] object-contain"
+            />
           </a>
 
           <button

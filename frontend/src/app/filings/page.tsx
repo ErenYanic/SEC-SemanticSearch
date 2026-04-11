@@ -228,36 +228,34 @@ function FilingsContent() {
   const tickerCount = status?.tickers.length ?? 0;
 
   return (
-    <div className="space-y-5 [animation:fade-in_200ms_ease-out]">
-      {/* ---- Compact page header ---- */}
-      <div className="flex flex-wrap items-baseline justify-between gap-3">
-        <h1 className="text-2xl font-semibold tracking-tight text-fg">
+    <div className="space-y-8 [animation:fade-in_300ms_ease-out]">
+      {/* ---- Page header ---- */}
+      <div className="space-y-3">
+        <h1 className="text-3xl font-semibold tracking-tight text-fg sm:text-4xl">
           Filings
         </h1>
-        <div className="flex items-baseline gap-2 font-mono text-[11px] tabular-nums text-fg-muted">
+        <p className="text-base text-fg-muted">
           <span className="font-semibold text-fg">
             {totalFilings.toLocaleString()}
-          </span>
-          <span>filing{totalFilings !== 1 && "s"}</span>
-          <span className="text-fg-subtle">·</span>
+          </span>{" "}
+          filing{totalFilings !== 1 && "s"} across{" "}
           <span className="font-semibold text-fg">
             {tickerCount.toLocaleString()}
-          </span>
-          <span>ticker{tickerCount !== 1 && "s"}</span>
+          </span>{" "}
+          ticker{tickerCount !== 1 && "s"}
           {selected.size > 0 && (
             <>
-              <span className="text-fg-subtle">·</span>
+              {" · "}
               <span className="font-semibold text-accent">
-                {selected.size.toLocaleString()}
+                {selected.size.toLocaleString()} selected
               </span>
-              <span className="text-accent">selected</span>
             </>
           )}
-        </div>
+        </p>
       </div>
 
       {/* ---- Toolbar: filters + bulk actions ---- */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <FilingFilters
           ticker={params.ticker}
           formType={params.formType}

@@ -165,17 +165,17 @@ export function ResultList({ response, query }: ResultListProps) {
       role="region"
       aria-label="Search results"
       onKeyDown={handleKeyDown}
-      className="rounded-lg border border-hairline bg-surface"
+      className="rounded-2xl border border-hairline bg-card/70 shadow-sm backdrop-blur-sm"
     >
       {/* ---- Meta header ---- */}
-      <header className="flex flex-wrap items-baseline justify-between gap-3 border-b border-hairline px-4 py-2.5">
-        <div className="flex items-baseline gap-2 font-mono text-[11px] tabular-nums text-fg-muted">
-          <span className="font-semibold text-fg">
+      <header className="flex flex-wrap items-baseline justify-between gap-3 border-b border-hairline px-6 py-4">
+        <div className="flex items-baseline gap-2 text-sm text-fg-muted">
+          <span className="font-semibold tabular-nums text-fg">
             {response.total_results}
           </span>
           <span>result{response.total_results !== 1 && "s"}</span>
           <Separator />
-          <span className="font-semibold text-fg">
+          <span className="font-semibold tabular-nums text-fg">
             {response.search_time_ms.toFixed(0)}
           </span>
           <span>ms</span>
@@ -185,7 +185,7 @@ export function ResultList({ response, query }: ResultListProps) {
           </span>
         </div>
         <div
-          className="hidden items-center gap-2 font-mono text-[10px] uppercase tracking-wider text-fg-subtle md:flex"
+          className="hidden items-center gap-1.5 text-xs text-fg-subtle md:flex"
           aria-hidden="true"
         >
           <KbdHint>j</KbdHint>
@@ -229,7 +229,7 @@ function Separator() {
 
 function KbdHint({ children }: { children: React.ReactNode }) {
   return (
-    <kbd className="rounded border border-hairline bg-card px-1 py-0.5 font-mono text-[9px] text-fg-muted">
+    <kbd className="rounded-md border border-hairline bg-surface px-1.5 py-0.5 font-mono text-[11px] text-fg-muted">
       {children}
     </kbd>
   );

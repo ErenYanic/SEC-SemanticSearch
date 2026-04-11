@@ -56,26 +56,24 @@ export function BulkActions({
       {/* Delete Selected — primary destructive */}
       <Button
         variant="destructive"
-        size="sm"
         onClick={onDeleteSelected}
         disabled={selectedCount === 0 || isDeleting}
       >
-        <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+        <Trash2 className="mr-1.5 h-4 w-4" />
         Delete Selected
         {selectedCount > 0 && (
-          <span className="ml-1 font-mono tabular-nums">({selectedCount})</span>
+          <span className="ml-1 tabular-nums">({selectedCount})</span>
         )}
       </Button>
 
       {/* Delete All — ghost button with neg-token outline */}
       <Button
         variant="ghost"
-        size="sm"
         onClick={onDeleteAll}
         disabled={totalFilings === 0 || isDeleting}
         className="border border-neg/40 text-neg hover:bg-neg/10 hover:text-neg"
       >
-        <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+        <Trash2 className="mr-1.5 h-4 w-4" />
         Delete All
       </Button>
     </div>

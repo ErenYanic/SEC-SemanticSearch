@@ -47,11 +47,11 @@ const FormChart = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="rounded-2xl border border-hairline bg-card/80">
+      <div className="flex h-full flex-col rounded-2xl border border-hairline bg-card/80">
         <div className="border-b border-hairline px-6 py-4">
           <Skeleton className="h-5 w-40" />
         </div>
-        <div className="flex h-72 items-end gap-6 p-6 pb-10">
+        <div className="flex min-h-[18rem] flex-1 items-end gap-6 p-6 pb-10">
           <Skeleton className="h-3/4 flex-1 rounded-t-lg" />
           <Skeleton className="h-1/2 flex-1 rounded-t-lg" />
           <Skeleton className="h-5/6 flex-1 rounded-t-lg" />

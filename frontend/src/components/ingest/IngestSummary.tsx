@@ -82,15 +82,22 @@ const STATUS_CHIP_CLASS: Record<FilingEvent["type"], string> = {
 };
 
 const STATUS_CHIP_LABEL: Record<FilingEvent["type"], string> = {
-  done: "OK",
-  skipped: "SKIP",
-  failed: "FAIL",
-  eviction: "EVICT",
+  done: "Ok",
+  skipped: "Skip",
+  failed: "Fail",
+  eviction: "Evict",
 };
 
 // ---------------------------------------------------------------------------
 // Sub-component
 // ---------------------------------------------------------------------------
+
+const TONE_BADGE_CLASS: Record<Tone, string> = {
+  pos: "bg-pos/10 text-pos",
+  warn: "bg-warn/10 text-warn",
+  neg: "bg-neg/10 text-neg",
+  accent: "bg-accent/10 text-accent",
+};
 
 function SummaryCard({
   label,
@@ -104,14 +111,16 @@ function SummaryCard({
   tone: Tone;
 }) {
   return (
-    <div className="rounded-lg border border-hairline bg-card p-5 transition-colors hover:border-fg-subtle/40">
+    <div className="group relative overflow-hidden rounded-2xl border border-hairline bg-card/80 p-6 shadow-sm backdrop-blur-sm transition-all hover:-translate-y-0.5 hover:border-accent/40 hover:shadow-lg hover:shadow-accent/5">
       <div className="flex items-center justify-between">
-        <span className="font-mono text-[10px] font-semibold uppercase tracking-widest text-fg-subtle">
-          {label}
+        <span className="text-sm font-medium text-fg-muted">{label}</span>
+        <span
+          className={`flex h-9 w-9 items-center justify-center rounded-lg ${TONE_BADGE_CLASS[tone]}`}
+        >
+          <Icon className={`h-4 w-4 ${TONE_ICON_CLASS[tone]}`} aria-hidden="true" />
         </span>
-        <Icon className={`h-4 w-4 ${TONE_ICON_CLASS[tone]}`} aria-hidden="true" />
       </div>
-      <p className="mt-3 text-3xl font-semibold tabular-nums text-fg">
+      <p className="mt-4 text-4xl font-semibold tracking-tight tabular-nums text-fg">
         {value}
       </p>
     </div>
@@ -123,8 +132,8 @@ function SummaryCard({
 // ---------------------------------------------------------------------------
 
 const HEADER_CELL =
-  "px-4 py-2.5 font-mono text-[10px] font-semibold uppercase tracking-widest text-fg-subtle";
-const BODY_CELL = "px-4 py-2.5 text-sm";
+  "px-5 py-3.5 text-xs font-semibold uppercase tracking-wider text-fg-subtle";
+const BODY_CELL = "px-5 py-3.5 text-sm";
 
 // ---------------------------------------------------------------------------
 // Component
@@ -141,7 +150,7 @@ export function IngestSummary({
   const rows = filingEvents.filter((e) => e.type !== "eviction");
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       {/* ---- Summary cards ---- */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <SummaryCard
@@ -172,10 +181,10 @@ export function IngestSummary({
 
       {/* ---- Results table ---- */}
       {rows.length > 0 && (
-        <div className="overflow-x-auto rounded-lg border border-hairline bg-card">
+        <div className="overflow-x-auto rounded-2xl border border-hairline bg-card/80 shadow-sm backdrop-blur-sm">
           <table className="w-full border-collapse text-left">
             <thead>
-              <tr className="border-b border-hairline bg-surface/60">
+              <tr className="border-b border-hairline bg-surface/40">
                 <th className={HEADER_CELL}>Status</th>
                 <th className={HEADER_CELL}>Ticker</th>
                 <th className={HEADER_CELL}>Form</th>
@@ -194,45 +203,45 @@ export function IngestSummary({
                 >
                   <td className={BODY_CELL}>
                     <span
-                      className={`inline-flex items-center rounded border px-1.5 py-0.5 font-mono text-[10px] font-semibold uppercase tabular-nums tracking-wider ${STATUS_CHIP_CLASS[event.type]}`}
+                      className={`inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-semibold tabular-nums ${STATUS_CHIP_CLASS[event.type]}`}
                     >
                       {STATUS_CHIP_LABEL[event.type]}
                     </span>
                   </td>
                   <td
-                    className={`${BODY_CELL} font-mono font-semibold tabular-nums text-fg`}
+                    className={`${BODY_CELL} font-semibold tabular-nums text-fg`}
                   >
                     {event.ticker}
                   </td>
                   <td className={BODY_CELL}>
-                    <span className="inline-flex items-center rounded border border-hairline bg-surface px-1.5 py-0.5 font-mono text-[10px] font-medium tabular-nums text-fg-muted">
+                    <span className="inline-flex items-center rounded-md border border-hairline bg-surface px-2 py-0.5 text-xs font-medium tabular-nums text-fg-muted">
                       {event.form_type}
                     </span>
                   </td>
                   <td
-                    className={`${BODY_CELL} font-mono text-xs tabular-nums text-fg-muted`}
+                    className={`${BODY_CELL} tabular-nums text-fg-muted`}
                   >
                     {event.filing_date ?? "\u2014"}
                   </td>
                   <td
-                    className={`${BODY_CELL} text-right font-mono tabular-nums text-fg-muted`}
+                    className={`${BODY_CELL} text-right tabular-nums text-fg-muted`}
                   >
                     {event.type === "done" ? event.segments : "\u2014"}
                   </td>
                   <td
-                    className={`${BODY_CELL} text-right font-mono tabular-nums text-fg-muted`}
+                    className={`${BODY_CELL} text-right tabular-nums text-fg-muted`}
                   >
                     {event.type === "done" ? event.chunks : "\u2014"}
                   </td>
                   <td
-                    className={`${BODY_CELL} text-right font-mono tabular-nums text-fg-muted`}
+                    className={`${BODY_CELL} text-right tabular-nums text-fg-muted`}
                   >
                     {event.type === "done"
                       ? `${event.time?.toFixed(1)}s`
                       : "\u2014"}
                   </td>
                   <td
-                    className={`${BODY_CELL} font-mono text-xs tabular-nums text-fg-subtle`}
+                    className={`${BODY_CELL} text-xs tabular-nums text-fg-subtle`}
                   >
                     {event.type === "skipped" && event.reason}
                     {event.type === "failed" && (
@@ -248,7 +257,7 @@ export function IngestSummary({
 
       {/* ---- Action button ---- */}
       <div className="flex justify-end">
-        <Button onClick={onReset}>
+        <Button size="lg" onClick={onReset}>
           <Upload className="mr-2 h-4 w-4" />
           Ingest More Filings
         </Button>

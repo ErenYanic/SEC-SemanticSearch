@@ -30,7 +30,10 @@ describe("MetricCard", () => {
         capacity={{ current: 50, max: 200 }}
       />,
     );
-    expect(screen.getByText("50 / 200")).toBeInTheDocument();
+    // Value "50" appears in both the big metric and the capacity sub-label
+    expect(screen.getAllByText("50")).toHaveLength(2);
+    expect(screen.getByText("200")).toBeInTheDocument();
+    expect(screen.getByText("of")).toBeInTheDocument();
   });
 
   it("calculates capacity percentage correctly", () => {

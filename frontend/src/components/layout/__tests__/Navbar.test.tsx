@@ -81,10 +81,10 @@ describe("Navbar — portfolio icons (BF-009)", () => {
     expect(link).toHaveAttribute("rel", "noopener noreferrer");
   });
 
-  it("renders portfolio icons with circular key-press styling", () => {
+  it("renders portfolio icons with rounded-lg chrome styling", () => {
     renderNavbar();
     const githubLink = screen.getByRole("link", { name: "GitHub profile" });
-    expect(githubLink.className).toContain("rounded-full");
+    expect(githubLink.className).toContain("rounded-lg");
     expect(githubLink.className).toContain("border");
   });
 

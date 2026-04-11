@@ -150,7 +150,7 @@ describe("WelcomeGate", () => {
 
     renderGate();
     expect(screen.queryByTestId("app-content")).not.toBeInTheDocument();
-    expect(screen.getByText("SEC Semantic Search")).toBeInTheDocument();
+    expect(screen.getByText("EDGAR credentials required")).toBeInTheDocument();
     expect(screen.getByLabelText("Full name")).toBeInTheDocument();
     expect(screen.getByLabelText("Email address")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Continue" })).toBeInTheDocument();

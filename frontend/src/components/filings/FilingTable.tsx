@@ -96,9 +96,9 @@ const PAGE_SIZES = [10, 25, 50] as const;
 // ---------------------------------------------------------------------------
 
 const HEADER_CELL =
-  "px-4 py-2.5 font-mono text-[10px] font-semibold uppercase tracking-widest text-fg-subtle";
+  "px-5 py-3.5 text-xs font-semibold uppercase tracking-wider text-fg-subtle";
 
-const BODY_CELL = "px-4 py-2.5 text-sm";
+const BODY_CELL = "px-5 py-3.5 text-sm";
 
 // ---------------------------------------------------------------------------
 // Component
@@ -216,8 +216,8 @@ export function FilingTable({
   // ---- Empty state: filters active but no matches ----
   if (filings.length === 0) {
     return (
-      <div className="rounded-lg border border-hairline bg-card p-10 text-center">
-        <p className="font-mono text-xs uppercase tracking-wider text-fg-muted">
+      <div className="rounded-2xl border border-hairline bg-card/70 p-12 text-center shadow-sm backdrop-blur-sm">
+        <p className="text-base text-fg-muted">
           No filings match the current filters
         </p>
       </div>
@@ -225,14 +225,14 @@ export function FilingTable({
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       {/* ---- Table ---- */}
-      <div className="overflow-x-auto rounded-lg border border-hairline bg-card">
+      <div className="overflow-x-auto rounded-2xl border border-hairline bg-card/80 shadow-sm backdrop-blur-sm">
         <table className="w-full border-collapse text-left">
           <thead>
-            <tr className="border-b border-hairline bg-surface/60">
+            <tr className="border-b border-hairline bg-surface/40">
               {/* Checkbox column */}
-              <th className="w-10 px-4 py-2.5">
+              <th className="w-10 px-5 py-3.5">
                 <input
                   type="checkbox"
                   checked={allVisibleSelected}
@@ -241,7 +241,7 @@ export function FilingTable({
                   }}
                   onChange={toggleAll}
                   aria-label="Select all filings on this page"
-                  className="h-3.5 w-3.5 rounded border-hairline text-accent accent-[var(--accent)] focus-visible:ring-2 focus-visible:ring-accent/30"
+                  className="h-4 w-4 rounded border-hairline text-accent accent-[var(--accent)] focus-visible:ring-2 focus-visible:ring-accent/30"
                 />
               </th>
 
@@ -278,7 +278,7 @@ export function FilingTable({
               ))}
 
               {/* Actions column */}
-              <th className="w-14 px-4 py-2.5">
+              <th className="w-14 px-5 py-3.5">
                 <span className="sr-only">Actions</span>
               </th>
             </tr>
@@ -292,36 +292,36 @@ export function FilingTable({
                   key={filing.accession_number}
                   className={`border-b border-hairline/70 transition-colors last:border-b-0 ${
                     isSelected
-                      ? "bg-accent/[0.06] hover:bg-accent/[0.09]"
-                      : "hover:bg-surface/70"
+                      ? "bg-accent/[0.08] hover:bg-accent/[0.12]"
+                      : "hover:bg-surface/50"
                   }`}
                 >
                   {/* Checkbox */}
-                  <td className="px-4 py-2.5">
+                  <td className="px-5 py-3.5">
                     <input
                       type="checkbox"
                       checked={isSelected}
                       onChange={() => toggleOne(filing.accession_number)}
                       aria-label={`Select ${filing.ticker} ${filing.form_type}`}
-                      className="h-3.5 w-3.5 rounded border-hairline accent-[var(--accent)] focus-visible:ring-2 focus-visible:ring-accent/30"
+                      className="h-4 w-4 rounded border-hairline accent-[var(--accent)] focus-visible:ring-2 focus-visible:ring-accent/30"
                     />
                   </td>
 
                   {/* Ticker */}
-                  <td className={`${BODY_CELL} font-mono font-semibold tabular-nums text-fg`}>
+                  <td className={`${BODY_CELL} text-base font-semibold tabular-nums text-fg`}>
                     {filing.ticker}
                   </td>
 
                   {/* Form type */}
                   <td className={BODY_CELL}>
-                    <span className="inline-flex items-center rounded border border-hairline bg-surface px-1.5 py-0.5 font-mono text-[10px] font-medium tabular-nums text-fg-muted">
+                    <span className="inline-flex items-center rounded-md border border-hairline bg-surface px-2 py-0.5 text-xs font-medium tabular-nums text-fg-muted">
                       {filing.form_type}
                     </span>
                   </td>
 
                   {/* Accession number */}
                   <td className={BODY_CELL}>
-                    <span className="inline-flex items-center gap-1.5">
+                    <span className="inline-flex items-center gap-2">
                       <span className="font-mono text-xs tabular-nums text-fg-muted">
                         {filing.accession_number}
                       </span>
@@ -330,7 +330,7 @@ export function FilingTable({
                         onClick={() =>
                           handleCopyAccession(filing.accession_number)
                         }
-                        className="rounded p-0.5 text-fg-subtle transition-colors hover:bg-surface hover:text-fg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                        className="rounded-md p-1 text-fg-subtle transition-colors hover:bg-surface hover:text-fg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
                         title="Copy accession number to clipboard"
                         aria-label={`Copy accession number ${filing.accession_number}`}
                       >
@@ -344,22 +344,22 @@ export function FilingTable({
                   </td>
 
                   {/* Filing date */}
-                  <td className={`${BODY_CELL} font-mono text-xs tabular-nums text-fg-muted`}>
+                  <td className={`${BODY_CELL} tabular-nums text-fg-muted`}>
                     {filing.filing_date}
                   </td>
 
                   {/* Chunk count */}
-                  <td className={`${BODY_CELL} text-right font-mono tabular-nums text-fg-muted`}>
+                  <td className={`${BODY_CELL} text-right tabular-nums text-fg-muted`}>
                     {filing.chunk_count.toLocaleString()}
                   </td>
 
                   {/* Ingested at */}
-                  <td className={`${BODY_CELL} font-mono text-xs tabular-nums text-fg-muted`}>
+                  <td className={`${BODY_CELL} tabular-nums text-fg-muted`}>
                     {formattedDates.get(filing.accession_number)}
                   </td>
 
                   {/* Remove button */}
-                  <td className="px-4 py-2.5">
+                  <td className="px-5 py-3.5">
                     <Button
                       variant="ghost"
                       size="sm"
@@ -368,7 +368,7 @@ export function FilingTable({
                       className="text-fg-subtle hover:bg-neg/10 hover:text-neg"
                       aria-label={`Delete ${filing.ticker} ${filing.form_type}`}
                     >
-                      <Trash2 className="h-3.5 w-3.5" />
+                      <Trash2 className="h-4 w-4" />
                     </Button>
                   </td>
                 </tr>
@@ -379,23 +379,25 @@ export function FilingTable({
       </div>
 
       {/* ---- Pagination footer ---- */}
-      <div className="flex flex-wrap items-center justify-between gap-3 px-1">
-        <span className="font-mono text-[11px] tabular-nums text-fg-muted">
-          <span className="text-fg">{startIndex + 1}</span>
+      <div className="flex flex-wrap items-center justify-between gap-4 px-2">
+        <span className="text-sm tabular-nums text-fg-muted">
+          <span className="font-semibold text-fg">{startIndex + 1}</span>
           <span className="text-fg-subtle">–</span>
-          <span className="text-fg">{endIndex}</span>
+          <span className="font-semibold text-fg">{endIndex}</span>
           <span className="text-fg-subtle"> of </span>
-          <span className="text-fg">{filings.length.toLocaleString()}</span>
+          <span className="font-semibold text-fg">
+            {filings.length.toLocaleString()}
+          </span>
           <span className="text-fg-subtle">
             {" "}filing{filings.length === 1 ? "" : "s"}
           </span>
         </span>
 
         {/* Centre: page size selector */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2.5">
           <label
             htmlFor="page-size"
-            className="font-mono text-[10px] uppercase tracking-wider text-fg-subtle"
+            className="text-sm font-medium text-fg-muted"
           >
             Rows
           </label>
@@ -406,7 +408,7 @@ export function FilingTable({
               setPageSize(Number(e.target.value));
               setPage(0);
             }}
-            className="rounded-md border border-hairline bg-card px-2 py-1 font-mono text-xs tabular-nums text-fg outline-none transition-colors hover:border-fg-subtle/40 focus:border-accent focus:ring-2 focus:ring-accent/25"
+            className="rounded-lg border border-hairline bg-card px-3 py-1.5 text-sm tabular-nums text-fg outline-none transition-colors hover:border-accent/40 focus:border-accent focus:ring-2 focus:ring-accent/25"
           >
             {PAGE_SIZES.map((size) => (
               <option key={size} value={size}>
@@ -428,8 +430,8 @@ export function FilingTable({
           >
             <ChevronLeft className="h-4 w-4" />
           </Button>
-          <span className="px-2 font-mono text-[11px] tabular-nums text-fg-muted">
-            <span className="text-fg">{page + 1}</span>
+          <span className="px-3 text-sm tabular-nums text-fg-muted">
+            <span className="font-semibold text-fg">{page + 1}</span>
             <span className="text-fg-subtle"> / </span>
             <span>{totalPages}</span>
           </span>
