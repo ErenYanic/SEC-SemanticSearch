@@ -1,18 +1,15 @@
 /**
- * Page footer with version number.
+ * Page footer.
  *
- * This is a Server Component (no "use client") — it has no
- * interactivity, so it renders as static HTML with zero JavaScript
- * sent to the browser.
+ * Server component — no interactivity, no JavaScript shipped.
  */
 
 export function Footer() {
   return (
-    <footer className="border-t border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-950">
-      <div className="mx-auto flex h-12 max-w-7xl items-center justify-center px-4 sm:px-6 lg:px-8">
-        <p className="text-sm text-gray-500 dark:text-gray-400">
-          SEC Semantic Search
-        </p>
+    <footer className="border-t border-hairline bg-surface/40">
+      <div className="mx-auto flex h-14 max-w-[1440px] items-center justify-between gap-4 px-6 text-sm text-fg-muted sm:px-8 lg:px-12">
+        <p>SEC Semantic Search</p>
+        <p className="text-fg-subtle">Built for analysts</p>
       </div>
     </footer>
   );

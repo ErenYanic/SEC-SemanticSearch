@@ -43,17 +43,20 @@ export function FilingInventory({ status }: FilingInventoryProps) {
   if (status.filing_count === 0) return null;
 
   return (
-    <div className="rounded-lg border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-950">
+    <div className="rounded-2xl border border-hairline bg-card/70 backdrop-blur-sm">
       <button
         onClick={() => setIsOpen(!isOpen)}
         aria-expanded={isOpen}
         aria-controls={panelId}
-        className="flex w-full items-center justify-between px-4 py-3 text-sm text-gray-600 transition-colors hover:bg-gray-50 dark:text-gray-400 dark:hover:bg-gray-900"
+        className="flex w-full items-center justify-between px-5 py-4 text-sm text-fg-muted transition-colors hover:bg-surface/60 hover:text-fg"
       >
-        <span className="flex items-center gap-2">
+        <span className="flex items-center gap-2.5">
           <Database className="h-4 w-4" />
-          {status.filing_count} filing{status.filing_count !== 1 && "s"} across{" "}
-          {status.tickers.length} ticker{status.tickers.length !== 1 && "s"}
+          <span className="font-semibold text-fg">{status.filing_count}</span>
+          filing{status.filing_count !== 1 && "s"}
+          <span className="text-fg-subtle">·</span>
+          <span className="font-semibold text-fg">{status.tickers.length}</span>
+          ticker{status.tickers.length !== 1 && "s"}
         </span>
         {isOpen ? (
           <ChevronUp className="h-4 w-4" />
@@ -67,25 +70,21 @@ export function FilingInventory({ status }: FilingInventoryProps) {
           id={panelId}
           role="region"
           aria-label="Filing inventory"
-          className="border-t border-gray-200 px-4 py-3 dark:border-gray-800"
+          className="border-t border-hairline px-5 py-4"
         >
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-x-4 gap-y-3">
             {status.ticker_breakdown.map((t) => (
               <span
                 key={t.ticker}
-                className="inline-flex items-center gap-1.5 text-xs text-gray-600 dark:text-gray-400"
+                className="inline-flex items-center gap-1.5 text-sm text-fg-muted"
               >
-                <span className="font-semibold text-gray-900 dark:text-gray-100">
-                  {t.ticker}
-                </span>
+                <span className="font-semibold text-fg">{t.ticker}</span>
                 {t.forms.map((form) => (
                   <Badge key={form} variant="blue">
                     {form}
                   </Badge>
                 ))}
-                <span className="text-gray-400 dark:text-gray-600">
-                  ({t.filings})
-                </span>
+                <span className="text-fg-subtle">({t.filings})</span>
               </span>
             ))}
           </div>

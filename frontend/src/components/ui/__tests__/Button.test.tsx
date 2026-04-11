@@ -12,26 +12,26 @@ describe("Button", () => {
   it("applies primary variant by default", () => {
     render(<Button>Primary</Button>);
     const btn = screen.getByRole("button");
-    expect(btn.className).toContain("bg-blue-600");
+    expect(btn.className).toContain("bg-accent");
   });
 
   it("applies destructive variant classes", () => {
     render(<Button variant="destructive">Delete</Button>);
     const btn = screen.getByRole("button");
-    expect(btn.className).toContain("bg-red-600");
+    expect(btn.className).toContain("bg-neg");
   });
 
   it("applies secondary variant classes", () => {
     render(<Button variant="secondary">Cancel</Button>);
     const btn = screen.getByRole("button");
-    expect(btn.className).toContain("bg-gray-100");
+    expect(btn.className).toContain("bg-card");
   });
 
   it("applies ghost variant classes", () => {
     render(<Button variant="ghost">Ghost</Button>);
     const btn = screen.getByRole("button");
-    expect(btn.className).toContain("text-gray-600");
-    expect(btn.className).not.toContain("bg-blue-600");
+    expect(btn.className).toContain("text-fg-muted");
+    expect(btn.className).not.toContain("bg-accent");
   });
 
   it("applies size classes", () => {

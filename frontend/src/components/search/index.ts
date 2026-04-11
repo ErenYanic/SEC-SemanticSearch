@@ -9,3 +9,4 @@ export { ResultCard } from "./ResultCard";
 export { ResultList } from "./ResultList";
 export { FilingInventory } from "./FilingInventory";
 export { SearchResultSkeleton } from "./SearchResultSkeleton";
+export { SuggestedQueries } from "./SuggestedQueries";

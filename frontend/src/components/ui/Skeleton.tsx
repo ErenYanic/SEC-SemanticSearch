@@ -47,10 +47,10 @@ export function Skeleton({ className }: SkeletonProps) {
   return (
     <div
       className={[
-        // Base shape: rounded, grey background
-        "rounded-md bg-gray-200 dark:bg-gray-700",
+        // Base shape: rounded, muted surface
+        "rounded-md bg-card",
         // Shimmer gradient overlay
-        "bg-gradient-to-r from-transparent via-gray-300/50 dark:via-gray-600/50 to-transparent",
+        "bg-gradient-to-r from-transparent via-surface to-transparent",
         // Animation: sweep the gradient across (defined in globals.css)
         "bg-[length:200%_100%] [animation:shimmer_1.5s_ease-in-out_infinite]",
         className,

@@ -51,22 +51,20 @@ export interface EmptyStateProps {
 
 export function EmptyState({ icon: Icon, title, description, action }: EmptyStateProps) {
   return (
-    <div className="flex flex-col items-center justify-center py-16 text-center">
-      {/* ---- Icon in a muted circle ---- */}
-      <div className="rounded-full bg-gray-100 p-4 dark:bg-gray-800">
-        <Icon className="h-8 w-8 text-gray-400 dark:text-gray-500" />
+    <div className="flex flex-col items-center justify-center rounded-2xl border border-hairline bg-card/60 px-6 py-20 text-center backdrop-blur-sm">
+      {/* ---- Icon in an accent-tinted circle ---- */}
+      <div className="rounded-2xl border border-accent/20 bg-accent/10 p-4">
+        <Icon className="h-8 w-8 text-accent" />
       </div>
 
       {/* ---- Title ---- */}
-      <h3 className="mt-4 text-lg font-semibold text-gray-900 dark:text-gray-100">
+      <h3 className="mt-5 text-xl font-semibold tracking-tight text-fg">
         {title}
       </h3>
 
       {/* ---- Description (optional) ---- */}
       {description && (
-        <p className="mt-2 max-w-sm text-sm text-gray-600 dark:text-gray-400">
-          {description}
-        </p>
+        <p className="mt-2 max-w-md text-sm text-fg-muted">{description}</p>
       )}
 
       {/* ---- Action (optional) ---- */}

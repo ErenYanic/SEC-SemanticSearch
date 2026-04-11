@@ -66,7 +66,7 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body
         className={`${geistSans.variable} ${geistMono.variable} font-sans antialiased
-          bg-gray-50 text-gray-900 dark:bg-gray-900 dark:text-gray-100`}
+          bg-bg text-fg`}
       >
         <Providers>
           <WelcomeGate>
@@ -75,7 +75,7 @@ export default function RootLayout({
                   Hidden until focused (sr-only → not-sr-only on focus). */}
               <a
                 href="#main-content"
-                className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:bg-blue-600 focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-white focus:outline-none"
+                className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-accent focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-accent-fg focus:outline-none"
               >
                 Skip to content
               </a>
@@ -83,7 +83,7 @@ export default function RootLayout({
                 <Navbar />
                 <main
                   id="main-content"
-                  className="mx-auto w-full max-w-7xl flex-1 px-4 py-8 sm:px-6 lg:px-8"
+                  className="mx-auto w-full max-w-[1440px] flex-1 px-6 py-10 sm:px-8 lg:px-12"
                 >
                   {children}
                 </main>

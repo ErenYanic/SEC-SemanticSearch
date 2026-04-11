@@ -35,6 +35,28 @@ import { IngestForm, ProgressTracker, IngestSummary } from "@/components/ingest"
 import type { IngestRequest } from "@/lib/types";
 
 // ---------------------------------------------------------------------------
+// Status meta strip
+// ---------------------------------------------------------------------------
+
+const STATUS_LABEL: Record<string, string> = {
+  idle: "READY",
+  pending: "QUEUED",
+  running: "STREAMING",
+  completed: "COMPLETE",
+  failed: "ERROR",
+  cancelled: "CANCELLED",
+};
+
+const STATUS_TONE: Record<string, string> = {
+  idle: "text-fg-muted",
+  pending: "text-warn",
+  running: "text-accent",
+  completed: "text-pos",
+  failed: "text-neg",
+  cancelled: "text-warn",
+};
+
+// ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
@@ -42,7 +64,6 @@ export default function IngestPage() {
   const ingest = useIngest();
   const { addToast } = useToast();
 
-  // ---- Submit handler ----
   async function handleSubmit(request: IngestRequest) {
     try {
       await ingest.startIngest(request);
@@ -51,7 +72,6 @@ export default function IngestPage() {
     }
   }
 
-  // ---- Cancel handler ----
   async function handleCancel() {
     try {
       await ingest.cancel();
@@ -61,23 +81,24 @@ export default function IngestPage() {
     }
   }
 
-  // ---- Page header (always shown) ----
   const header = (
-    <div className="flex items-center gap-3">
-      <Upload className="h-8 w-8 text-blue-600 dark:text-blue-400" />
-      <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-        Ingest
-      </h1>
+    <div className="flex flex-wrap items-baseline justify-between gap-3">
+      <h1 className="text-2xl font-semibold tracking-tight text-fg">Ingest</h1>
+      <div className="flex items-baseline gap-2 font-mono text-[11px] uppercase tabular-nums text-fg-muted">
+        <span className="text-fg-subtle">status</span>
+        <span className={`font-semibold ${STATUS_TONE[ingest.status]}`}>
+          {STATUS_LABEL[ingest.status]}
+        </span>
+      </div>
     </div>
   );
 
-  // ---- State machine rendering ----
   switch (ingest.status) {
     case "idle":
       return (
-        <div className="space-y-6">
+        <div className="space-y-5 [animation:fade-in_200ms_ease-out]">
           {header}
-          <p className="text-gray-600 dark:text-gray-400">
+          <p className="max-w-2xl text-sm text-fg-muted">
             Fetch SEC filings, process them into chunks, and embed them for
             semantic search.
           </p>
@@ -88,7 +109,7 @@ export default function IngestPage() {
     case "pending":
     case "running":
       return (
-        <div className="space-y-6">
+        <div className="space-y-5 [animation:fade-in_200ms_ease-out]">
           {header}
           <ProgressTracker
             progress={ingest.progress}
@@ -101,7 +122,7 @@ export default function IngestPage() {
 
     case "completed":
       return (
-        <div className="space-y-6">
+        <div className="space-y-5 [animation:fade-in_200ms_ease-out]">
           {header}
           {ingest.summary && (
             <IngestSummary
@@ -118,21 +139,20 @@ export default function IngestPage() {
 
     case "failed":
       return (
-        <div className="space-y-6">
+        <div className="space-y-5 [animation:fade-in_200ms_ease-out]">
           {header}
-          <div className="rounded-lg border border-red-200 bg-red-50 p-6 dark:border-red-900 dark:bg-red-950">
-            <div className="flex items-center gap-3">
-              <AlertCircle className="h-6 w-6 text-red-600 dark:text-red-400" />
-              <h2 className="text-lg font-semibold text-red-800 dark:text-red-200">
+          <div className="rounded-lg border border-neg/40 bg-neg/5 p-5">
+            <div className="flex items-center gap-2.5">
+              <AlertCircle className="h-4 w-4 text-neg" />
+              <h2 className="font-mono text-[11px] font-semibold uppercase tracking-widest text-neg">
                 Ingestion Failed
               </h2>
             </div>
-            <p className="mt-2 text-sm text-red-700 dark:text-red-300">
+            <p className="mt-2 text-sm text-fg-muted">
               {ingest.error || "An unexpected error occurred."}
             </p>
-            {/* Show partial results if any filings were ingested before failure */}
             {ingest.filingEvents.length > 0 && ingest.summary && (
-              <div className="mt-4">
+              <div className="mt-5">
                 <IngestSummary
                   results={ingest.results}
                   summary={ingest.summary}
@@ -154,22 +174,21 @@ export default function IngestPage() {
 
     case "cancelled":
       return (
-        <div className="space-y-6">
+        <div className="space-y-5 [animation:fade-in_200ms_ease-out]">
           {header}
-          <div className="rounded-lg border border-amber-200 bg-amber-50 p-6 dark:border-amber-900 dark:bg-amber-950">
-            <div className="flex items-center gap-3">
-              <XCircle className="h-6 w-6 text-amber-600 dark:text-amber-400" />
-              <h2 className="text-lg font-semibold text-amber-800 dark:text-amber-200">
+          <div className="rounded-lg border border-warn/40 bg-warn/5 p-5">
+            <div className="flex items-center gap-2.5">
+              <XCircle className="h-4 w-4 text-warn" />
+              <h2 className="font-mono text-[11px] font-semibold uppercase tracking-widest text-warn">
                 Ingestion Cancelled
               </h2>
             </div>
-            <p className="mt-2 text-sm text-amber-700 dark:text-amber-300">
+            <p className="mt-2 text-sm text-fg-muted">
               The ingestion was cancelled. Any filings that were fully
               processed have been kept in the database.
             </p>
           </div>
 
-          {/* Show partial results if any filings were ingested before cancel */}
           {ingest.filingEvents.length > 0 && ingest.summary && (
             <IngestSummary
               results={ingest.results}
@@ -181,7 +200,7 @@ export default function IngestPage() {
             />
           )}
           {ingest.filingEvents.length === 0 && (
-            <div className="flex justify-center">
+            <div className="flex justify-end">
               <Button onClick={ingest.reset}>
                 <Upload className="mr-2 h-4 w-4" />
                 Ingest Again

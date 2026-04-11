@@ -1,17 +1,13 @@
 /**
- * Three metric cards for the Dashboard: Filings, Chunks, Tickers.
+ * KPI strip for the Dashboard: four compact cards showing Filings,
+ * Chunks, Tickers, and Avg chunks/filing.
  *
- * This is a **presentational component** — it receives data via props
- * and renders it. It has no data-fetching logic, no hooks, no state.
- * The parent page is responsible for fetching and passing the data.
- *
- * Why this separation? It makes the component:
- *   1. Easy to test — pass props, assert output
- *   2. Easy to reuse — doesn't care where data comes from
- *   3. Easy to read — rendering logic only, no async concerns
+ * The fourth "Avg chunks/filing" card is a derived stat — it's cheap
+ * to compute from the existing payload and adds a useful signal about
+ * corpus density (how rich each filing is once chunked).
  */
 
-import { FileText, Layers, Building2 } from "lucide-react";
+import { FileText, Layers, Building2, Gauge } from "lucide-react";
 import { MetricCard } from "@/components/ui";
 import type { StatusResponse } from "@/lib/types";
 
@@ -28,8 +24,13 @@ interface DashboardMetricsProps {
 // ---------------------------------------------------------------------------
 
 export function DashboardMetrics({ status }: DashboardMetricsProps) {
+  const avgChunks =
+    status.filing_count > 0
+      ? Math.round(status.chunk_count / status.filing_count)
+      : 0;
+
   return (
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
       <MetricCard
         label="Filings"
         value={status.filing_count}
@@ -48,6 +49,11 @@ export function DashboardMetrics({ status }: DashboardMetricsProps) {
         label="Tickers"
         value={status.tickers.length}
         icon={Building2}
+      />
+      <MetricCard
+        label="Avg chunks / filing"
+        value={avgChunks.toLocaleString()}
+        icon={Gauge}
       />
     </div>
   );

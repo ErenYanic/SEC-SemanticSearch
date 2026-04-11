@@ -1,39 +1,14 @@
 /**
  * Bar chart showing the number of filings per form type (e.g. 10-K, 10-Q).
  *
- * Uses **Recharts**, a composable charting library built on React components.
- * Instead of a monolithic `<Chart options={...} />` API (like Chart.js),
- * Recharts lets you compose a chart from individual building blocks:
+ * Styling is driven entirely by CSS custom properties (`var(--accent)`,
+ * `var(--fg-muted)`, etc.) so the chart automatically re-colours when
+ * the user switches to dark mode — no `dark:` variants, no runtime
+ * theme detection, no duplicated palette.
  *
- *   <BarChart data={data}>        ← The coordinate system
- *     <XAxis dataKey="form" />    ← What goes on the horizontal axis
- *     <Bar dataKey="count" />     ← What the bars represent
- *   </BarChart>
- *
- * This composable pattern is very React-idiomatic — each piece is a
- * component with its own props, and you can add/remove features by
- * adding/removing child components.
- *
- * ## Why `ResponsiveContainer`?
- *
- * Recharts needs an explicit width/height. `ResponsiveContainer`
- * watches its parent's size and passes it down, so the chart
- * automatically resizes when the viewport changes.
- *
- * ## Per-bar colours via data
- *
- * Recharts 3.x deprecated the `<Cell>` component. The modern
- * approach is to embed the colour directly in each data point
- * (e.g. `{ form: "10-K", count: 5, fill: "#2563eb" }`) and
- * reference it with `<Bar fill` pointing to a data key.  But
- * since we only have 2–3 form types, an even simpler approach
- * is to use a single brand colour for all bars.
- *
- * ## Clickable bars
- *
- * Each bar has an `onClick` handler that navigates to the Filings
- * page with a pre-applied `form_type` filter. We use Next.js's
- * `useRouter().push()` for client-side navigation.
+ * Bars use a single accent colour with stepped `fillOpacity` to hint
+ * at ordering without introducing competing hues. Clicking a bar
+ * navigates to the Filings page with a pre-applied `form_type` filter.
  */
 
 "use client";
@@ -46,6 +21,7 @@ import {
   YAxis,
   Tooltip,
   ResponsiveContainer,
+  CartesianGrid,
 } from "recharts";
 
 // ---------------------------------------------------------------------------
@@ -57,19 +33,21 @@ interface FormChartProps {
   formBreakdown: Record<string, number>;
 }
 
-/** Shape of each data point passed to Recharts. */
 interface FormDataPoint {
   form: string;
   count: number;
   fill: string;
+  fillOpacity: number;
 }
 
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 
-/** Colour palette for chart bars — blue shades that work in both themes. */
-const BAR_COLOURS = ["#2563eb", "#3b82f6", "#60a5fa", "#93c5fd"];
+// Stepped opacity per bar index — single hue, different weights. With
+// four steps the weakest bar is still readable (0.55) while the
+// strongest stays fully saturated.
+const BAR_OPACITIES = [1, 0.82, 0.68, 0.55];
 
 // ---------------------------------------------------------------------------
 // Component
@@ -78,59 +56,72 @@ const BAR_COLOURS = ["#2563eb", "#3b82f6", "#60a5fa", "#93c5fd"];
 export function FormChart({ formBreakdown }: FormChartProps) {
   const router = useRouter();
 
-  // Transform the Record into an array Recharts can iterate over.
-  // Recharts needs `[{ form: "10-K", count: 5, fill: "..." }, ...]`.
-  // Each data point carries its own colour — the modern Recharts 3.x
-  // replacement for the deprecated <Cell> component.
   const data: FormDataPoint[] = Object.entries(formBreakdown).map(
     ([form, count], index) => ({
       form,
       count,
-      fill: BAR_COLOURS[index % BAR_COLOURS.length],
+      fill: "var(--accent)",
+      fillOpacity: BAR_OPACITIES[index % BAR_OPACITIES.length],
     }),
   );
 
   if (data.length === 0) return null;
 
   return (
-    <div className="rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-gray-950">
-      <h2 className="mb-4 text-lg font-semibold text-gray-900 dark:text-gray-100">
-        Filings by Form Type
-      </h2>
+    <div className="rounded-2xl border border-hairline bg-card/80 shadow-sm backdrop-blur-sm">
+      {/* ---- Header ---- */}
+      <div className="flex items-baseline justify-between border-b border-hairline px-6 py-4">
+        <h2 className="text-base font-semibold text-fg">Filings by form type</h2>
+        <span className="text-sm text-fg-subtle">Click a bar to filter</span>
+      </div>
 
-      <div className="h-64">
+      {/* ---- Chart body ---- */}
+      <div className="h-72 p-6">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart
             data={data}
-            margin={{ top: 8, right: 8, bottom: 8, left: 0 }}
+            margin={{ top: 8, right: 8, bottom: 0, left: 0 }}
           >
+            <CartesianGrid
+              vertical={false}
+              stroke="var(--hairline)"
+              strokeDasharray="2 4"
+            />
             <XAxis
               dataKey="form"
-              tick={{ fill: "#9ca3af", fontSize: 13 }}
+              tick={{ fill: "var(--fg-muted)", fontSize: 13 }}
               axisLine={false}
               tickLine={false}
             />
             <YAxis
               allowDecimals={false}
-              tick={{ fill: "#9ca3af", fontSize: 12 }}
+              tick={{ fill: "var(--fg-subtle)", fontSize: 12 }}
               axisLine={false}
               tickLine={false}
               width={32}
             />
             <Tooltip
               contentStyle={{
-                backgroundColor: "#1f2937",
-                border: "none",
-                borderRadius: "0.5rem",
-                color: "#f3f4f6",
-                fontSize: "0.875rem",
+                backgroundColor: "var(--elev)",
+                border: "1px solid var(--hairline)",
+                borderRadius: "0.75rem",
+                color: "var(--fg)",
+                fontSize: "13px",
+                padding: "8px 12px",
+                boxShadow: "0 10px 30px rgba(0,0,0,0.25)",
               }}
-              cursor={{ fill: "rgba(59, 130, 246, 0.08)" }}
+              labelStyle={{
+                color: "var(--fg-subtle)",
+                fontSize: "12px",
+                marginBottom: "2px",
+              }}
+              itemStyle={{ color: "var(--fg)" }}
+              cursor={{ fill: "var(--surface)", fillOpacity: 0.6 }}
             />
             <Bar
               dataKey="count"
               name="Filings"
-              radius={[6, 6, 0, 0]}
+              radius={[8, 8, 0, 0]}
               cursor="pointer"
               onClick={(_data, index) => {
                 const point = data[index];
@@ -142,10 +133,6 @@ export function FormChart({ formBreakdown }: FormChartProps) {
           </BarChart>
         </ResponsiveContainer>
       </div>
-
-      <p className="mt-2 text-center text-xs text-gray-500 dark:text-gray-400">
-        Click a bar to view filings
-      </p>
     </div>
   );
 }

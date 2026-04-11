@@ -1,25 +1,161 @@
 @import "tailwindcss";
 
-/*
- * Tell Tailwind v4 to use the `dark` class on <html> for dark mode,
- * rather than the OS `prefers-color-scheme` media query.  This lets
- * our ThemeProvider toggle dark mode via JavaScript.
- *
- * Tailwind v4 uses CSS-based configuration (not tailwind.config.js).
- * The `@custom-variant` directive replaces the old `darkMode: "class"`
- * config option.
- */
 @custom-variant dark (&:where(.dark, .dark *));
 
 /*
+ * ============================================================
+ * Design tokens
+ * ============================================================
+ *
+ * Semantic colour tokens. Light and dark variants swap at `.dark`,
+ * so components use a single utility (e.g. `bg-card`, `text-fg`)
+ * without needing `dark:` variants.
+ *
+ *   --bg          page background
+ *   --surface     nav / footer / rail surfaces (one step above bg)
+ *   --card        card / row / input fill
+ *   --elev        modals / popovers / floating surfaces
+ *   --hairline    1px dividers and borders
+ *   --fg          primary text
+ *   --fg-muted    secondary text
+ *   --fg-subtle   tertiary text (placeholders, captions)
+ *   --accent      primary action, focus ring
+ *   --accent-fg   foreground on accent fills
+ *   --pos / --warn / --neg   semantic status colours
+ *   --accent-rgb  decomposed accent for rgba() use in gradients
+ */
+:root {
+  --bg: #FAFAFA;
+  --surface: #F4F4F5;
+  --card: #FFFFFF;
+  --elev: #FFFFFF;
+  --hairline: #E4E4E7;
+  --fg: #09090B;
+  --fg-muted: #52525B;
+  --fg-subtle: #A1A1AA;
+  --accent: #4F46E5;
+  --accent-fg: #FFFFFF;
+  --accent-rgb: 79 70 229;
+  --pos: #059669;
+  --warn: #D97706;
+  --neg: #DC2626;
+}
+
+.dark {
+  --bg: #09090D;
+  --surface: #0F0F14;
+  --card: #14141C;
+  --elev: #1B1B26;
+  --hairline: #26262F;
+  --fg: #F4F4F5;
+  --fg-muted: #A1A1AA;
+  --fg-subtle: #71717A;
+  --accent: #818CF8;
+  --accent-fg: #0B0B12;
+  --accent-rgb: 129 140 248;
+  --pos: #34D399;
+  --warn: #FBBF24;
+  --neg: #F87171;
+}
+
+/*
+ * Expose variables to Tailwind v4's class scanner so `bg-card`,
+ * `text-fg-muted`, `border-hairline`, etc. all work as utilities.
+ */
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-card: var(--card);
+  --color-elev: var(--elev);
+  --color-hairline: var(--hairline);
+  --color-fg: var(--fg);
+  --color-fg-muted: var(--fg-muted);
+  --color-fg-subtle: var(--fg-subtle);
+  --color-accent: var(--accent);
+  --color-accent-fg: var(--accent-fg);
+  --color-pos: var(--pos);
+  --color-warn: var(--warn);
+  --color-neg: var(--neg);
+}
+
+/*
+ * Background depth — a fixed pseudo-element behind page content so the
+ * backdrop never feels flat. Two soft radial washes in accent colour
+ * give the app a subtle "stage lit" look that tracks the theme.
+ */
+body {
+  position: relative;
+  background-color: var(--bg);
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(
+      ellipse 70% 50% at 50% -10%,
+      rgba(var(--accent-rgb) / 0.12),
+      transparent 70%
+    ),
+    radial-gradient(
+      ellipse 50% 40% at 90% 110%,
+      rgba(var(--accent-rgb) / 0.08),
+      transparent 70%
+    );
+}
+
+.dark body::before {
+  background:
+    radial-gradient(
+      ellipse 70% 50% at 50% -10%,
+      rgba(var(--accent-rgb) / 0.18),
+      transparent 70%
+    ),
+    radial-gradient(
+      ellipse 60% 40% at 85% 110%,
+      rgba(var(--accent-rgb) / 0.12),
+      transparent 70%
+    );
+}
+
+/*
+ * Ensure actual page content sits above the backdrop layer.
+ */
+body > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* Custom scrollbar — dark-mode friendly, unobtrusive in light mode. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--hairline) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background-color: var(--hairline);
+  border-radius: 9999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background-color: var(--fg-subtle);
+  background-clip: padding-box;
+  border: 2px solid transparent;
+}
+
+/*
  * Skeleton shimmer animation.
- *
- * A linear gradient slides from left to right across the skeleton block,
- * creating the "loading pulse" effect seen on Facebook/YouTube/GitHub.
- *
- * The gradient has three stops: transparent → semi-white → transparent.
- * `background-size: 200% 100%` doubles the gradient width so the bright
- * band can sweep fully across the element.
  */
 @keyframes shimmer {
   0% {
@@ -32,15 +168,14 @@
 
 /*
  * Fade-in for content replacing skeletons.
- *
- * 200ms is fast enough to feel instant but slow enough to prevent
- * the jarring "flash" when the skeleton swaps to real content.
  */
 @keyframes fade-in {
   from {
     opacity: 0;
+    transform: translateY(4px);
   }
   to {
     opacity: 1;
+    transform: translateY(0);
   }
 }

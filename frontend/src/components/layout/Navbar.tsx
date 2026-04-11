@@ -3,33 +3,32 @@
 /**
  * Top navigation bar — present on every page.
  *
- * Layout:
- *   SEC Semantic Search  |  Dashboard  Search  Ingest  Filings  |  [task indicator]  [GitHub]  [LinkedIn]  [theme toggle]
- *
- * "use client" is required because we use `usePathname()` (a React
- * hook) to highlight the active navigation link, and `useTheme()` to
- * toggle dark/light mode.
+ * Modern translucent chrome with a subtle accent brand mark, mixed-case
+ * sans-serif nav links, and a cluster of session/theme controls.
  */
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { FormEvent, useState } from "react";
-import { Github, Linkedin, LayoutDashboard, Search, Upload, FileText, Sun, Moon, Loader2, LogOut, Shield, ShieldCheck } from "lucide-react";
+import {
+  Github,
+  Linkedin,
+  LayoutDashboard,
+  Search,
+  Upload,
+  FileText,
+  Sun,
+  Moon,
+  Loader2,
+  LogOut,
+  Shield,
+  ShieldCheck,
+} from "lucide-react";
 import { useTheme } from "./ThemeProvider";
 import { useEdgarSession } from "@/hooks/useEdgarSession";
 import { useAdminSession } from "@/hooks/useAdminSession";
 import { Modal, useToast } from "@/components/ui";
 
-// ---------------------------------------------------------------------------
-// Navigation items
-// ---------------------------------------------------------------------------
-
-/**
- * Each nav item maps a URL path to a label and icon.
- *
- * We define this as a const array so the navbar and active-link
- * logic share a single source of truth.
- */
 const NAV_ITEMS = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
   { href: "/search", label: "Search", icon: Search },
@@ -37,27 +36,32 @@ const NAV_ITEMS = [
   { href: "/filings", label: "Filings", icon: FileText },
 ] as const;
 
-// ---------------------------------------------------------------------------
-// Component
-// ---------------------------------------------------------------------------
+const ICON_BUTTON =
+  "flex h-10 w-10 items-center justify-center rounded-lg border border-hairline bg-card/50 text-fg-muted " +
+  "transition-all hover:border-accent/40 hover:bg-card hover:text-fg " +
+  "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
 
-/**
- * Props for the Navbar.
- *
- * `isTaskActive` is passed from the layout (which will poll for
- * active tasks via React Query in W3).  For now it defaults to false.
- */
+const PILL_BUTTON =
+  "inline-flex items-center gap-2 rounded-lg border border-hairline bg-card/50 px-3.5 py-2 " +
+  "text-sm font-medium text-fg-muted transition-all " +
+  "hover:border-accent/40 hover:bg-card hover:text-fg " +
+  "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
+
 interface NavbarProps {
   isTaskActive?: boolean;
 }
 
 export function Navbar({ isTaskActive = false }: NavbarProps) {
-  // `usePathname()` returns the current URL path, e.g. "/search".
-  // We use it to determine which nav link should be highlighted.
   const pathname = usePathname();
   const { theme, toggleTheme } = useTheme();
   const { isAuthenticated, logout } = useEdgarSession();
-  const { adminRequired, isAdmin, login, logout: logoutAdmin, isPending } = useAdminSession();
+  const {
+    adminRequired,
+    isAdmin,
+    login,
+    logout: logoutAdmin,
+    isPending,
+  } = useAdminSession();
   const { addToast } = useToast();
   const [showAdminModal, setShowAdminModal] = useState(false);
   const [adminKey, setAdminKey] = useState("");
@@ -84,74 +88,72 @@ export function Navbar({ isTaskActive = false }: NavbarProps) {
   }
 
   return (
-    <nav className="border-b border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-950">
-      <div className="mx-auto flex h-16 max-w-7xl items-center px-4 sm:px-6 lg:px-8">
-
-        {/* ---- Left: app title ---- */}
-        <div className="flex items-center gap-3">
-          <Link
-            href="/"
-            className="text-lg font-semibold text-gray-900 dark:text-gray-100"
+    <nav className="sticky top-0 z-20 border-b border-hairline bg-bg/75 backdrop-blur-xl">
+      <div className="mx-auto flex h-16 max-w-[1440px] items-center gap-8 px-6 sm:px-8 lg:px-12">
+        {/* ---- Brand mark ---- */}
+        <Link
+          href="/"
+          className="group flex items-center gap-2.5 text-base font-semibold tracking-tight text-fg transition-colors"
+        >
+          <span
+            className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-accent to-accent/70 text-accent-fg shadow-lg shadow-accent/20 transition-transform group-hover:scale-105"
+            aria-hidden="true"
           >
-            SEC Semantic Search
-          </Link>
-        </div>
+            <span className="text-xs font-bold">S</span>
+          </span>
+          <span className="hidden sm:inline">SEC Semantic Search</span>
+        </Link>
 
         {/* ---- Centre: navigation links ---- */}
-        <div className="ml-10 flex items-center gap-1">
+        <div className="flex items-center gap-1">
           {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
-            // A link is "active" when the pathname matches exactly
-            // (for "/") or starts with the href (for "/search", etc.).
             const isActive =
               href === "/" ? pathname === "/" : pathname.startsWith(href);
-
             return (
               <Link
                 key={href}
                 href={href}
+                aria-current={isActive ? "page" : undefined}
                 className={`
-                  flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors
+                  group flex items-center gap-2 rounded-lg px-3.5 py-2 text-sm font-medium transition-all
                   ${
                     isActive
-                      ? "bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300"
-                      : "text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100"
+                      ? "bg-accent/10 text-accent"
+                      : "text-fg-muted hover:bg-card hover:text-fg"
                   }
                 `}
               >
                 <Icon className="h-4 w-4" />
-                {label}
+                <span className="hidden md:inline">{label}</span>
               </Link>
             );
           })}
         </div>
 
-        {/* ---- Right: active task indicator + portfolio links + theme toggle ---- */}
-        <div className="ml-auto flex items-center gap-3">
-
-          {/* Active task indicator — only visible when a task is running */}
+        {/* ---- Right: status + controls ---- */}
+        <div className="ml-auto flex items-center gap-2">
           {isTaskActive && (
-            <div className="flex items-center gap-2 rounded-full bg-blue-50 px-3 py-1.5 text-sm font-medium text-blue-700 dark:bg-blue-950 dark:text-blue-300">
-              {/* Loader2 has a built-in spin animation via CSS */}
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Ingesting...
+            <div className="flex items-center gap-2 rounded-lg border border-accent/40 bg-accent/10 px-3 py-2 text-sm font-medium text-accent">
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              <span className="hidden sm:inline">Ingesting</span>
             </div>
           )}
 
           {adminRequired && !isAdmin && (
             <button
               onClick={() => setShowAdminModal(true)}
-              className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100"
+              className={PILL_BUTTON}
               aria-label="Open admin access dialog"
             >
               <Shield className="h-4 w-4" />
-              <span className="hidden sm:inline">Admin Access</span>
+              <span className="hidden sm:inline">Admin</span>
             </button>
           )}
 
           {adminRequired && isAdmin && (
             <button
               onClick={handleAdminLogout}
-              className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm text-emerald-700 transition-colors hover:bg-emerald-50 hover:text-emerald-800 dark:text-emerald-300 dark:hover:bg-emerald-950 dark:hover:text-emerald-200"
+              className="inline-flex items-center gap-2 rounded-lg border border-pos/40 bg-pos/10 px-3.5 py-2 text-sm font-medium text-pos transition-all hover:bg-pos/15 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pos"
               aria-label="Clear admin session"
             >
               <ShieldCheck className="h-4 w-4" />
@@ -159,12 +161,24 @@ export function Navbar({ isTaskActive = false }: NavbarProps) {
             </button>
           )}
 
-          {/* Portfolio links — circular "key press" buttons */}
+          {isAuthenticated && (
+            <button
+              onClick={logout}
+              className={PILL_BUTTON}
+              aria-label="Clear EDGAR credentials and return to Welcome screen"
+            >
+              <LogOut className="h-4 w-4" />
+              <span className="hidden sm:inline">Logout</span>
+            </button>
+          )}
+
+          <span className="mx-1 h-6 w-px bg-hairline" aria-hidden="true" />
+
           <a
             href="https://github.com/ErenYanic"
             target="_blank"
             rel="noopener noreferrer"
-            className="flex h-8 w-8 items-center justify-center rounded-full border border-gray-200 text-gray-500 transition-all hover:border-gray-400 hover:bg-gray-100 hover:text-gray-900 active:shadow-inner dark:border-gray-700 dark:text-gray-400 dark:hover:border-gray-500 dark:hover:bg-gray-800 dark:hover:text-gray-100"
+            className={ICON_BUTTON}
             aria-label="GitHub profile"
           >
             <Github className="h-4 w-4" />
@@ -173,36 +187,23 @@ export function Navbar({ isTaskActive = false }: NavbarProps) {
             href="https://www.linkedin.com/in/erenyanic/"
             target="_blank"
             rel="noopener noreferrer"
-            className="flex h-8 w-8 items-center justify-center rounded-full border border-gray-200 text-gray-500 transition-all hover:border-gray-400 hover:bg-gray-100 hover:text-gray-900 active:shadow-inner dark:border-gray-700 dark:text-gray-400 dark:hover:border-gray-500 dark:hover:bg-gray-800 dark:hover:text-gray-100"
+            className={ICON_BUTTON}
             aria-label="LinkedIn profile"
           >
             <Linkedin className="h-4 w-4" />
           </a>
 
-          {/* Theme toggle button */}
           <button
             onClick={toggleTheme}
-            className="rounded-md p-2 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100"
+            className={ICON_BUTTON}
             aria-label={`Switch to ${theme === "light" ? "dark" : "light"} mode`}
           >
             {theme === "light" ? (
-              <Moon className="h-5 w-5" />
+              <Moon className="h-4 w-4" />
             ) : (
-              <Sun className="h-5 w-5" />
+              <Sun className="h-4 w-4" />
             )}
           </button>
-
-          {/* Logout button — visible only when per-session EDGAR credentials are active */}
-          {isAuthenticated && (
-            <button
-              onClick={logout}
-              className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100"
-              aria-label="Clear EDGAR credentials and return to Welcome screen"
-            >
-              <LogOut className="h-4 w-4" />
-              <span className="hidden sm:inline">Logout</span>
-            </button>
-          )}
         </div>
       </div>
 
@@ -220,15 +221,18 @@ export function Navbar({ isTaskActive = false }: NavbarProps) {
         confirmDisabled={adminKey.trim().length === 0}
         confirmLoading={isPending}
       >
-        <form onSubmit={handleAdminLogin} className="space-y-3">
-          <p>Enter the admin key to enable destructive operations in this browser session.</p>
-          <label className="block space-y-1">
-            <span className="text-sm font-medium text-gray-900 dark:text-gray-100">Admin key</span>
+        <form onSubmit={handleAdminLogin} className="space-y-4">
+          <p className="text-sm text-fg-muted">
+            Enter the admin key to enable destructive operations in this
+            browser session.
+          </p>
+          <label className="block space-y-2">
+            <span className="text-sm font-medium text-fg">Admin key</span>
             <input
               type="password"
               value={adminKey}
               onChange={(event) => setAdminKey(event.target.value)}
-              className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-xs outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
+              className="w-full rounded-lg border border-hairline bg-card px-4 py-2.5 text-sm text-fg outline-none transition-colors focus:border-accent focus:ring-2 focus:ring-accent/25"
               autoComplete="current-password"
             />
           </label>

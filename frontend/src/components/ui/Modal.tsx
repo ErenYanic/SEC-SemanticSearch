@@ -137,7 +137,7 @@ export function Modal({
     // `z-50` ensures the modal sits above all other content.
     // Clicking the backdrop (but not the dialog itself) closes the modal.
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 dark:bg-black/70"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
       onClick={onClose}
       aria-hidden="true"
     >
@@ -148,21 +148,16 @@ export function Modal({
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className="relative mx-4 w-full max-w-md rounded-lg bg-white p-6 shadow-xl dark:bg-gray-900"
+        className="relative mx-4 w-full max-w-md rounded-2xl border border-hairline bg-elev p-6 shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Title */}
-        <h2
-          id={titleId}
-          className="text-lg font-semibold text-gray-900 dark:text-gray-100"
-        >
+        <h2 id={titleId} className="text-lg font-semibold text-fg">
           {title}
         </h2>
 
         {/* Body */}
-        <div className="mt-3 text-sm text-gray-600 dark:text-gray-400">
-          {children}
-        </div>
+        <div className="mt-2 text-sm text-fg-muted">{children}</div>
 
         {/* Actions */}
         <div className="mt-6 flex justify-end gap-3">

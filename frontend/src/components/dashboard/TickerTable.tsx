@@ -1,30 +1,18 @@
 /**
- * Table listing each ticker with its filing count, chunk count, and
- * form types. Clicking a row navigates to `/filings?ticker=AAPL`.
+ * Terminal-style table listing each ticker with its filing count,
+ * chunk count, and the form types filed. Clicking a row navigates
+ * to the Filings page with a pre-applied ticker filter.
  *
- * ## Design pattern: presentational + navigation
- *
- * This component receives data (no fetching), renders a table, and
- * handles one interaction — row clicks that navigate to the Filings
- * page. It uses `useRouter()` for that, which makes it a Client
- * Component (`"use client"`).
- *
- * ## Why <Badge> for form types?
- *
- * Each ticker can have multiple form types (["10-K", "10-Q"]).
- * Badges are a compact, scannable way to show categorical data.
- * We use the existing `Badge` component from `components/ui/`.
- *
- * ## Accessibility: `cursor-pointer` + `hover:` styles
- *
- * Rows look and behave like clickable elements. The pointer cursor
- * signals interactivity, and the hover background provides feedback.
+ * Columns are arranged with the identifier on the left (mono,
+ * tabular) and numeric columns right-aligned, mirroring how
+ * Bloomberg/Reuters terminals display quote tables. Row height is
+ * tight so ~10 rows fit in the column next to the chart without
+ * dominating the layout.
  */
 
 "use client";
 
 import { useRouter } from "next/navigation";
-import { Badge } from "@/components/ui";
 import type { TickerBreakdown } from "@/lib/types";
 
 // ---------------------------------------------------------------------------
@@ -45,27 +33,28 @@ export function TickerTable({ tickers }: TickerTableProps) {
   if (tickers.length === 0) return null;
 
   return (
-    <div className="rounded-lg border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-950">
-      <div className="px-6 py-4">
-        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-          Tickers
-        </h2>
+    <div className="rounded-2xl border border-hairline bg-card/80 shadow-sm backdrop-blur-sm">
+      {/* ---- Header ---- */}
+      <div className="flex items-baseline justify-between border-b border-hairline px-6 py-4">
+        <h2 className="text-base font-semibold text-fg">Tickers</h2>
+        <span className="text-sm text-fg-subtle">Click a row to filter</span>
       </div>
 
+      {/* ---- Table ---- */}
       <div className="overflow-x-auto">
-        <table className="w-full text-left text-sm">
+        <table className="w-full border-collapse">
           <thead>
-            <tr className="border-t border-gray-200 bg-gray-50 dark:border-gray-800 dark:bg-gray-900">
-              <th className="px-6 py-3 font-medium text-gray-600 dark:text-gray-400">
+            <tr className="border-b border-hairline bg-surface/40">
+              <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wide text-fg-subtle">
                 Ticker
               </th>
-              <th className="px-6 py-3 font-medium text-gray-600 dark:text-gray-400">
+              <th className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wide text-fg-subtle">
                 Filings
               </th>
-              <th className="px-6 py-3 font-medium text-gray-600 dark:text-gray-400">
+              <th className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wide text-fg-subtle">
                 Chunks
               </th>
-              <th className="px-6 py-3 font-medium text-gray-600 dark:text-gray-400">
+              <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wide text-fg-subtle">
                 Forms
               </th>
             </tr>
@@ -75,23 +64,26 @@ export function TickerTable({ tickers }: TickerTableProps) {
               <tr
                 key={t.ticker}
                 onClick={() => router.push(`/filings?ticker=${t.ticker}`)}
-                className="cursor-pointer border-t border-gray-200 transition-colors hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-gray-900"
+                className="cursor-pointer border-b border-hairline/50 transition-colors last:border-b-0 hover:bg-surface/60"
               >
-                <td className="px-6 py-3 font-semibold text-gray-900 dark:text-gray-100">
+                <td className="px-6 py-3.5 text-sm font-semibold text-fg">
                   {t.ticker}
                 </td>
-                <td className="px-6 py-3 text-gray-700 dark:text-gray-300">
+                <td className="px-6 py-3.5 text-right text-sm tabular-nums text-fg-muted">
                   {t.filings}
                 </td>
-                <td className="px-6 py-3 text-gray-700 dark:text-gray-300">
+                <td className="px-6 py-3.5 text-right text-sm tabular-nums text-fg-muted">
                   {t.chunks.toLocaleString()}
                 </td>
-                <td className="px-6 py-3">
-                  <div className="flex gap-1.5">
+                <td className="px-6 py-3.5">
+                  <div className="flex flex-wrap gap-1.5">
                     {t.forms.map((form) => (
-                      <Badge key={form} variant="blue">
+                      <span
+                        key={form}
+                        className="inline-flex items-center rounded-md border border-hairline bg-surface px-2 py-0.5 text-xs font-medium text-fg-muted"
+                      >
                         {form}
-                      </Badge>
+                      </span>
                     ))}
                   </div>
                 </td>
@@ -100,10 +92,6 @@ export function TickerTable({ tickers }: TickerTableProps) {
           </tbody>
         </table>
       </div>
-
-      <p className="px-6 py-3 text-xs text-gray-500 dark:text-gray-400">
-        Click a row to view filings
-      </p>
     </div>
   );
 }

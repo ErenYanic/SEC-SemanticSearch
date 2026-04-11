@@ -9,14 +9,14 @@ describe("Badge", () => {
 
   it("applies gray variant by default", () => {
     render(<Badge>Default</Badge>);
-    expect(screen.getByText("Default").className).toContain("bg-gray-100");
+    expect(screen.getByText("Default").className).toContain("bg-surface");
   });
 
   it.each([
-    ["blue", "bg-blue-50"],
-    ["green", "bg-green-50"],
-    ["amber", "bg-amber-50"],
-    ["red", "bg-red-50"],
+    ["blue", "bg-accent/10"],
+    ["green", "bg-pos/10"],
+    ["amber", "bg-warn/10"],
+    ["red", "bg-neg/10"],
   ] as const)("applies %s variant", (variant, expectedClass) => {
     render(<Badge variant={variant}>Label</Badge>);
     expect(screen.getByText("Label").className).toContain(expectedClass);

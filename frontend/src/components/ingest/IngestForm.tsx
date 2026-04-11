@@ -5,14 +5,14 @@
  *
  * Unlike the Search page (where query + filters are lifted to the page
  * for persistence across searches), the ingest form manages its own
- * local state.  The values are one-shot — submit builds an
+ * local state. The values are one-shot — submit builds an
  * `IngestRequest` and the form disappears, replaced by the progress
- * tracker.  No reason to burden the page with ephemeral form state.
+ * tracker. No reason to burden the page with ephemeral form state.
  *
  * ## Sub-sections
  *
  *   1. Ticker tag input  — Enter/comma adds, X removes
- *   2. Form type chips   — toggleable 10-K / 10-Q
+ *   2. Form type chips   — toggleable (10-K / 10-Q selected by default)
  *   3. Count mode radio  — latest / total / per_form
  *   4. Date filters      — collapsible year, start_date, end_date
  *   5. Submit button     — disabled until valid
@@ -58,13 +58,29 @@ const COUNT_MODE_INFO: Record<string, { label: string; description: string }> = 
   },
 };
 
-// Static Tailwind class maps — never interpolated.
-const CHIP_CLASSES: Record<"active" | "inactive", string> = {
-  active:
-    "border-blue-300 bg-blue-100 text-blue-800 dark:border-blue-700 dark:bg-blue-900 dark:text-blue-200",
-  inactive:
-    "border-gray-300 bg-gray-100 text-gray-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-500",
-};
+// ---------------------------------------------------------------------------
+// Shared styles
+// ---------------------------------------------------------------------------
+
+const INPUT_CLASS =
+  "w-full rounded-md border border-hairline bg-card px-3 py-1.5 text-sm text-fg " +
+  "tabular-nums placeholder:text-fg-subtle outline-none transition-colors " +
+  "focus:border-accent focus:ring-2 focus:ring-accent/25";
+
+const SECTION_HEADING =
+  "font-mono text-[10px] font-semibold uppercase tracking-widest text-fg-subtle";
+
+const FIELD_LABEL = "text-xs font-medium text-fg-muted";
+
+const CHIP_BASE =
+  "inline-flex items-center gap-1 rounded-md border px-3 py-1.5 font-mono text-xs font-medium " +
+  "transition-colors cursor-pointer select-none tabular-nums";
+
+const CHIP_ACTIVE =
+  "border-accent/60 bg-accent/15 text-accent hover:bg-accent/20";
+
+const CHIP_INACTIVE =
+  "border-hairline bg-card text-fg-muted hover:border-fg-subtle hover:text-fg";
 
 // ---------------------------------------------------------------------------
 // Component
@@ -101,7 +117,6 @@ export function IngestForm({ onSubmit, isSubmitting }: IngestFormProps) {
 
   // ---- Ticker helpers ----
 
-  /** Add a ticker tag, rejecting empty strings and duplicates. */
   function addTicker(raw: string) {
     const ticker = raw.toUpperCase().trim();
     if (!ticker) return;
@@ -119,7 +134,6 @@ export function IngestForm({ onSubmit, isSubmitting }: IngestFormProps) {
       e.preventDefault();
       addTicker(tickerInput);
     }
-    // Backspace on empty input removes the last tag.
     if (e.key === "Backspace" && !tickerInput && tickers.length > 0) {
       setTickers((prev) => prev.slice(0, -1));
     }
@@ -161,7 +175,7 @@ export function IngestForm({ onSubmit, isSubmitting }: IngestFormProps) {
     if (!canSubmit) return;
 
     // When date filters are active, suppress count mode and fetch all matching
-    // filings (count: null).  This matches CLI behaviour (BF-003).
+    // filings (count: null). This matches CLI behaviour (BF-003).
     const effectiveCountMode = hasDateFilter ? "latest" : countMode;
     const effectiveCount = hasDateFilter
       ? undefined
@@ -183,31 +197,30 @@ export function IngestForm({ onSubmit, isSubmitting }: IngestFormProps) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
-      {/* ---- Ticker tag input ---- */}
-      <div className="space-y-2">
-        <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-          Tickers
-        </label>
-        <div className="flex flex-wrap items-center gap-2 rounded-lg border border-gray-300 bg-white p-2 focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500 dark:border-gray-700 dark:bg-gray-900">
-          {/* Existing tags */}
+    <form
+      onSubmit={handleSubmit}
+      className="space-y-6 rounded-lg border border-hairline bg-surface p-6"
+    >
+      {/* ==================== TICKERS ==================== */}
+      <section className="space-y-2">
+        <div className={SECTION_HEADING}>Tickers</div>
+        <div className="flex flex-wrap items-center gap-1.5 rounded-md border border-hairline bg-card p-2 transition-colors focus-within:border-accent focus-within:ring-2 focus-within:ring-accent/25">
           {tickers.map((ticker) => (
             <span
               key={ticker}
-              className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-3 py-1 text-sm font-medium text-blue-800 dark:bg-blue-900 dark:text-blue-200"
+              className="inline-flex items-center gap-1 rounded border border-accent/60 bg-accent/15 px-2 py-0.5 font-mono text-xs font-medium tabular-nums text-accent"
             >
               {ticker}
               <button
                 type="button"
                 onClick={() => removeTicker(ticker)}
-                className="ml-0.5 rounded-full p-0.5 text-blue-600 hover:bg-blue-200 hover:text-blue-800 dark:text-blue-300 dark:hover:bg-blue-800 dark:hover:text-blue-100"
+                className="rounded p-0.5 text-accent/80 transition-colors hover:bg-accent/20 hover:text-accent focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
                 aria-label={`Remove ${ticker}`}
               >
                 <X className="h-3 w-3" />
               </button>
             </span>
           ))}
-          {/* Text input */}
           <input
             type="text"
             value={tickerInput}
@@ -217,20 +230,18 @@ export function IngestForm({ onSubmit, isSubmitting }: IngestFormProps) {
             placeholder={
               tickers.length === 0 ? "Type a ticker and press Enter..." : ""
             }
-            className="min-w-[120px] flex-1 border-0 bg-transparent p-1 text-sm text-gray-900 outline-none placeholder:text-gray-400 dark:text-gray-100 dark:placeholder:text-gray-500"
+            className="min-w-[140px] flex-1 border-0 bg-transparent p-1 font-mono text-sm tabular-nums text-fg outline-none placeholder:text-fg-subtle"
           />
         </div>
-        <p className="text-xs text-gray-500 dark:text-gray-400">
-          Press Enter or comma to add. Backspace removes the last tag.
+        <p className="text-xs text-fg-subtle">
+          Press Enter or comma to add · Backspace removes the last tag
         </p>
-      </div>
+      </section>
 
-      {/* ---- Form type chips ---- */}
-      <div className="space-y-2">
-        <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-          Form types
-        </label>
-        <div className="flex gap-2">
+      {/* ==================== FORM TYPES ==================== */}
+      <section className="space-y-2">
+        <div className={SECTION_HEADING}>Form types</div>
+        <div className="flex flex-wrap gap-1.5" role="group" aria-label="Form type filters">
           {FORM_TYPES.map((ft) => {
             const isActive = formTypes.has(ft);
             return (
@@ -238,26 +249,25 @@ export function IngestForm({ onSubmit, isSubmitting }: IngestFormProps) {
                 key={ft}
                 type="button"
                 onClick={() => toggleFormType(ft)}
-                className={`rounded-full border px-4 py-1.5 text-sm font-medium transition-colors ${CHIP_CLASSES[isActive ? "active" : "inactive"]}`}
+                aria-pressed={isActive}
+                className={`${CHIP_BASE} ${isActive ? CHIP_ACTIVE : CHIP_INACTIVE}`}
               >
                 {ft}
               </button>
             );
           })}
         </div>
-      </div>
+      </section>
 
-      {/* ---- Count mode radio (hidden when date filters are active) ---- */}
+      {/* ==================== COUNT MODE ==================== */}
       {hasDateFilter ? (
-        <p className="text-sm text-gray-500 dark:text-gray-400">
+        <p className="text-sm text-fg-muted">
           When a date filter is active, all matching filings are fetched.
         </p>
       ) : (
-        <div className="space-y-2">
-          <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-            Count mode
-          </label>
-          <div className="grid gap-3 sm:grid-cols-3">
+        <section className="space-y-2">
+          <div className={SECTION_HEADING}>Count mode</div>
+          <div className="grid gap-2 sm:grid-cols-3">
             {(Object.keys(COUNT_MODE_INFO) as Array<"latest" | "total" | "per_form">).map(
               (mode) => {
                 const info = COUNT_MODE_INFO[mode];
@@ -265,10 +275,10 @@ export function IngestForm({ onSubmit, isSubmitting }: IngestFormProps) {
                 return (
                   <label
                     key={mode}
-                    className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors ${
+                    className={`flex cursor-pointer items-start gap-2.5 rounded-md border p-3 transition-colors ${
                       isSelected
-                        ? "border-blue-300 bg-blue-50 dark:border-blue-700 dark:bg-blue-950"
-                        : "border-gray-200 bg-white hover:border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:hover:border-gray-600"
+                        ? "border-accent/60 bg-accent/10"
+                        : "border-hairline bg-card hover:border-fg-subtle/40"
                     }`}
                   >
                     <input
@@ -277,13 +287,13 @@ export function IngestForm({ onSubmit, isSubmitting }: IngestFormProps) {
                       value={mode}
                       checked={isSelected}
                       onChange={() => setCountMode(mode)}
-                      className="mt-0.5 accent-blue-600"
+                      className="mt-0.5 accent-[var(--accent)]"
                     />
-                    <div>
-                      <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                    <div className="min-w-0">
+                      <span className="block text-sm font-medium text-fg">
                         {info.label}
                       </span>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                      <p className="mt-0.5 text-xs text-fg-subtle">
                         {info.description}
                       </p>
                     </div>
@@ -295,41 +305,37 @@ export function IngestForm({ onSubmit, isSubmitting }: IngestFormProps) {
 
           {/* Count input — visible only for total / per_form modes */}
           {countMode !== "latest" && (
-            <div className="mt-2">
-              <label className="space-y-1">
-                <span className="text-xs font-medium text-gray-600 dark:text-gray-400">
-                  Number of filings
-                </span>
-                <input
-                  type="number"
-                  min={1}
-                  max={20}
-                  value={count}
-                  onChange={(e) => setCount(e.target.value)}
-                  placeholder="e.g. 3"
-                  className="w-32 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 placeholder:text-gray-400 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:placeholder:text-gray-500"
-                />
-              </label>
-            </div>
+            <label className="mt-1 block space-y-1">
+              <span className={FIELD_LABEL}>Number of filings</span>
+              <input
+                type="number"
+                min={1}
+                max={20}
+                value={count}
+                onChange={(e) => setCount(e.target.value)}
+                placeholder="e.g. 3"
+                className={`${INPUT_CLASS} w-32`}
+              />
+            </label>
           )}
-        </div>
+        </section>
       )}
 
-      {/* ---- Date filters (collapsible) ---- */}
-      <div>
+      {/* ==================== DATE FILTERS ==================== */}
+      <section>
         <button
           type="button"
           onClick={() => setShowDateFilters(!showDateFilters)}
           aria-expanded={showDateFilters}
           aria-controls={dateFiltersPanelId}
-          className="flex items-center gap-2 text-sm font-medium text-gray-600 transition-colors hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200"
+          className="inline-flex items-center gap-2 rounded font-mono text-[10px] font-semibold uppercase tracking-widest text-fg-subtle transition-colors hover:text-fg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
         >
-          <Calendar className="h-4 w-4" />
+          <Calendar className="h-3.5 w-3.5" />
           Date Filters
           {showDateFilters ? (
-            <ChevronUp className="h-4 w-4" />
+            <ChevronUp className="h-3.5 w-3.5" />
           ) : (
-            <ChevronDown className="h-4 w-4" />
+            <ChevronDown className="h-3.5 w-3.5" />
           )}
         </button>
 
@@ -338,13 +344,10 @@ export function IngestForm({ onSubmit, isSubmitting }: IngestFormProps) {
             id={dateFiltersPanelId}
             role="region"
             aria-label="Date filters"
-            className="mt-3 grid gap-4 rounded-lg border border-gray-200 bg-white p-4 sm:grid-cols-3 dark:border-gray-800 dark:bg-gray-950"
+            className="mt-3 grid gap-3 rounded-md border border-hairline bg-card p-4 sm:grid-cols-3"
           >
-            {/* Year */}
             <label className="space-y-1">
-              <span className="text-xs font-medium text-gray-600 dark:text-gray-400">
-                Year
-              </span>
+              <span className={FIELD_LABEL}>Year</span>
               <input
                 type="number"
                 min={1993}
@@ -352,48 +355,42 @@ export function IngestForm({ onSubmit, isSubmitting }: IngestFormProps) {
                 value={year}
                 onChange={(e) => setYear(e.target.value)}
                 placeholder="e.g. 2024"
-                className="w-full rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 placeholder:text-gray-400 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:placeholder:text-gray-500"
+                className={INPUT_CLASS}
               />
             </label>
 
-            {/* Start date */}
             <label className="space-y-1">
-              <span className="text-xs font-medium text-gray-600 dark:text-gray-400">
-                Start date
-              </span>
+              <span className={FIELD_LABEL}>Start date</span>
               <input
                 type="date"
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
-                className="w-full rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
+                className={`${INPUT_CLASS} font-mono text-xs`}
               />
             </label>
 
-            {/* End date */}
             <label className="space-y-1">
-              <span className="text-xs font-medium text-gray-600 dark:text-gray-400">
-                End date
-              </span>
+              <span className={FIELD_LABEL}>End date</span>
               <input
                 type="date"
                 value={endDate}
                 onChange={(e) => setEndDate(e.target.value)}
-                className="w-full rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
+                className={`${INPUT_CLASS} font-mono text-xs`}
               />
             </label>
           </div>
         )}
-      </div>
+      </section>
 
-      {/* ---- Submit button ---- */}
-      <Button
-        type="submit"
-        disabled={!canSubmit}
-        loading={isSubmitting}
-      >
-        <Upload className="mr-2 h-4 w-4" />
-        {tickers.length <= 1 ? "Start Ingestion" : `Ingest ${tickers.length} Tickers`}
-      </Button>
+      {/* ==================== SUBMIT ==================== */}
+      <div className="flex justify-end border-t border-hairline pt-4">
+        <Button type="submit" disabled={!canSubmit} loading={isSubmitting}>
+          <Upload className="mr-2 h-4 w-4" />
+          {tickers.length <= 1
+            ? "Start Ingestion"
+            : `Ingest ${tickers.length} Tickers`}
+        </Button>
+      </div>
     </form>
   );
 }

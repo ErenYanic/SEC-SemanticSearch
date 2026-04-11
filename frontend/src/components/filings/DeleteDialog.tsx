@@ -98,16 +98,22 @@ export function DeleteDialog({
       confirmLoading={isDeleting}
       confirmDisabled={isDeleting}
     >
-      <div className="text-sm text-gray-600 dark:text-gray-400">
+      <div className="text-sm text-fg-muted">
         {target.kind === "single" && (
           <p>
             Delete{" "}
-            <span className="font-semibold text-gray-900 dark:text-gray-100">
+            <span className="font-mono font-semibold tabular-nums text-fg">
               {target.filing.ticker} {target.filing.form_type}
             </span>{" "}
-            (filed {target.filing.filing_date})? This will remove{" "}
-            {target.filing.chunk_count.toLocaleString()} chunk
-            {target.filing.chunk_count === 1 ? "" : "s"} from the database.
+            (filed{" "}
+            <span className="font-mono tabular-nums">
+              {target.filing.filing_date}
+            </span>
+            )? This will remove{" "}
+            <span className="font-mono tabular-nums text-fg">
+              {target.filing.chunk_count.toLocaleString()}
+            </span>{" "}
+            chunk{target.filing.chunk_count === 1 ? "" : "s"} from the database.
           </p>
         )}
 
@@ -115,14 +121,17 @@ export function DeleteDialog({
           <>
             <p>
               Delete{" "}
-              <span className="font-semibold text-gray-900 dark:text-gray-100">
-                {target.count} selected filing
-                {target.count === 1 ? "" : "s"}
+              <span className="font-semibold text-fg">
+                <span className="font-mono tabular-nums">{target.count}</span>{" "}
+                selected filing{target.count === 1 ? "" : "s"}
               </span>
               ? This will remove approximately{" "}
-              {target.totalChunks.toLocaleString()} chunks.
+              <span className="font-mono tabular-nums text-fg">
+                {target.totalChunks.toLocaleString()}
+              </span>{" "}
+              chunks.
             </p>
-            <p className="mt-2 text-red-600 dark:text-red-400">
+            <p className="mt-2 font-mono text-[11px] uppercase tracking-wider text-neg">
               This action cannot be undone.
             </p>
           </>
@@ -132,12 +141,14 @@ export function DeleteDialog({
           <>
             <p>
               Delete{" "}
-              <span className="font-semibold text-gray-900 dark:text-gray-100">
-                all {target.count} filing{target.count === 1 ? "" : "s"}
+              <span className="font-semibold text-fg">
+                all{" "}
+                <span className="font-mono tabular-nums">{target.count}</span>{" "}
+                filing{target.count === 1 ? "" : "s"}
               </span>
               ? This will clear the entire database.
             </p>
-            <p className="mt-2 text-red-600 dark:text-red-400">
+            <p className="mt-2 font-mono text-[11px] uppercase tracking-wider text-neg">
               This action cannot be undone.
             </p>
           </>

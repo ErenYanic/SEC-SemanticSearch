@@ -39,27 +39,19 @@ export interface BadgeProps {
  * Base classes shared by all variants: inline layout, pill shape,
  * compact padding, and small bold text.
  */
-const BASE = "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium";
+const BASE =
+  "inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium tabular-nums";
 
 /**
- * Each variant uses a light tinted background with darker text.
- * In dark mode, the background becomes very dark and the text
- * becomes lighter — maintaining contrast on both themes.
- *
- * All classes are written as full static strings so Tailwind v4's
- * class scanner can detect them at build time.
+ * Each variant uses a tinted background + border + matching text tone,
+ * driven by semantic CSS variables so light/dark mode swap cleanly.
  */
 const VARIANT_CLASSES: Record<NonNullable<BadgeProps["variant"]>, string> = {
-  gray:
-    "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300",
-  blue:
-    "bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300",
-  green:
-    "bg-green-50 text-green-700 dark:bg-green-950 dark:text-green-300",
-  amber:
-    "bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-300",
-  red:
-    "bg-red-50 text-red-700 dark:bg-red-950 dark:text-red-300",
+  gray: "border-hairline bg-surface text-fg-muted",
+  blue: "border-accent/40 bg-accent/10 text-accent",
+  green: "border-pos/40 bg-pos/10 text-pos",
+  amber: "border-warn/40 bg-warn/10 text-warn",
+  red: "border-neg/40 bg-neg/10 text-neg",
 };
 
 // ---------------------------------------------------------------------------

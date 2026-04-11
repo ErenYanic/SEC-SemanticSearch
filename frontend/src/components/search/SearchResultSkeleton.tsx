@@ -1,13 +1,14 @@
 /**
- * Search page loading skeleton — shows a search bar placeholder and
- * 3 result card placeholders.
+ * Loading skeleton shown while the Search page's initial status
+ * (ticker list, filing inventory) is fetching.
  *
- * Used when the search page is loading its initial status data
- * (ticker list for filters, filing inventory).  Once status loads,
- * the real SearchBar and FilingInventory replace this skeleton.
+ * Mirrors the two-column terminal layout of the redesigned Search
+ * page: left rail (filters) and main column with search bar + result
+ * rows. The `shimmer` animation keyframe lives in globals.css; the
+ * `Skeleton` component below applies it via a background gradient.
  *
- * The result card shape mirrors `ResultCard`: rank circle on the left,
- * badge placeholders, metadata row with icons, and text lines.
+ * A minimum of one skeleton element uses the `shimmer` class so that
+ * tests scanning HTML for "shimmer" can detect the loading state.
  */
 
 import { Skeleton } from "@/components/ui";
@@ -16,38 +17,33 @@ import { Skeleton } from "@/components/ui";
 // Sub-components
 // ---------------------------------------------------------------------------
 
-/** Mirrors `ResultCard` layout: rank + badges + metadata + content. */
-function ResultCardSkeleton() {
+/** Mirrors the new row-style ResultCard: left gutter + main column. */
+function ResultRowSkeleton() {
   return (
-    <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-950">
-      <div className="flex gap-4">
-        {/* Rank circle */}
-        <Skeleton className="h-8 w-8 flex-shrink-0 rounded-full" />
+    <div className="grid grid-cols-[56px_1fr_auto] gap-4 border-b border-hairline px-4 py-3.5">
+      {/* Left gutter: rank + sim + bar */}
+      <div className="flex flex-col items-start gap-1.5">
+        <Skeleton className="h-3 w-6" />
+        <Skeleton className="h-4 w-10" />
+        <Skeleton className="h-1 w-full rounded-full" />
+      </div>
 
-        <div className="min-w-0 flex-1 space-y-3">
-          {/* Badges row (similarity + form type) */}
-          <div className="flex gap-2">
-            <Skeleton className="h-5 w-16 rounded-full" />
-            <Skeleton className="h-5 w-12 rounded-full" />
-          </div>
-
-          {/* Metadata row (ticker, date, accession) */}
-          <div className="flex gap-4">
-            <Skeleton className="h-4 w-12" />
-            <Skeleton className="h-4 w-24" />
-            <Skeleton className="h-4 w-36" />
-          </div>
-
-          {/* Section path */}
-          <Skeleton className="h-4 w-2/3" />
-
-          {/* Content preview (3 lines) */}
-          <div className="space-y-2">
-            <Skeleton className="h-4 w-full" />
-            <Skeleton className="h-4 w-[90%]" />
-            <Skeleton className="h-4 w-3/5" />
-          </div>
+      {/* Main column: metadata + path + snippet */}
+      <div className="min-w-0 space-y-2">
+        <div className="flex gap-2">
+          <Skeleton className="h-3 w-12" />
+          <Skeleton className="h-3 w-10" />
+          <Skeleton className="h-3 w-20" />
+          <Skeleton className="h-3 w-32" />
         </div>
+        <Skeleton className="h-3 w-2/3" />
+        <Skeleton className="h-4 w-full" />
+        <Skeleton className="h-4 w-[92%]" />
+      </div>
+
+      {/* Right gutter: action slot */}
+      <div>
+        <Skeleton className="h-7 w-7 rounded-md" />
       </div>
     </div>
   );
@@ -57,29 +53,43 @@ function ResultCardSkeleton() {
 // Main export
 // ---------------------------------------------------------------------------
 
-/** Number of placeholder result cards. */
-const CARD_COUNT = 3;
+const ROW_COUNT = 4;
 
 export function SearchResultSkeleton() {
   return (
     <div className="space-y-4">
-      {/* Page header */}
+      {/* Page title placeholder */}
       <div className="flex items-center gap-3">
-        <Skeleton className="h-8 w-8 rounded-md" />
         <Skeleton className="h-7 w-24" />
       </div>
 
       {/* Search bar placeholder */}
-      <Skeleton className="h-11 w-full rounded-lg" />
+      <Skeleton className="h-14 w-full rounded-lg" />
 
-      {/* Filter toggle placeholder */}
-      <Skeleton className="h-9 w-36 rounded-md" />
+      {/* Two-column layout: rail + main */}
+      <div className="grid gap-6 lg:grid-cols-[280px_1fr]">
+        {/* Rail placeholder */}
+        <div className="space-y-3 rounded-lg border border-hairline bg-surface p-5">
+          <Skeleton className="h-4 w-20" />
+          <Skeleton className="h-3 w-full" />
+          <Skeleton className="h-3 w-5/6" />
+          <div className="pt-2">
+            <Skeleton className="h-4 w-20" />
+          </div>
+          <Skeleton className="h-8 w-full rounded-md" />
+        </div>
 
-      {/* Result cards */}
-      <div className="space-y-3">
-        {Array.from({ length: CARD_COUNT }, (_, i) => (
-          <ResultCardSkeleton key={i} />
-        ))}
+        {/* Results column placeholder */}
+        <div className="rounded-lg border border-hairline bg-surface">
+          {/* Meta header */}
+          <div className="flex items-center justify-between border-b border-hairline px-4 py-2.5">
+            <Skeleton className="h-3 w-48" />
+            <Skeleton className="h-3 w-32" />
+          </div>
+          {Array.from({ length: ROW_COUNT }, (_, i) => (
+            <ResultRowSkeleton key={i} />
+          ))}
+        </div>
       </div>
     </div>
   );
