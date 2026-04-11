@@ -5,15 +5,8 @@
  * partial results).  Shows:
  *
  *   1. Summary cards  — succeeded / skipped / failed counts + duration
- *   2. Results table  — per-filing details (success + skipped + failed)
+ *   2. Results table  — blotter-style per-filing details
  *   3. Action button  — "Ingest More Filings" to reset to idle
- *
- * ## Why not MetricCard?
- *
- * `MetricCard` always renders its icon in blue.  Here we need
- * green/amber/red icons per card.  Rather than modifying MetricCard
- * for a single use case, we inline a similar layout with per-card
- * colour control.  This avoids over-engineering the shared component.
  */
 
 "use client";
@@ -26,7 +19,7 @@ import {
   Clock,
   Upload,
 } from "lucide-react";
-import { Button, Badge } from "@/components/ui";
+import { Button } from "@/components/ui";
 import type { WsFilingResult } from "@/lib/types";
 import type { FilingEvent } from "@/hooks/useIngest";
 
@@ -58,78 +51,80 @@ interface IngestSummaryProps {
 // Helpers
 // ---------------------------------------------------------------------------
 
-/** Format a duration in seconds to a human-readable string. */
-function formatDuration(startedAt: Date | null, completedAt: Date | null): string {
+function formatDuration(
+  startedAt: Date | null,
+  completedAt: Date | null,
+): string {
   if (!startedAt || !completedAt) return "\u2014";
-  const seconds = Math.round((completedAt.getTime() - startedAt.getTime()) / 1000);
+  const seconds = Math.round(
+    (completedAt.getTime() - startedAt.getTime()) / 1000,
+  );
   if (seconds < 60) return `${seconds}s`;
   const minutes = Math.floor(seconds / 60);
   const remaining = seconds % 60;
   return `${minutes}m ${remaining}s`;
 }
 
-// Static class maps for Badge variants per event type.
-const EVENT_BADGE_VARIANT: Record<FilingEvent["type"], "green" | "amber" | "red" | "blue"> = {
-  done: "green",
-  skipped: "amber",
-  failed: "red",
-  eviction: "blue",
+type Tone = "pos" | "warn" | "neg" | "accent";
+
+const TONE_ICON_CLASS: Record<Tone, string> = {
+  pos: "text-pos",
+  warn: "text-warn",
+  neg: "text-neg",
+  accent: "text-accent",
 };
 
-const EVENT_BADGE_LABEL: Record<FilingEvent["type"], string> = {
-  done: "Success",
-  skipped: "Skipped",
-  failed: "Failed",
-  eviction: "Eviction",
+const STATUS_CHIP_CLASS: Record<FilingEvent["type"], string> = {
+  done: "border-pos/40 bg-pos/10 text-pos",
+  skipped: "border-warn/40 bg-warn/10 text-warn",
+  failed: "border-neg/40 bg-neg/10 text-neg",
+  eviction: "border-hairline bg-surface text-fg-muted",
 };
 
-// Summary card colour classes — static maps, never interpolated.
-const CARD_ICON_BG: Record<string, string> = {
-  green: "bg-green-50 dark:bg-green-950",
-  amber: "bg-amber-50 dark:bg-amber-950",
-  red: "bg-red-50 dark:bg-red-950",
-  blue: "bg-blue-50 dark:bg-blue-950",
-};
-
-const CARD_ICON_TEXT: Record<string, string> = {
-  green: "text-green-600 dark:text-green-400",
-  amber: "text-amber-600 dark:text-amber-400",
-  red: "text-red-600 dark:text-red-400",
-  blue: "text-blue-600 dark:text-blue-400",
+const STATUS_CHIP_LABEL: Record<FilingEvent["type"], string> = {
+  done: "OK",
+  skipped: "SKIP",
+  failed: "FAIL",
+  eviction: "EVICT",
 };
 
 // ---------------------------------------------------------------------------
 // Sub-component
 // ---------------------------------------------------------------------------
 
-/** A summary metric card with configurable icon colour. */
 function SummaryCard({
   label,
   value,
   icon: Icon,
-  colour,
+  tone,
 }: {
   label: string;
   value: number | string;
   icon: ElementType;
-  colour: "green" | "amber" | "red" | "blue";
+  tone: Tone;
 }) {
   return (
-    <div className="rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-gray-950">
-      <div className="flex items-center gap-3">
-        <div className={`rounded-md p-2 ${CARD_ICON_BG[colour]}`}>
-          <Icon className={`h-5 w-5 ${CARD_ICON_TEXT[colour]}`} />
-        </div>
-        <span className="text-sm font-medium text-gray-600 dark:text-gray-400">
+    <div className="rounded-lg border border-hairline bg-card p-5 transition-colors hover:border-fg-subtle/40">
+      <div className="flex items-center justify-between">
+        <span className="font-mono text-[10px] font-semibold uppercase tracking-widest text-fg-subtle">
           {label}
         </span>
+        <Icon className={`h-4 w-4 ${TONE_ICON_CLASS[tone]}`} aria-hidden="true" />
       </div>
-      <p className="mt-3 text-3xl font-bold text-gray-900 dark:text-gray-100">
+      <p className="mt-3 text-3xl font-semibold tabular-nums text-fg">
         {value}
       </p>
     </div>
   );
 }
+
+// ---------------------------------------------------------------------------
+// Constants (shared with FilingTable blotter)
+// ---------------------------------------------------------------------------
+
+const HEADER_CELL =
+  "px-4 py-2.5 font-mono text-[10px] font-semibold uppercase tracking-widest text-fg-subtle";
+const BODY_CELL = "px-4 py-2.5 text-sm";
 
 // ---------------------------------------------------------------------------
 // Component
@@ -143,104 +138,105 @@ export function IngestSummary({
   onReset,
 }: IngestSummaryProps) {
   const duration = formatDuration(startedAt, completedAt);
+  const rows = filingEvents.filter((e) => e.type !== "eviction");
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {/* ---- Summary cards ---- */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <SummaryCard
           label="Succeeded"
           value={summary.succeeded}
           icon={CheckCircle2}
-          colour="green"
+          tone="pos"
         />
         <SummaryCard
           label="Skipped"
           value={summary.skipped}
           icon={SkipForward}
-          colour="amber"
+          tone="warn"
         />
         <SummaryCard
           label="Failed"
           value={summary.failed}
           icon={XCircle}
-          colour="red"
+          tone="neg"
         />
         <SummaryCard
           label="Duration"
           value={duration}
           icon={Clock}
-          colour="blue"
+          tone="accent"
         />
       </div>
 
       {/* ---- Results table ---- */}
-      {filingEvents.length > 0 && (
-        <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-800">
-          <table className="w-full text-left text-sm">
-            <thead className="border-b border-gray-200 bg-gray-50 dark:border-gray-800 dark:bg-gray-900">
-              <tr>
-                <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">
-                  Status
-                </th>
-                <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">
-                  Ticker
-                </th>
-                <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">
-                  Form
-                </th>
-                <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">
-                  Date
-                </th>
-                <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">
-                  Segments
-                </th>
-                <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">
-                  Chunks
-                </th>
-                <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">
-                  Time
-                </th>
-                <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">
-                  Detail
-                </th>
+      {rows.length > 0 && (
+        <div className="overflow-x-auto rounded-lg border border-hairline bg-card">
+          <table className="w-full border-collapse text-left">
+            <thead>
+              <tr className="border-b border-hairline bg-surface/60">
+                <th className={HEADER_CELL}>Status</th>
+                <th className={HEADER_CELL}>Ticker</th>
+                <th className={HEADER_CELL}>Form</th>
+                <th className={HEADER_CELL}>Date</th>
+                <th className={`${HEADER_CELL} text-right`}>Segments</th>
+                <th className={`${HEADER_CELL} text-right`}>Chunks</th>
+                <th className={`${HEADER_CELL} text-right`}>Time</th>
+                <th className={HEADER_CELL}>Detail</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-200 dark:divide-gray-800">
-              {filingEvents.filter((e) => e.type !== "eviction").map((event, index) => (
+            <tbody>
+              {rows.map((event, index) => (
                 <tr
                   key={index}
-                  className="bg-white dark:bg-gray-950"
+                  className="border-b border-hairline/70 transition-colors last:border-b-0 hover:bg-surface/70"
                 >
-                  <td className="px-4 py-3">
-                    <Badge variant={EVENT_BADGE_VARIANT[event.type]}>
-                      {EVENT_BADGE_LABEL[event.type]}
-                    </Badge>
+                  <td className={BODY_CELL}>
+                    <span
+                      className={`inline-flex items-center rounded border px-1.5 py-0.5 font-mono text-[10px] font-semibold uppercase tabular-nums tracking-wider ${STATUS_CHIP_CLASS[event.type]}`}
+                    >
+                      {STATUS_CHIP_LABEL[event.type]}
+                    </span>
                   </td>
-                  <td className="px-4 py-3 font-medium text-gray-900 dark:text-gray-100">
+                  <td
+                    className={`${BODY_CELL} font-mono font-semibold tabular-nums text-fg`}
+                  >
                     {event.ticker}
                   </td>
-                  <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
-                    {event.form_type}
+                  <td className={BODY_CELL}>
+                    <span className="inline-flex items-center rounded border border-hairline bg-surface px-1.5 py-0.5 font-mono text-[10px] font-medium tabular-nums text-fg-muted">
+                      {event.form_type}
+                    </span>
                   </td>
-                  <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
+                  <td
+                    className={`${BODY_CELL} font-mono text-xs tabular-nums text-fg-muted`}
+                  >
                     {event.filing_date ?? "\u2014"}
                   </td>
-                  <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
+                  <td
+                    className={`${BODY_CELL} text-right font-mono tabular-nums text-fg-muted`}
+                  >
                     {event.type === "done" ? event.segments : "\u2014"}
                   </td>
-                  <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
+                  <td
+                    className={`${BODY_CELL} text-right font-mono tabular-nums text-fg-muted`}
+                  >
                     {event.type === "done" ? event.chunks : "\u2014"}
                   </td>
-                  <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
-                    {event.type === "done" ? `${event.time?.toFixed(1)}s` : "\u2014"}
+                  <td
+                    className={`${BODY_CELL} text-right font-mono tabular-nums text-fg-muted`}
+                  >
+                    {event.type === "done"
+                      ? `${event.time?.toFixed(1)}s`
+                      : "\u2014"}
                   </td>
-                  <td className="px-4 py-3 text-gray-500 dark:text-gray-400">
+                  <td
+                    className={`${BODY_CELL} font-mono text-xs tabular-nums text-fg-subtle`}
+                  >
                     {event.type === "skipped" && event.reason}
                     {event.type === "failed" && (
-                      <span className="text-red-600 dark:text-red-400">
-                        {event.error}
-                      </span>
+                      <span className="text-neg">{event.error}</span>
                     )}
                   </td>
                 </tr>
@@ -251,7 +247,7 @@ export function IngestSummary({
       )}
 
       {/* ---- Action button ---- */}
-      <div className="flex justify-center">
+      <div className="flex justify-end">
         <Button onClick={onReset}>
           <Upload className="mr-2 h-4 w-4" />
           Ingest More Filings

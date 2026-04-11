@@ -81,28 +81,31 @@ function WelcomeForm({ onLogin }: WelcomeFormProps) {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50 dark:bg-gray-900">
-      <div className="mx-auto w-full max-w-md space-y-8 rounded-xl border border-gray-200 bg-white p-8 shadow-sm dark:border-gray-800 dark:bg-gray-950">
+    <div className="flex min-h-screen items-center justify-center px-4">
+      <div className="mx-auto w-full max-w-md space-y-8 rounded-2xl border border-hairline bg-card/80 p-8 shadow-2xl backdrop-blur-xl">
         {/* Header */}
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-            SEC Semantic Search
+        <div className="space-y-3 text-center">
+          <div className="flex items-center justify-center">
+            <span
+              className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-accent to-accent/70 text-accent-fg shadow-lg shadow-accent/20"
+              aria-hidden="true"
+            >
+              <span className="text-base font-bold">S</span>
+            </span>
+          </div>
+          <h1 className="text-2xl font-semibold tracking-tight text-fg">
+            EDGAR credentials required
           </h1>
-          <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-            The SEC requires a name and email in every EDGAR request.
-            Please enter your details to continue.
+          <p className="text-sm text-fg-muted">
+            The SEC requires a name and email in every EDGAR request. Please
+            enter your details to continue.
           </p>
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="space-y-5">
-          <div>
-            <label
-              htmlFor="edgar-name"
-              className="block text-sm font-medium text-gray-700 dark:text-gray-300"
-            >
-              Full name
-            </label>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <label htmlFor="edgar-name" className="block space-y-2">
+            <span className="text-sm font-medium text-fg">Full name</span>
             <input
               id="edgar-name"
               type="text"
@@ -111,16 +114,11 @@ function WelcomeForm({ onLogin }: WelcomeFormProps) {
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Jane Smith"
-              className="mt-1 block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:placeholder-gray-500"
+              className="block w-full rounded-lg border border-hairline bg-card px-4 py-2.5 text-sm text-fg outline-none transition-colors placeholder:text-fg-subtle focus:border-accent focus:ring-2 focus:ring-accent/25"
             />
-          </div>
-          <div>
-            <label
-              htmlFor="edgar-email"
-              className="block text-sm font-medium text-gray-700 dark:text-gray-300"
-            >
-              Email address
-            </label>
+          </label>
+          <label htmlFor="edgar-email" className="block space-y-2">
+            <span className="text-sm font-medium text-fg">Email address</span>
             <input
               id="edgar-email"
               type="email"
@@ -129,18 +127,17 @@ function WelcomeForm({ onLogin }: WelcomeFormProps) {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="jane@example.com"
-              className="mt-1 block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:placeholder-gray-500"
+              className="block w-full rounded-lg border border-hairline bg-card px-4 py-2.5 text-sm text-fg outline-none transition-colors placeholder:text-fg-subtle focus:border-accent focus:ring-2 focus:ring-accent/25"
             />
-          </div>
-          <Button type="submit" className="w-full">
+          </label>
+          <Button type="submit" size="lg" className="w-full">
             Continue
           </Button>
         </form>
 
         {/* Privacy notice */}
-        <p className="text-center text-xs text-gray-500 dark:text-gray-500">
-          Your credentials are stored only in this browser tab and are
-          never saved on the server. Closing the tab clears them automatically.
+        <p className="border-t border-hairline pt-4 text-center text-xs text-fg-subtle">
+          Credentials stay in this tab · Never saved on the server
         </p>
       </div>
     </div>

@@ -1,30 +1,45 @@
 /**
- * FilingTable — sortable, paginated table with row selection and per-row
- * delete buttons.
+ * FilingTable — sortable, paginated blotter-style table with row
+ * selection and per-row delete.
  *
- * ## Three sub-features
+ * ## Sub-features
  *
  * **Sortable columns:** Each column header is a `<button>` for keyboard
- * accessibility. Clicking the active column toggles asc/desc; clicking a
- * different column activates it with `desc` default. Sort parameters are
- * sent to the backend — the hook refetches when they change.
+ * access. Clicking the active column toggles asc/desc; clicking a new
+ * column activates it with `desc` default. Sort params are sent to the
+ * backend — the hook refetches on change.
  *
- * **Client-side pagination:** The backend returns all filings (max ~100).
- * The table slices the array into pages locally. Page resets to 0 when
- * `filings.length` changes (filter change or deletion).
+ * **Client-side pagination:** The backend returns all filings (max
+ * ~100); the table slices locally. If a filter change or deletion
+ * leaves the current page beyond the end, we fall back to page 0 via
+ * a render-time clamp (no useEffect — React 19 lint rule).
  *
- * **Row selection:** Checkboxes in the first column, "Select All" header
- * checkbox applies to the current page only. Selection state lives in the
+ * **Row selection:** Checkboxes in the first column; the header
+ * checkbox applies to the current page only. Selection lives in the
  * page component (not here) because BulkActions also reads it.
+ *
+ * ## Visual language
+ *
+ * Terminal blotter: mono uppercase headers in subtle text, `font-mono
+ * tabular-nums` on every numeric/identifier column so digits align
+ * perfectly across rows. Hover uses the `surface` token so the row
+ * "lights up" on pointer without introducing competing hues.
  */
 
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
-import { Check, ChevronLeft, ChevronRight, Copy, Trash2 } from "lucide-react";
+import {
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsUpDown,
+  Copy,
+  Trash2,
+} from "lucide-react";
 import type { Filing } from "@/lib/types";
 import type { FilingListParams } from "@/lib/api";
-import { Badge, Button, useToast } from "@/components/ui";
+import { Button, useToast } from "@/components/ui";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -55,10 +70,6 @@ interface FilingTableProps {
 // Column definitions
 // ---------------------------------------------------------------------------
 
-/**
- * Column metadata. `key` maps to a `Filing` field or a backend sort column.
- * `sortKey` is sent to the backend; `null` means the column is not sortable.
- */
 interface Column {
   label: string;
   sortKey: SortColumn | null;
@@ -81,6 +92,15 @@ const COLUMNS: Column[] = [
 const PAGE_SIZES = [10, 25, 50] as const;
 
 // ---------------------------------------------------------------------------
+// Shared atoms
+// ---------------------------------------------------------------------------
+
+const HEADER_CELL =
+  "px-4 py-2.5 font-mono text-[10px] font-semibold uppercase tracking-widest text-fg-subtle";
+
+const BODY_CELL = "px-4 py-2.5 text-sm";
+
+// ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
@@ -98,27 +118,26 @@ export function FilingTable({
   const { addToast } = useToast();
   const [copiedAccession, setCopiedAccession] = useState<string | null>(null);
 
-  const handleCopyAccession = useCallback(async (accession: string) => {
-    try {
-      await navigator.clipboard.writeText(accession);
-      setCopiedAccession(accession);
-      addToast("success", "Copied to clipboard");
-      setTimeout(() => setCopiedAccession(null), 2000);
-    } catch {
-      addToast("error", "Failed to copy — try selecting the text manually");
-    }
-  }, [addToast]);
+  const handleCopyAccession = useCallback(
+    async (accession: string) => {
+      try {
+        await navigator.clipboard.writeText(accession);
+        setCopiedAccession(accession);
+        addToast("success", "Copied to clipboard");
+        setTimeout(() => setCopiedAccession(null), 2000);
+      } catch {
+        addToast("error", "Failed to copy — try selecting the text manually");
+      }
+    },
+    [addToast],
+  );
 
   // ---- Pagination state (local to the table) ----
   const [rawPage, setPage] = useState(0);
   const [pageSize, setPageSize] = useState<number>(10);
 
-  // ---- Derived pagination values ----
-  // Clamp the page during render instead of resetting via useEffect.
-  // If a filter change or deletion reduces the data so the current page
-  // is beyond the end, we fall back to page 0. This avoids the React 19
-  // lint rule "no setState in effects" and eliminates the cascading
-  // render that an effect-based reset would cause.
+  // Render-time clamp — if filters/deletions shrink the list, fall back
+  // to page 0 rather than resetting via useEffect.
   const totalPages = Math.max(1, Math.ceil(filings.length / pageSize));
   const page = rawPage >= totalPages ? 0 : rawPage;
   const startIndex = page * pageSize;
@@ -137,59 +156,47 @@ export function FilingTable({
   function toggleAll() {
     const next = new Set(selected);
     if (allVisibleSelected) {
-      // Deselect all visible
-      for (const acc of visibleAccessions) {
-        next.delete(acc);
-      }
+      for (const acc of visibleAccessions) next.delete(acc);
     } else {
-      // Select all visible
-      for (const acc of visibleAccessions) {
-        next.add(acc);
-      }
+      for (const acc of visibleAccessions) next.add(acc);
     }
     onSelectionChange(next);
   }
 
   function toggleOne(accessionNumber: string) {
     const next = new Set(selected);
-    if (next.has(accessionNumber)) {
-      next.delete(accessionNumber);
-    } else {
-      next.add(accessionNumber);
-    }
+    if (next.has(accessionNumber)) next.delete(accessionNumber);
+    else next.add(accessionNumber);
     onSelectionChange(next);
   }
 
   // ---- Sort handler ----
   function handleSort(column: SortColumn) {
     if (column === sortBy) {
-      // Same column: toggle direction
       onSortChange(column, order === "asc" ? "desc" : "asc");
     } else {
-      // Different column: activate with desc default
       onSortChange(column, "desc");
     }
   }
 
-  // ---- Render sort indicator ----
+  // ---- Sort indicator (upward / downward / neutral chevrons) ----
   function sortIndicator(column: SortColumn) {
     if (column === sortBy) {
       return (
-        <span className="ml-1 text-blue-600 dark:text-blue-400">
+        <span className="ml-1 text-accent" aria-hidden="true">
           {order === "asc" ? "\u25B2" : "\u25BC"}
         </span>
       );
     }
     return (
-      <span className="ml-1 text-gray-300 dark:text-gray-600">
-        {"\u25B4\u25BE"}
-      </span>
+      <ChevronsUpDown
+        className="ml-1 h-3 w-3 text-fg-subtle/50"
+        aria-hidden="true"
+      />
     );
   }
 
-  // ---- Pre-format ingested_at dates once per visible page (memoised to
-  // avoid recreating Date objects and calling toLocaleDateString on every
-  // render when only sort/selection state changes) ----
+  // ---- Memoised date formatting for the visible page ----
   const formattedDates = useMemo(() => {
     const opts: Intl.DateTimeFormatOptions = {
       year: "numeric",
@@ -206,12 +213,12 @@ export function FilingTable({
     return map;
   }, [visibleFilings]);
 
-  // ---- Empty state (filters active but no matches) ----
+  // ---- Empty state: filters active but no matches ----
   if (filings.length === 0) {
     return (
-      <div className="rounded-lg border border-gray-200 bg-white p-8 text-center dark:border-gray-800 dark:bg-gray-950">
-        <p className="text-sm text-gray-500 dark:text-gray-400">
-          No filings match the current filters.
+      <div className="rounded-lg border border-hairline bg-card p-10 text-center">
+        <p className="font-mono text-xs uppercase tracking-wider text-fg-muted">
+          No filings match the current filters
         </p>
       </div>
     );
@@ -219,14 +226,13 @@ export function FilingTable({
 
   return (
     <div className="space-y-3">
-      {/* Table */}
-      <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-950">
-        <table className="w-full text-left text-sm">
-          {/* ---- Header ---- */}
+      {/* ---- Table ---- */}
+      <div className="overflow-x-auto rounded-lg border border-hairline bg-card">
+        <table className="w-full border-collapse text-left">
           <thead>
-            <tr className="border-b border-gray-200 bg-gray-50 dark:border-gray-800 dark:bg-gray-900">
+            <tr className="border-b border-hairline bg-surface/60">
               {/* Checkbox column */}
-              <th className="w-10 px-4 py-3">
+              <th className="w-10 px-4 py-2.5">
                 <input
                   type="checkbox"
                   checked={allVisibleSelected}
@@ -235,7 +241,7 @@ export function FilingTable({
                   }}
                   onChange={toggleAll}
                   aria-label="Select all filings on this page"
-                  className="h-4 w-4 rounded border-gray-300 text-blue-600 focus-visible:ring-blue-500 dark:border-gray-600"
+                  className="h-3.5 w-3.5 rounded border-hairline text-accent accent-[var(--accent)] focus-visible:ring-2 focus-visible:ring-accent/30"
                 />
               </th>
 
@@ -252,15 +258,15 @@ export function FilingTable({
                         ? "none"
                         : undefined
                   }
-                  className={`px-4 py-3 font-medium text-gray-500 dark:text-gray-400 ${
-                    col.align === "right" ? "text-right" : ""
-                  }`}
+                  className={`${HEADER_CELL} ${col.align === "right" ? "text-right" : ""}`}
                 >
                   {col.sortKey ? (
                     <button
                       type="button"
                       onClick={() => handleSort(col.sortKey!)}
-                      className="inline-flex items-center rounded hover:text-gray-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 dark:hover:text-gray-100"
+                      className={`inline-flex items-center rounded transition-colors hover:text-fg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
+                        col.sortKey === sortBy ? "text-fg" : ""
+                      }`}
                     >
                       {col.label}
                       {sortIndicator(col.sortKey)}
@@ -272,109 +278,126 @@ export function FilingTable({
               ))}
 
               {/* Actions column */}
-              <th className="w-16 px-4 py-3">
+              <th className="w-14 px-4 py-2.5">
                 <span className="sr-only">Actions</span>
               </th>
             </tr>
           </thead>
 
-          {/* ---- Body ---- */}
           <tbody>
-            {visibleFilings.map((filing) => (
-              <tr
-                key={filing.accession_number}
-                className="border-t border-gray-100 hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-gray-900"
-              >
-                {/* Checkbox */}
-                <td className="px-4 py-3">
-                  <input
-                    type="checkbox"
-                    checked={selected.has(filing.accession_number)}
-                    onChange={() => toggleOne(filing.accession_number)}
-                    aria-label={`Select ${filing.ticker} ${filing.form_type}`}
-                    className="h-4 w-4 rounded border-gray-300 text-blue-600 focus-visible:ring-blue-500 dark:border-gray-600"
-                  />
-                </td>
+            {visibleFilings.map((filing) => {
+              const isSelected = selected.has(filing.accession_number);
+              return (
+                <tr
+                  key={filing.accession_number}
+                  className={`border-b border-hairline/70 transition-colors last:border-b-0 ${
+                    isSelected
+                      ? "bg-accent/[0.06] hover:bg-accent/[0.09]"
+                      : "hover:bg-surface/70"
+                  }`}
+                >
+                  {/* Checkbox */}
+                  <td className="px-4 py-2.5">
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={() => toggleOne(filing.accession_number)}
+                      aria-label={`Select ${filing.ticker} ${filing.form_type}`}
+                      className="h-3.5 w-3.5 rounded border-hairline accent-[var(--accent)] focus-visible:ring-2 focus-visible:ring-accent/30"
+                    />
+                  </td>
 
-                {/* Ticker */}
-                <td className="px-4 py-3 font-medium text-gray-900 dark:text-gray-100">
-                  {filing.ticker}
-                </td>
+                  {/* Ticker */}
+                  <td className={`${BODY_CELL} font-mono font-semibold tabular-nums text-fg`}>
+                    {filing.ticker}
+                  </td>
 
-                {/* Form type */}
-                <td className="px-4 py-3">
-                  <Badge variant="blue">{filing.form_type}</Badge>
-                </td>
-
-                {/* Accession number */}
-                <td className="px-4 py-3">
-                  <span className="inline-flex items-center gap-1.5">
-                    <span className="font-mono text-xs text-gray-600 dark:text-gray-400">
-                      {filing.accession_number}
+                  {/* Form type */}
+                  <td className={BODY_CELL}>
+                    <span className="inline-flex items-center rounded border border-hairline bg-surface px-1.5 py-0.5 font-mono text-[10px] font-medium tabular-nums text-fg-muted">
+                      {filing.form_type}
                     </span>
-                    <button
-                      type="button"
-                      onClick={() => handleCopyAccession(filing.accession_number)}
-                      className="rounded p-0.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 dark:text-gray-500 dark:hover:bg-gray-800 dark:hover:text-gray-300"
-                      title="Copy accession number to clipboard"
-                      aria-label={`Copy accession number ${filing.accession_number}`}
+                  </td>
+
+                  {/* Accession number */}
+                  <td className={BODY_CELL}>
+                    <span className="inline-flex items-center gap-1.5">
+                      <span className="font-mono text-xs tabular-nums text-fg-muted">
+                        {filing.accession_number}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          handleCopyAccession(filing.accession_number)
+                        }
+                        className="rounded p-0.5 text-fg-subtle transition-colors hover:bg-surface hover:text-fg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                        title="Copy accession number to clipboard"
+                        aria-label={`Copy accession number ${filing.accession_number}`}
+                      >
+                        {copiedAccession === filing.accession_number ? (
+                          <Check className="h-3.5 w-3.5 text-pos" />
+                        ) : (
+                          <Copy className="h-3.5 w-3.5" />
+                        )}
+                      </button>
+                    </span>
+                  </td>
+
+                  {/* Filing date */}
+                  <td className={`${BODY_CELL} font-mono text-xs tabular-nums text-fg-muted`}>
+                    {filing.filing_date}
+                  </td>
+
+                  {/* Chunk count */}
+                  <td className={`${BODY_CELL} text-right font-mono tabular-nums text-fg-muted`}>
+                    {filing.chunk_count.toLocaleString()}
+                  </td>
+
+                  {/* Ingested at */}
+                  <td className={`${BODY_CELL} font-mono text-xs tabular-nums text-fg-muted`}>
+                    {formattedDates.get(filing.accession_number)}
+                  </td>
+
+                  {/* Remove button */}
+                  <td className="px-4 py-2.5">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => onDeleteFiling(filing)}
+                      disabled={isDeleting}
+                      className="text-fg-subtle hover:bg-neg/10 hover:text-neg"
+                      aria-label={`Delete ${filing.ticker} ${filing.form_type}`}
                     >
-                      {copiedAccession === filing.accession_number ? (
-                        <Check className="h-3.5 w-3.5 text-green-600" />
-                      ) : (
-                        <Copy className="h-3.5 w-3.5" />
-                      )}
-                    </button>
-                  </span>
-                </td>
-
-                {/* Filing date */}
-                <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
-                  {filing.filing_date}
-                </td>
-
-                {/* Chunk count */}
-                <td className="px-4 py-3 text-right tabular-nums text-gray-600 dark:text-gray-400">
-                  {filing.chunk_count.toLocaleString()}
-                </td>
-
-                {/* Ingested at */}
-                <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
-                  {formattedDates.get(filing.accession_number)}
-                </td>
-
-                {/* Remove button */}
-                <td className="px-4 py-3">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => onDeleteFiling(filing)}
-                    disabled={isDeleting}
-                    className="text-red-500 hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-950 dark:hover:text-red-300"
-                    aria-label={`Delete ${filing.ticker} ${filing.form_type}`}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </td>
-              </tr>
-            ))}
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
 
       {/* ---- Pagination footer ---- */}
-      <div className="flex items-center justify-between text-sm text-gray-600 dark:text-gray-400">
-        {/* Left: showing range */}
-        <span>
-          Showing {startIndex + 1}–{endIndex} of{" "}
-          {filings.length.toLocaleString()} filing
-          {filings.length === 1 ? "" : "s"}
+      <div className="flex flex-wrap items-center justify-between gap-3 px-1">
+        <span className="font-mono text-[11px] tabular-nums text-fg-muted">
+          <span className="text-fg">{startIndex + 1}</span>
+          <span className="text-fg-subtle">–</span>
+          <span className="text-fg">{endIndex}</span>
+          <span className="text-fg-subtle"> of </span>
+          <span className="text-fg">{filings.length.toLocaleString()}</span>
+          <span className="text-fg-subtle">
+            {" "}filing{filings.length === 1 ? "" : "s"}
+          </span>
         </span>
 
         {/* Centre: page size selector */}
         <div className="flex items-center gap-2">
-          <label htmlFor="page-size" className="text-xs">
-            Rows:
+          <label
+            htmlFor="page-size"
+            className="font-mono text-[10px] uppercase tracking-wider text-fg-subtle"
+          >
+            Rows
           </label>
           <select
             id="page-size"
@@ -383,7 +406,7 @@ export function FilingTable({
               setPageSize(Number(e.target.value));
               setPage(0);
             }}
-            className="rounded border border-gray-300 bg-white px-2 py-1 text-xs dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
+            className="rounded-md border border-hairline bg-card px-2 py-1 font-mono text-xs tabular-nums text-fg outline-none transition-colors hover:border-fg-subtle/40 focus:border-accent focus:ring-2 focus:ring-accent/25"
           >
             {PAGE_SIZES.map((size) => (
               <option key={size} value={size}>
@@ -401,11 +424,14 @@ export function FilingTable({
             onClick={() => setPage((p) => Math.max(0, p - 1))}
             disabled={page === 0}
             aria-label="Previous page"
+            className="text-fg-muted hover:text-fg"
           >
             <ChevronLeft className="h-4 w-4" />
           </Button>
-          <span className="px-2 text-xs">
-            {page + 1} / {totalPages}
+          <span className="px-2 font-mono text-[11px] tabular-nums text-fg-muted">
+            <span className="text-fg">{page + 1}</span>
+            <span className="text-fg-subtle"> / </span>
+            <span>{totalPages}</span>
           </span>
           <Button
             variant="ghost"
@@ -413,6 +439,7 @@ export function FilingTable({
             onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
             disabled={page >= totalPages - 1}
             aria-label="Next page"
+            className="text-fg-muted hover:text-fg"
           >
             <ChevronRight className="h-4 w-4" />
           </Button>

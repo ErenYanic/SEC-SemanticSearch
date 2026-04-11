@@ -1,28 +1,14 @@
 /**
- * Dashboard metric card — displays a large number with a label,
- * an icon, and an optional capacity progress bar.
+ * Dashboard KPI card — compact, terminal-style tile with a mono label,
+ * a large tabular number, and an optional capacity bar.
  *
- * Used on the Dashboard page (W3.1) to show:
- *   - Filing count (with capacity bar: current / max)
- *   - Chunk count
- *   - Ticker count
+ * Layout is vertical-tight: label row on top, value below, capacity
+ * (when present) at the bottom. Numbers use `tabular-nums` so that
+ * counts in a row of cards align across the strip, which is the
+ * single most effective density signal for a data dashboard.
  *
- * ## Why `ElementType` for the icon?
- *
- * This is the same pattern used in `Navbar.tsx` for nav item icons:
- * you pass the Lucide component reference (e.g. `FileText`), and
- * MetricCard renders it with the right size and colour classes.
- * `ElementType` is React's type for "any component that can be
- * rendered as JSX".
- *
- * ## Why the capacity bar uses inline `style`
- *
- * The fill width is dynamic (e.g. 45%).  Tailwind classes like
- * `w-[45%]` must exist in source code at build time — they can't
- * be computed at runtime.  Inline `style={{ width: "45%" }}` is
- * the correct approach for dynamic values.
- *
- * No `"use client"` needed — pure presentational component.
+ * The capacity bar's fill is a dynamic percentage, so its width must
+ * be set via inline `style` — Tailwind class names are static.
  */
 
 import { type ElementType } from "react";
@@ -32,7 +18,7 @@ import { type ElementType } from "react";
 // ---------------------------------------------------------------------------
 
 export interface MetricCardProps {
-  /** Card title shown below the icon (e.g. "Filings", "Chunks"). */
+  /** Card title shown above the value (e.g. "Filings", "Chunks"). */
   label: string;
   /** The prominent value to display (number or formatted string). */
   value: number | string;
@@ -52,44 +38,46 @@ export interface MetricCardProps {
 // ---------------------------------------------------------------------------
 
 export function MetricCard({ label, value, icon: Icon, capacity }: MetricCardProps) {
-  // Calculate the fill percentage for the capacity bar.
-  // `Math.min` caps at 100% so the bar never overflows.
   const percent = capacity
     ? Math.min(Math.round((capacity.current / capacity.max) * 100), 100)
     : null;
 
   return (
-    <div className="rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-gray-950">
-      {/* ---- Header: icon + label ---- */}
-      <div className="flex items-center gap-3">
-        {/* Icon sits in a tinted rounded box for visual emphasis */}
-        <div className="rounded-md bg-blue-50 p-2 dark:bg-blue-950">
-          <Icon className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-        </div>
-        <span className="text-sm font-medium text-gray-600 dark:text-gray-400">
-          {label}
+    <div className="group relative overflow-hidden rounded-2xl border border-hairline bg-card/80 p-6 shadow-sm backdrop-blur-sm transition-all hover:-translate-y-0.5 hover:border-accent/40 hover:shadow-lg hover:shadow-accent/5">
+      {/* subtle top highlight for depth */}
+      <div
+        className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-accent/30 to-transparent opacity-0 transition-opacity group-hover:opacity-100"
+        aria-hidden="true"
+      />
+      {/* ---- Header: label + icon ---- */}
+      <div className="flex items-center justify-between">
+        <span className="text-sm font-medium text-fg-muted">{label}</span>
+        <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-accent/10 text-accent">
+          <Icon className="h-4 w-4" aria-hidden="true" />
         </span>
       </div>
 
       {/* ---- Value ---- */}
-      <p className="mt-3 text-3xl font-bold text-gray-900 dark:text-gray-100">
+      <p className="mt-4 text-4xl font-semibold tracking-tight tabular-nums text-fg">
         {value}
       </p>
 
       {/* ---- Capacity bar (optional) ---- */}
       {capacity && percent !== null && (
-        <div className="mt-3">
-          {/* Track — the full-width background bar */}
-          <div className="h-2 w-full rounded-full bg-gray-100 dark:bg-gray-800">
-            {/* Fill — width is set via inline style (dynamic value) */}
+        <div className="mt-5 space-y-2">
+          <div className="h-1.5 w-full overflow-hidden rounded-full bg-surface">
             <div
-              className="h-full rounded-full bg-blue-600 transition-all dark:bg-blue-400"
+              className="h-full rounded-full bg-gradient-to-r from-accent/70 to-accent transition-all"
               style={{ width: `${percent}%` }}
             />
           </div>
-          {/* Caption below the bar */}
-          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-            {capacity.current} / {capacity.max}
+          <p className="flex items-baseline gap-1.5 text-sm tabular-nums text-fg-muted">
+            <span className="font-medium text-fg">
+              {capacity.current.toLocaleString()}
+            </span>
+            <span className="text-fg-subtle">of</span>
+            <span>{capacity.max.toLocaleString()}</span>
+            <span className="ml-auto font-medium text-accent">{percent}%</span>
           </p>
         </div>
       )}

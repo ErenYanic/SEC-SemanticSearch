@@ -49,8 +49,8 @@ describe("IngestForm", () => {
     // Attempt to deselect 10-Q — should be blocked.
     await user.click(tenQButton);
 
-    // 10-Q chip should still be in the active state (check via class).
-    expect(tenQButton.className).toContain("bg-blue-100");
+    // 10-Q chip should still be in the active state.
+    expect(tenQButton).toHaveAttribute("aria-pressed", "true");
   });
 
   // -------------------------------------------------------------------

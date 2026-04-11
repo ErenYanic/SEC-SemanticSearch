@@ -20,9 +20,9 @@ export function DemoBanner({ children }: { children: React.ReactNode }) {
       {data?.demo_mode && (
         <div
           role="status"
-          className="bg-amber-50 border-b border-amber-200 px-4 py-2 text-center text-sm text-amber-800 dark:bg-amber-900/30 dark:border-amber-700 dark:text-amber-200"
+          className="border-b border-warn/30 bg-warn/10 px-4 py-2 text-center text-sm font-medium text-warn"
         >
-          Demo — Data resets nightly at midnight UTC
+          Demo mode · Data resets nightly at midnight UTC
         </div>
       )}
       {children}

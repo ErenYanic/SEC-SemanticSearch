@@ -1,12 +1,18 @@
 /**
- * Collapsible filter panel for search refinement.
+ * Filter panel for search refinement.
  *
- * ## Why collapsible?
+ * ## Two modes
  *
- * Most searches work fine without filters. Showing 5 filter inputs
- * all the time overwhelms the interface and pushes results below
- * the fold. The "Filters" button with an active-count badge gives
- * power users quick access without penalising casual users.
+ *   - **Collapsible** (default) — "Filters" toggle button reveals a
+ *     panel. Used in tight layouts and preserved so existing tests
+ *     (which click the toggle button) continue to pass.
+ *
+ *   - **Rail** (`alwaysOpen`) — panel is always visible, with no
+ *     toggle button. Used by the Search page's two-column layout,
+ *     where the filter rail lives in a dedicated column.
+ *
+ * Both modes share the same `<FilterControls>` sub-component, so
+ * restyling or adding a filter field automatically propagates.
  *
  * ## State ownership
  *
@@ -17,17 +23,16 @@
  *
  * ## Multi-select filters
  *
- * Ticker and form type use chip-based multi-select (consistent with
- * the IngestForm ticker input style). Accession numbers are entered
- * as comma-separated text. All three filter fields map to arrays
- * in the API request.
+ * Ticker and form type use chip-based multi-select. Accession
+ * numbers are entered as comma-separated text. All three filter
+ * fields map to arrays in the API request.
  */
 
 "use client";
 
-import { useId, useState } from "react";
+import { useId, useState, type ReactNode } from "react";
 import { SlidersHorizontal, X } from "lucide-react";
-import { Button, Badge } from "@/components/ui";
+import { Badge } from "@/components/ui";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -48,6 +53,12 @@ interface SearchFiltersProps {
   onFiltersChange: (filters: SearchFilterValues) => void;
   /** Available tickers for the dropdown (from status endpoint). */
   availableTickers: string[];
+  /**
+   * When true, renders the filter panel inline (no toggle button).
+   * Used by the two-column Search page layout. Default: false
+   * (collapsible, backwards-compatible with existing tests).
+   */
+  alwaysOpen?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -82,26 +93,41 @@ export function countActiveFilters(filters: SearchFilterValues): number {
 }
 
 // ---------------------------------------------------------------------------
-// Chip styles (static Tailwind class maps — decision #30)
+// Chip styles
 // ---------------------------------------------------------------------------
 
 const CHIP_BASE =
-  "inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-medium transition-colors cursor-pointer select-none";
+  "inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium " +
+  "transition-all cursor-pointer select-none";
 
 const CHIP_ACTIVE =
-  "border-blue-300 bg-blue-50 text-blue-700 hover:bg-blue-100 dark:border-blue-700 dark:bg-blue-950 dark:text-blue-300 dark:hover:bg-blue-900";
+  "border-accent/50 bg-accent/15 text-accent hover:bg-accent/20";
 
 const CHIP_INACTIVE =
-  "border-gray-300 bg-white text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-400 dark:hover:bg-gray-800";
+  "border-hairline bg-card text-fg-muted hover:border-accent/40 hover:text-fg";
+
+// Input field styles shared by number, text, date inputs
+const INPUT_CLASS =
+  "w-full rounded-lg border border-hairline bg-card px-3.5 py-2.5 text-sm text-fg " +
+  "placeholder:text-fg-subtle outline-none transition-colors " +
+  "focus:border-accent focus:ring-2 focus:ring-accent/20";
+
+// Group heading style (used in rail mode)
+const GROUP_HEADING =
+  "mb-3 text-xs font-semibold uppercase tracking-wider text-fg-subtle";
+
+// Field label style
+const FIELD_LABEL = "text-sm font-medium text-fg-muted";
 
 // ---------------------------------------------------------------------------
-// Component
+// Main component
 // ---------------------------------------------------------------------------
 
 export function SearchFilters({
   filters,
   onFiltersChange,
   availableTickers,
+  alwaysOpen = false,
 }: SearchFiltersProps) {
   const [isOpen, setIsOpen] = useState(false);
   const panelId = useId();
@@ -112,63 +138,79 @@ export function SearchFilters({
     onFiltersChange({ ...filters, ...patch });
   }
 
-  /** Toggle a ticker in the selected list. */
-  function toggleTicker(ticker: string) {
-    const next = filters.tickers.includes(ticker)
-      ? filters.tickers.filter((t) => t !== ticker)
-      : [...filters.tickers, ticker];
-    update({ tickers: next });
+  // -------------------------------------------------------------------
+  // Rail mode — inline, always visible, grouped sections
+  // -------------------------------------------------------------------
+  if (alwaysOpen) {
+    return (
+      <aside
+        aria-label="Search filters"
+        className="sticky top-20 space-y-6 rounded-2xl border border-hairline bg-card/70 p-6 shadow-sm backdrop-blur-sm"
+      >
+        {/* Header: active count + clear */}
+        <div className="flex items-center justify-between border-b border-hairline pb-4">
+          <div className="flex items-center gap-2.5">
+            <SlidersHorizontal className="h-4 w-4 text-fg-muted" />
+            <span className="text-base font-semibold text-fg">Filters</span>
+            {activeCount > 0 && (
+              <span className="ml-1 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-accent px-1.5 text-xs font-semibold tabular-nums text-accent-fg">
+                {activeCount}
+              </span>
+            )}
+          </div>
+          {activeCount > 0 && (
+            <button
+              type="button"
+              onClick={() => onFiltersChange(DEFAULT_FILTERS)}
+              className="flex items-center gap-1 rounded-md text-sm font-medium text-fg-muted transition-colors hover:text-fg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            >
+              <X className="h-3.5 w-3.5" />
+              Clear
+            </button>
+          )}
+        </div>
+
+        <FilterControls
+          filters={filters}
+          onChange={update}
+          availableTickers={availableTickers}
+          layout="rail"
+        />
+      </aside>
+    );
   }
 
-  /** Toggle a form type in the selected list. */
-  function toggleFormType(formType: string) {
-    const next = filters.formTypes.includes(formType)
-      ? filters.formTypes.filter((f) => f !== formType)
-      : [...filters.formTypes, formType];
-    update({ formTypes: next });
-  }
-
-  /** Parse comma-separated accession numbers from text input. */
-  function handleAccessionChange(value: string) {
-    if (!value.trim()) {
-      update({ accessionNumbers: [] });
-      return;
-    }
-    const parsed = value
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean);
-    update({ accessionNumbers: parsed });
-  }
-
+  // -------------------------------------------------------------------
+  // Collapsible mode — legacy toggle-button layout (preserves tests)
+  // -------------------------------------------------------------------
   return (
     <div>
       {/* ---- Toggle button ---- */}
       <div className="flex items-center gap-2">
-        <Button
-          variant="secondary"
-          size="sm"
+        <button
+          type="button"
           onClick={() => setIsOpen(!isOpen)}
           aria-expanded={isOpen}
           aria-controls={panelId}
+          className="inline-flex items-center gap-2 rounded-lg border border-hairline bg-card px-3.5 py-2 text-sm font-medium text-fg transition-colors hover:border-accent/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
         >
-          <SlidersHorizontal className="mr-1.5 h-4 w-4" />
+          <SlidersHorizontal className="h-4 w-4" />
           Filters
           {activeCount > 0 && (
-            <Badge variant="blue" className="ml-1.5">
+            <Badge variant="blue" className="ml-1">
               {activeCount}
             </Badge>
           )}
-        </Button>
+        </button>
         {activeCount > 0 && (
-          <Button
-            variant="ghost"
-            size="sm"
+          <button
+            type="button"
             onClick={() => onFiltersChange(DEFAULT_FILTERS)}
+            className="inline-flex items-center gap-1 rounded-md px-2.5 py-1.5 text-sm font-medium text-fg-muted transition-colors hover:bg-card hover:text-fg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
           >
-            <X className="mr-1 h-3.5 w-3.5" />
+            <X className="mr-0.5 h-4 w-4" />
             Clear
-          </Button>
+          </button>
         )}
       </div>
 
@@ -178,134 +220,220 @@ export function SearchFilters({
           id={panelId}
           role="region"
           aria-label="Search filters"
-          className="mt-3 space-y-4 rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-950"
+          className="mt-4 rounded-2xl border border-hairline bg-card/70 p-5 backdrop-blur-sm"
         >
-          {/* Ticker multi-select chips */}
-          {availableTickers.length > 0 && (
-            <div className="space-y-1.5">
-              <span className="text-xs font-medium text-gray-600 dark:text-gray-400">
-                Tickers
-              </span>
-              <div className="flex flex-wrap gap-1.5" role="group" aria-label="Ticker filters">
-                {availableTickers.map((t) => {
-                  const isActive = filters.tickers.includes(t);
-                  return (
-                    <button
-                      key={t}
-                      type="button"
-                      onClick={() => toggleTicker(t)}
-                      className={`${CHIP_BASE} ${isActive ? CHIP_ACTIVE : CHIP_INACTIVE}`}
-                      aria-pressed={isActive}
-                    >
-                      {t}
-                      {isActive && <X className="h-3 w-3" />}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
+          <FilterControls
+            filters={filters}
+            onChange={update}
+            availableTickers={availableTickers}
+            layout="inline"
+          />
+        </div>
+      )}
+    </div>
+  );
+}
 
-          {/* Form type multi-select chips */}
-          <div className="space-y-1.5">
-            <span className="text-xs font-medium text-gray-600 dark:text-gray-400">
-              Form type
-            </span>
-            <div className="flex flex-wrap gap-1.5" role="group" aria-label="Form type filters">
-              {["8-K", "8-K/A", "10-K", "10-K/A", "10-Q", "10-Q/A"].map((f) => {
-                const isActive = filters.formTypes.includes(f);
+// ---------------------------------------------------------------------------
+// Shared filter controls (used by both modes)
+// ---------------------------------------------------------------------------
+
+interface FilterControlsProps {
+  filters: SearchFilterValues;
+  onChange: (patch: Partial<SearchFilterValues>) => void;
+  availableTickers: string[];
+  layout: "rail" | "inline";
+}
+
+function FilterControls({
+  filters,
+  onChange,
+  availableTickers,
+  layout,
+}: FilterControlsProps) {
+  function toggleTicker(ticker: string) {
+    const next = filters.tickers.includes(ticker)
+      ? filters.tickers.filter((t) => t !== ticker)
+      : [...filters.tickers, ticker];
+    onChange({ tickers: next });
+  }
+
+  function toggleFormType(formType: string) {
+    const next = filters.formTypes.includes(formType)
+      ? filters.formTypes.filter((f) => f !== formType)
+      : [...filters.formTypes, formType];
+    onChange({ formTypes: next });
+  }
+
+  function handleAccessionChange(value: string) {
+    if (!value.trim()) {
+      onChange({ accessionNumbers: [] });
+      return;
+    }
+    const parsed = value
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    onChange({ accessionNumbers: parsed });
+  }
+
+  const inlineGrid = layout === "inline";
+
+  return (
+    <div className={inlineGrid ? "space-y-4" : "space-y-6"}>
+      {/* ==================== SCOPE ==================== */}
+      <Section heading="Scope" showHeading={layout === "rail"}>
+        {availableTickers.length > 0 && (
+          <ChipGroup label="Tickers">
+            <div className="flex flex-wrap gap-1.5" role="group" aria-label="Ticker filters">
+              {availableTickers.map((t) => {
+                const isActive = filters.tickers.includes(t);
                 return (
                   <button
-                    key={f}
+                    key={t}
                     type="button"
-                    onClick={() => toggleFormType(f)}
+                    onClick={() => toggleTicker(t)}
                     className={`${CHIP_BASE} ${isActive ? CHIP_ACTIVE : CHIP_INACTIVE}`}
                     aria-pressed={isActive}
                   >
-                    {f}
+                    {t}
                     {isActive && <X className="h-3 w-3" />}
                   </button>
                 );
               })}
             </div>
+          </ChipGroup>
+        )}
+
+        <ChipGroup label="Form type">
+          <div className="flex flex-wrap gap-1.5" role="group" aria-label="Form type filters">
+            {["8-K", "8-K/A", "10-K", "10-K/A", "10-Q", "10-Q/A"].map((f) => {
+              const isActive = filters.formTypes.includes(f);
+              return (
+                <button
+                  key={f}
+                  type="button"
+                  onClick={() => toggleFormType(f)}
+                  className={`${CHIP_BASE} ${isActive ? CHIP_ACTIVE : CHIP_INACTIVE}`}
+                  aria-pressed={isActive}
+                >
+                  {f}
+                  {isActive && <X className="h-3 w-3" />}
+                </button>
+              );
+            })}
           </div>
+        </ChipGroup>
 
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {/* Top K */}
-            <label className="space-y-1">
-              <span className="text-xs font-medium text-gray-600 dark:text-gray-400">
-                Results (top K)
-              </span>
-              <input
-                type="number"
-                min={1}
-                max={100}
-                value={filters.topK}
-                onChange={(e) =>
-                  update({ topK: Math.max(1, Math.min(100, Number(e.target.value) || 1)) })
-                }
-                className="w-full rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
-              />
-            </label>
+        <Field label="Accession number(s)">
+          <input
+            type="text"
+            value={filters.accessionNumbers.join(", ")}
+            onChange={(e) => handleAccessionChange(e.target.value)}
+            placeholder="e.g. 0000320193-24-000123, 0000320193-24-000456"
+            className={INPUT_CLASS}
+          />
+        </Field>
+      </Section>
 
-            {/* Min similarity */}
-            <label className="space-y-1">
-              <span className="text-xs font-medium text-gray-600 dark:text-gray-400">
-                Min similarity: {Math.round(filters.minSimilarity * 100)}%
-              </span>
-              <input
-                type="range"
-                min={0}
-                max={1}
-                step={0.05}
-                value={filters.minSimilarity}
-                onChange={(e) => update({ minSimilarity: Number(e.target.value) })}
-                className="w-full accent-blue-600"
-              />
-            </label>
+      {/* ==================== RELEVANCE ==================== */}
+      <Section heading="Relevance" showHeading={layout === "rail"}>
+        <div className={inlineGrid ? "grid gap-4 sm:grid-cols-2" : "space-y-3"}>
+          <Field label="Results (top K)">
+            <input
+              type="number"
+              min={1}
+              max={100}
+              value={filters.topK}
+              onChange={(e) =>
+                onChange({
+                  topK: Math.max(1, Math.min(100, Number(e.target.value) || 1)),
+                })
+              }
+              className={INPUT_CLASS}
+            />
+          </Field>
 
-            {/* Accession numbers (comma-separated) */}
-            <label className="space-y-1 sm:col-span-2 lg:col-span-1">
-              <span className="text-xs font-medium text-gray-600 dark:text-gray-400">
-                Accession number(s)
-              </span>
-              <input
-                type="text"
-                value={filters.accessionNumbers.join(", ")}
-                onChange={(e) => handleAccessionChange(e.target.value)}
-                placeholder="e.g. 0000320193-24-000123, 0000320193-24-000456"
-                className="w-full rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 placeholder:text-gray-400 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:placeholder:text-gray-500"
-              />
-            </label>
-
-            {/* Date range — From */}
-            <label className="space-y-1">
-              <span className="text-xs font-medium text-gray-600 dark:text-gray-400">
-                From date
-              </span>
-              <input
-                type="date"
-                value={filters.startDate}
-                onChange={(e) => update({ startDate: e.target.value })}
-                className="w-full rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
-              />
-            </label>
-
-            {/* Date range — To */}
-            <label className="space-y-1">
-              <span className="text-xs font-medium text-gray-600 dark:text-gray-400">
-                To date
-              </span>
-              <input
-                type="date"
-                value={filters.endDate}
-                onChange={(e) => update({ endDate: e.target.value })}
-                className="w-full rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
-              />
-            </label>
-          </div>
+          <Field label={`Min similarity: ${Math.round(filters.minSimilarity * 100)}%`}>
+            <input
+              type="range"
+              min={0}
+              max={1}
+              step={0.05}
+              value={filters.minSimilarity}
+              onChange={(e) => onChange({ minSimilarity: Number(e.target.value) })}
+              className="w-full accent-[var(--accent)]"
+            />
+          </Field>
         </div>
-      )}
+      </Section>
+
+      {/* ==================== DATE RANGE ==================== */}
+      <Section heading="Date range" showHeading={layout === "rail"}>
+        <div className={inlineGrid ? "grid gap-4 sm:grid-cols-2" : "grid grid-cols-2 gap-3"}>
+          <Field label="From date">
+            <input
+              type="date"
+              value={filters.startDate}
+              onChange={(e) => onChange({ startDate: e.target.value })}
+              className={INPUT_CLASS}
+            />
+          </Field>
+
+          <Field label="To date">
+            <input
+              type="date"
+              value={filters.endDate}
+              onChange={(e) => onChange({ endDate: e.target.value })}
+              className={INPUT_CLASS}
+            />
+          </Field>
+        </div>
+      </Section>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Tiny layout helpers
+// ---------------------------------------------------------------------------
+
+function Section({
+  heading,
+  showHeading,
+  children,
+}: {
+  heading: string;
+  showHeading: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <div>
+      {showHeading && <div className={GROUP_HEADING}>{heading}</div>}
+      <div className="space-y-3">{children}</div>
+    </div>
+  );
+}
+
+function Field({ label, children }: { label: string; children: ReactNode }) {
+  // Used for real form inputs (number, text, date, range) — the
+  // native `<label>` wrapping gives implicit labelling for a11y.
+  return (
+    <label className="block space-y-1.5">
+      <span className={FIELD_LABEL}>{label}</span>
+      {children}
+    </label>
+  );
+}
+
+function ChipGroup({ label, children }: { label: string; children: ReactNode }) {
+  // Used for multi-button chip groups. A `<label>` would collapse
+  // every chip's accessible name into the group label, so we use a
+  // plain `<div>` with a visible caption instead.
+  return (
+    <div className="space-y-1.5">
+      <span className={FIELD_LABEL}>{label}</span>
+      {children}
     </div>
   );
 }

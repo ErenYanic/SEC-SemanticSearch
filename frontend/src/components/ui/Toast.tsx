@@ -168,15 +168,9 @@ export function useToast(): ToastContextValue {
  * All classes are full static strings for Tailwind v4 scanner.
  */
 const VARIANT_CLASSES: Record<ToastVariant, string> = {
-  success:
-    "border-green-200 bg-green-50 text-green-800 " +
-    "dark:border-green-800 dark:bg-green-950 dark:text-green-200",
-  error:
-    "border-red-200 bg-red-50 text-red-800 " +
-    "dark:border-red-800 dark:bg-red-950 dark:text-red-200",
-  info:
-    "border-blue-200 bg-blue-50 text-blue-800 " +
-    "dark:border-blue-800 dark:bg-blue-950 dark:text-blue-200",
+  success: "border-pos/40 bg-pos/10 text-pos",
+  error: "border-neg/40 bg-neg/10 text-neg",
+  info: "border-accent/40 bg-accent/10 text-accent",
 };
 
 /** Variant → lucide icon component. */
@@ -248,7 +242,7 @@ function ToastItem({ toast, onRemove }: ToastItemProps) {
     <div
       role="alert"
       className={[
-        "flex items-center gap-3 rounded-lg border px-4 py-3 shadow-lg",
+        "flex min-w-[280px] items-center gap-3 rounded-xl border px-4 py-3 shadow-xl backdrop-blur-md",
         VARIANT_CLASSES[toast.variant],
       ].join(" ")}
     >

@@ -1,11 +1,10 @@
 /**
  * Filing table loading skeleton — mirrors `FilingTable` with its
- * checkbox column, 5 data columns, action column, and pagination footer.
+ * checkbox column, 6 data columns, action column, and pagination footer.
  *
- * The skeleton renders 5 placeholder rows (half a default page of 10).
- * Using fewer rows than the real page prevents the skeleton from being
- * taller than the real content, which would cause a noticeable layout
- * shrink on load.
+ * 5 placeholder rows (half a default page of 10) keeps the skeleton
+ * shorter than the real content so the transition doesn't shrink
+ * visibly when data arrives.
  */
 
 import { Skeleton } from "@/components/ui";
@@ -14,11 +13,8 @@ import { Skeleton } from "@/components/ui";
 // Constants
 // ---------------------------------------------------------------------------
 
-/** Number of placeholder rows to show. */
 const ROW_COUNT = 5;
-
-/** Column header labels — matches `FilingTable.COLUMNS` ordering. */
-const HEADER_WIDTHS = ["w-14", "w-12", "w-20", "w-14", "w-16"];
+const HEADER_WIDTHS = ["w-12", "w-10", "w-28", "w-16", "w-14", "w-16"];
 
 // ---------------------------------------------------------------------------
 // Component
@@ -27,61 +23,60 @@ const HEADER_WIDTHS = ["w-14", "w-12", "w-20", "w-14", "w-16"];
 export function FilingTableSkeleton() {
   return (
     <div className="space-y-3">
-      {/* Table container */}
-      <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-950">
-        <table className="w-full text-left text-sm">
-          {/* ---- Header ---- */}
+      {/* ---- Table container ---- */}
+      <div className="overflow-x-auto rounded-lg border border-hairline bg-card">
+        <table className="w-full border-collapse text-left">
           <thead>
-            <tr className="border-b border-gray-200 bg-gray-50 dark:border-gray-800 dark:bg-gray-900">
-              {/* Checkbox column */}
-              <th className="w-10 px-4 py-3">
-                <Skeleton className="h-4 w-4 rounded" />
+            <tr className="border-b border-hairline bg-surface/60">
+              <th className="w-10 px-4 py-2.5">
+                <Skeleton className="h-3.5 w-3.5 rounded" />
               </th>
-              {/* Data columns */}
               {HEADER_WIDTHS.map((w, i) => (
-                <th key={i} className="px-4 py-3">
-                  <Skeleton className={`h-4 ${w}`} />
+                <th key={i} className="px-4 py-2.5">
+                  <Skeleton className={`h-3 ${w}`} />
                 </th>
               ))}
-              {/* Actions column */}
-              <th className="w-16 px-4 py-3" />
+              <th className="w-14 px-4 py-2.5" />
             </tr>
           </thead>
 
-          {/* ---- Body rows ---- */}
           <tbody>
             {Array.from({ length: ROW_COUNT }, (_, i) => (
               <tr
                 key={i}
-                className="border-t border-gray-100 dark:border-gray-800"
+                className="border-b border-hairline/70 last:border-b-0"
               >
                 {/* Checkbox */}
-                <td className="px-4 py-3">
-                  <Skeleton className="h-4 w-4 rounded" />
+                <td className="px-4 py-2.5">
+                  <Skeleton className="h-3.5 w-3.5 rounded" />
                 </td>
                 {/* Ticker */}
-                <td className="px-4 py-3">
+                <td className="px-4 py-2.5">
                   <Skeleton className="h-4 w-12" />
                 </td>
-                {/* Form type badge */}
-                <td className="px-4 py-3">
-                  <Skeleton className="h-5 w-12 rounded-full" />
+                {/* Form type */}
+                <td className="px-4 py-2.5">
+                  <Skeleton className="h-4 w-10 rounded" />
+                </td>
+                {/* Accession number */}
+                <td className="px-4 py-2.5">
+                  <Skeleton className="h-3 w-32" />
                 </td>
                 {/* Filing date */}
-                <td className="px-4 py-3">
-                  <Skeleton className="h-4 w-24" />
+                <td className="px-4 py-2.5">
+                  <Skeleton className="h-3 w-20" />
                 </td>
-                {/* Chunk count */}
-                <td className="px-4 py-3 text-right">
-                  <Skeleton className="ml-auto h-4 w-10" />
+                {/* Chunks */}
+                <td className="px-4 py-2.5 text-right">
+                  <Skeleton className="ml-auto h-3 w-10" />
                 </td>
                 {/* Ingested at */}
-                <td className="px-4 py-3">
-                  <Skeleton className="h-4 w-20" />
+                <td className="px-4 py-2.5">
+                  <Skeleton className="h-3 w-20" />
                 </td>
                 {/* Action button */}
-                <td className="px-4 py-3">
-                  <Skeleton className="h-7 w-7 rounded-md" />
+                <td className="px-4 py-2.5">
+                  <Skeleton className="h-6 w-6 rounded-md" />
                 </td>
               </tr>
             ))}
@@ -90,12 +85,12 @@ export function FilingTableSkeleton() {
       </div>
 
       {/* ---- Pagination footer ---- */}
-      <div className="flex items-center justify-between">
-        <Skeleton className="h-4 w-40" />
-        <Skeleton className="h-4 w-20" />
+      <div className="flex items-center justify-between gap-3 px-1">
+        <Skeleton className="h-3 w-40" />
+        <Skeleton className="h-3 w-20" />
         <div className="flex items-center gap-2">
           <Skeleton className="h-7 w-7 rounded-md" />
-          <Skeleton className="h-4 w-12" />
+          <Skeleton className="h-3 w-10" />
           <Skeleton className="h-7 w-7 rounded-md" />
         </div>
       </div>

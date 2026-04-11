@@ -42,7 +42,7 @@
 import { Suspense, useCallback, useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { Database, FileText, Upload } from "lucide-react";
+import { Database, Upload } from "lucide-react";
 import { useStatus } from "@/hooks/useStatus";
 import { useAdminSession } from "@/hooks/useAdminSession";
 import {
@@ -51,7 +51,7 @@ import {
   type FilingQueryParams,
 } from "@/hooks/useFilings";
 import { extractApiError } from "@/lib/api";
-import { Badge, Button, EmptyState, FullPageSpinner, useToast } from "@/components/ui";
+import { Button, EmptyState, FullPageSpinner, useToast } from "@/components/ui";
 import {
   FilingTable,
   FilingTableSkeleton,
@@ -224,19 +224,40 @@ function FilingsContent() {
   }
 
   // ---- State machine: data loaded ----
+  const totalFilings = filing.total;
+  const tickerCount = status?.tickers.length ?? 0;
+
   return (
-    <div className="space-y-4 [animation:fade-in_200ms_ease-out]">
-      {/* Page header */}
-      <div className="flex items-center gap-3">
-        <FileText className="h-8 w-8 text-blue-600 dark:text-blue-400" />
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+    <div className="space-y-5 [animation:fade-in_200ms_ease-out]">
+      {/* ---- Compact page header ---- */}
+      <div className="flex flex-wrap items-baseline justify-between gap-3">
+        <h1 className="text-2xl font-semibold tracking-tight text-fg">
           Filings
         </h1>
-        <Badge variant="blue">{filing.total}</Badge>
+        <div className="flex items-baseline gap-2 font-mono text-[11px] tabular-nums text-fg-muted">
+          <span className="font-semibold text-fg">
+            {totalFilings.toLocaleString()}
+          </span>
+          <span>filing{totalFilings !== 1 && "s"}</span>
+          <span className="text-fg-subtle">·</span>
+          <span className="font-semibold text-fg">
+            {tickerCount.toLocaleString()}
+          </span>
+          <span>ticker{tickerCount !== 1 && "s"}</span>
+          {selected.size > 0 && (
+            <>
+              <span className="text-fg-subtle">·</span>
+              <span className="font-semibold text-accent">
+                {selected.size.toLocaleString()}
+              </span>
+              <span className="text-accent">selected</span>
+            </>
+          )}
+        </div>
       </div>
 
-      {/* Filters + Bulk Actions */}
-      <div className="flex flex-wrap items-center justify-between gap-4">
+      {/* ---- Toolbar: filters + bulk actions ---- */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <FilingFilters
           ticker={params.ticker}
           formType={params.formType}

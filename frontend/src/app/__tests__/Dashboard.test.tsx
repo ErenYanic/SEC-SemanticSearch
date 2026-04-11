@@ -110,7 +110,9 @@ describe("DashboardPage", () => {
 
     render(<DashboardPage />, { wrapper });
     expect(screen.getByText("Dashboard")).toBeInTheDocument();
-    expect(screen.getByText("5")).toBeInTheDocument(); // filing count
+    // Filing count "5" appears in both the KPI card and the header
+    // meta strip — at least one match confirms render.
+    expect(screen.getAllByText("5").length).toBeGreaterThan(0);
     // Chunk count is formatted via toLocaleString() — locale varies in jsdom
     expect(screen.getByText("AAPL")).toBeInTheDocument();
     expect(screen.getByText("MSFT")).toBeInTheDocument();

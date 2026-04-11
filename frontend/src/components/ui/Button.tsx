@@ -59,8 +59,8 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
  * keyboard navigation — mouse clicks won't show it.
  */
 const BASE =
-  "inline-flex items-center justify-center gap-2 rounded-md font-medium " +
-  "transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 " +
+  "inline-flex items-center justify-center gap-2 rounded-lg font-medium " +
+  "transition-all focus-visible:outline-2 focus-visible:outline-offset-2 " +
   "disabled:pointer-events-none disabled:opacity-50";
 
 /**
@@ -70,40 +70,32 @@ const BASE =
  */
 const VARIANT_CLASSES: Record<NonNullable<ButtonProps["variant"]>, string> = {
   primary:
-    "bg-blue-600 text-white hover:bg-blue-700 " +
-    "focus-visible:outline-blue-600 " +
-    "dark:bg-blue-500 dark:hover:bg-blue-600",
+    "bg-accent text-accent-fg shadow-sm shadow-accent/20 hover:brightness-110 " +
+    "hover:shadow-md hover:shadow-accent/30 focus-visible:outline-accent",
   destructive:
-    "bg-red-600 text-white hover:bg-red-700 " +
-    "focus-visible:outline-red-600 " +
-    "dark:bg-red-500 dark:hover:bg-red-600",
+    "bg-neg text-accent-fg shadow-sm shadow-neg/20 hover:brightness-110 " +
+    "focus-visible:outline-neg",
   secondary:
-    "bg-gray-100 text-gray-700 hover:bg-gray-200 " +
-    "focus-visible:outline-gray-500 " +
-    "dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700",
+    "border border-hairline bg-card text-fg hover:border-accent/40 hover:bg-surface " +
+    "focus-visible:outline-accent",
   ghost:
-    "text-gray-600 hover:bg-gray-100 hover:text-gray-900 " +
-    "focus-visible:outline-gray-500 " +
-    "dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100",
+    "text-fg-muted hover:bg-card hover:text-fg " +
+    "focus-visible:outline-accent",
 };
 
 /**
- * Size classes control padding and font size.  The values are chosen
- * to match the existing spacing scale in the Navbar (px-3 py-2 for
- * nav links, p-2 for the icon button).
+ * Size classes control padding and font size. Deliberately consistent —
+ * md is the default and matches other interactive elements (nav links,
+ * form inputs) so nothing feels smaller than it needs to be.
  */
 const SIZE_CLASSES: Record<NonNullable<ButtonProps["size"]>, string> = {
-  sm: "px-2.5 py-1.5 text-xs",
-  md: "px-4 py-2 text-sm",
+  sm: "px-3 py-1.5 text-sm",
+  md: "px-4 py-2.5 text-sm",
   lg: "px-6 py-3 text-base",
 };
 
-/**
- * Spinner sizes match the text size of each button size so the
- * spinner feels proportional.
- */
 const SPINNER_SIZES: Record<NonNullable<ButtonProps["size"]>, string> = {
-  sm: "h-3 w-3",
+  sm: "h-4 w-4",
   md: "h-4 w-4",
   lg: "h-5 w-5",
 };

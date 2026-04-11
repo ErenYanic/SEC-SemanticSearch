@@ -1,25 +1,20 @@
 /**
- * FilingFilters — inline ticker and form type dropdowns for the Filings page.
+ * FilingFilters — inline ticker and form type selects for the Filings page.
  *
- * Unlike the Search page's collapsible filter panel (5 filters, hidden by
+ * Unlike the Search page's chip-based filter rail (many filters, hidden by
  * default), the Filings page has only 2 filters and they are the primary
- * navigation tool, so they are always visible in a horizontal row.
+ * navigation tool, so they live inline in the toolbar row as compact
+ * selects.
  *
- * Both dropdowns are **controlled components**: the page owns the state
- * and passes values + change handlers as props. This makes the page the
- * single source of truth for filter values, which it also uses for:
- *   - the `useFilings` hook (API call parameters)
- *   - URL query parameter synchronisation
- *   - clearing the selection set on filter change
- *
- * Available options come from `useStatus()` data (passed down by the page),
- * so the dropdowns only show tickers/forms that actually exist in the
- * database — no hardcoded lists.
+ * Both dropdowns are controlled — the parent page owns the state and
+ * passes values + change handlers as props, making the page the single
+ * source of truth for filter values (also used for URL sync + selection
+ * clearing).
  */
 
 "use client";
 
-import { Filter } from "lucide-react";
+import { Filter, X } from "lucide-react";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -41,11 +36,13 @@ interface FilingFiltersProps {
 }
 
 // ---------------------------------------------------------------------------
-// Shared class string — matches the <select> styling in SearchFilters.tsx
+// Styles
 // ---------------------------------------------------------------------------
 
 const SELECT_CLASSES =
-  "w-full rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100";
+  "rounded-md border border-hairline bg-card px-3 py-1.5 font-mono text-xs tabular-nums " +
+  "text-fg outline-none transition-colors hover:border-fg-subtle/40 " +
+  "focus:border-accent focus:ring-2 focus:ring-accent/25";
 
 // ---------------------------------------------------------------------------
 // Component
@@ -59,9 +56,11 @@ export function FilingFilters({
   availableTickers,
   availableFormTypes,
 }: FilingFiltersProps) {
+  const hasActive = ticker !== "" || formType !== "";
+
   return (
-    <div className="flex items-center gap-3">
-      <Filter className="h-4 w-4 shrink-0 text-gray-400 dark:text-gray-500" />
+    <div className="flex flex-wrap items-center gap-2">
+      <Filter className="h-4 w-4 shrink-0 text-fg-subtle" aria-hidden="true" />
 
       {/* Ticker dropdown */}
       <select
@@ -92,6 +91,22 @@ export function FilingFilters({
           </option>
         ))}
       </select>
+
+      {/* Clear filters — only shown when at least one filter is active */}
+      {hasActive && (
+        <button
+          type="button"
+          onClick={() => {
+            onTickerChange("");
+            onFormTypeChange("");
+          }}
+          className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-medium text-fg-muted transition-colors hover:text-fg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+          aria-label="Clear all filters"
+        >
+          <X className="h-3 w-3" />
+          Clear
+        </button>
+      )}
     </div>
   );
 }

@@ -59,7 +59,7 @@ export function Spinner({ size = "md", className }: SpinnerProps) {
       <Loader2
         className={[
           SIZE_CLASSES[size],
-          "animate-spin text-blue-600 dark:text-blue-400",
+          "animate-spin text-accent",
           className,
         ]
           .filter(Boolean)

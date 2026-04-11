@@ -17,8 +17,8 @@
  * The pipeline has 5 fixed steps: Fetching → Parsing → Chunking →
  * Embedding → Storing.  The stepper uses `step_index` (0-based) from
  * `TaskProgress` to determine which step is current.  Completed steps
- * show a green checkmark, the current step pulses blue, and upcoming
- * steps are grey.
+ * show an accent checkmark, the current step pulses, and upcoming steps
+ * are muted.
  */
 
 "use client";
@@ -56,39 +56,37 @@ interface ProgressTrackerProps {
 
 const STEP_LABELS = ["Fetching", "Parsing", "Chunking", "Embedding", "Storing"];
 
-// Static Tailwind class maps — never interpolated.
-const STEP_CIRCLE_CLASSES: Record<"completed" | "current" | "upcoming", string> = {
-  completed: "bg-green-500 text-white dark:bg-green-600",
-  current: "bg-blue-500 text-white animate-pulse dark:bg-blue-600",
-  upcoming: "bg-gray-200 text-gray-400 dark:bg-gray-700 dark:text-gray-500",
+type StepState = "completed" | "current" | "upcoming";
+
+const STEP_CIRCLE_CLASSES: Record<StepState, string> = {
+  completed: "border-accent/60 bg-accent/15 text-accent",
+  current: "border-accent bg-accent text-accent-fg animate-pulse",
+  upcoming: "border-hairline bg-card text-fg-subtle",
 };
 
-const STEP_LABEL_CLASSES: Record<"completed" | "current" | "upcoming", string> = {
-  completed: "text-green-700 dark:text-green-400",
-  current: "text-blue-700 font-medium dark:text-blue-400",
-  upcoming: "text-gray-400 dark:text-gray-500",
+const STEP_LABEL_CLASSES: Record<StepState, string> = {
+  completed: "text-accent",
+  current: "text-fg",
+  upcoming: "text-fg-subtle",
 };
 
 const STEP_LINE_CLASSES: Record<"completed" | "upcoming", string> = {
-  completed: "bg-green-500 dark:bg-green-600",
-  upcoming: "bg-gray-200 dark:bg-gray-700",
+  completed: "bg-accent/60",
+  upcoming: "bg-hairline",
 };
 
 const EVENT_CLASSES: Record<FilingEvent["type"], string> = {
-  done: "text-green-600 dark:text-green-400",
-  skipped: "text-amber-600 dark:text-amber-400",
-  failed: "text-red-600 dark:text-red-400",
-  eviction: "text-orange-600 dark:text-orange-400",
+  done: "text-pos",
+  skipped: "text-warn",
+  failed: "text-neg",
+  eviction: "text-warn",
 };
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-function getStepState(
-  stepIndex: number,
-  currentIndex: number,
-): "completed" | "current" | "upcoming" {
+function getStepState(stepIndex: number, currentIndex: number): StepState {
   if (stepIndex < currentIndex) return "completed";
   if (stepIndex === currentIndex) return "current";
   return "upcoming";
@@ -97,13 +95,13 @@ function getStepState(
 function EventIcon({ type }: { type: FilingEvent["type"] }) {
   switch (type) {
     case "done":
-      return <CheckCircle2 className="h-4 w-4 shrink-0" />;
+      return <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />;
     case "skipped":
-      return <SkipForward className="h-4 w-4 shrink-0" />;
+      return <SkipForward className="h-3.5 w-3.5 shrink-0" />;
     case "failed":
-      return <XCircle className="h-4 w-4 shrink-0" />;
+      return <XCircle className="h-3.5 w-3.5 shrink-0" />;
     case "eviction":
-      return <Trash2 className="h-4 w-4 shrink-0" />;
+      return <Trash2 className="h-3.5 w-3.5 shrink-0" />;
   }
 }
 
@@ -144,12 +142,10 @@ export function ProgressTracker({
 
   // ---- Computed values ----
   const hasTotal = progress.filings_total > 0;
+  const processed =
+    progress.filings_done + progress.filings_skipped + progress.filings_failed;
   const progressPercent = hasTotal
-    ? Math.round(
-        ((progress.filings_done + progress.filings_skipped + progress.filings_failed) /
-          progress.filings_total) *
-          100,
-      )
+    ? Math.round((processed / progress.filings_total) * 100)
     : 0;
 
   const statusText =
@@ -157,46 +153,59 @@ export function ProgressTracker({
       ? `Processing ${progress.current_ticker} ${progress.current_form_type}`
       : "Waiting to start\u2026";
 
-  const counterParts: string[] = [];
-  const processed = progress.filings_done + progress.filings_skipped + progress.filings_failed;
-  if (hasTotal) {
-    counterParts.push(`${processed} of ${progress.filings_total} filings`);
-  }
-  if (progress.filings_skipped > 0) {
-    counterParts.push(`${progress.filings_skipped} skipped`);
-  }
-  if (progress.filings_failed > 0) {
-    counterParts.push(`${progress.filings_failed} failed`);
-  }
-
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 rounded-lg border border-hairline bg-surface p-6">
       {/* ---- Status header ---- */}
-      <div className="flex items-center gap-3">
-        <Loader2 className="h-5 w-5 animate-spin text-blue-600 dark:text-blue-400" />
-        <span className="text-lg font-medium text-gray-900 dark:text-gray-100">
-          {statusText}
-        </span>
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2.5">
+          <Loader2 className="h-4 w-4 animate-spin text-accent" />
+          <span className="font-mono text-sm tabular-nums text-fg">
+            {statusText}
+          </span>
+        </div>
+        {hasTotal && (
+          <span className="font-mono text-[11px] tabular-nums text-fg-muted">
+            <span className="text-fg">{progressPercent}%</span>
+          </span>
+        )}
       </div>
 
       {/* ---- Overall progress bar ---- */}
       <div className="space-y-2">
-        <div className="h-3 overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700">
+        <div className="h-1 w-full overflow-hidden rounded-full bg-card">
           {hasTotal ? (
             <div
-              className="h-full rounded-full bg-blue-600 transition-all duration-500 dark:bg-blue-500"
+              className="h-full rounded-full bg-accent transition-all duration-500"
               style={{ width: `${progressPercent}%` }}
             />
           ) : (
-            // Indeterminate: animated shimmer when total is unknown.
-            <div className="h-full w-1/3 animate-pulse rounded-full bg-blue-400 dark:bg-blue-600" />
+            <div className="h-full w-1/3 animate-pulse rounded-full bg-accent/60" />
           )}
         </div>
-        {counterParts.length > 0 && (
-          <p className="text-sm text-gray-600 dark:text-gray-400">
-            {counterParts.join(" \u00B7 ")}
-          </p>
-        )}
+        <div className="flex flex-wrap gap-3 font-mono text-[11px] tabular-nums text-fg-muted">
+          {hasTotal && (
+            <span>
+              <span className="text-fg">{processed}</span>
+              <span className="text-fg-subtle"> / </span>
+              <span className="text-fg">{progress.filings_total}</span>
+              <span className="text-fg-subtle"> filings</span>
+            </span>
+          )}
+          {progress.filings_skipped > 0 && (
+            <>
+              <span className="text-fg-subtle">·</span>
+              <span className="text-warn">
+                {progress.filings_skipped} skipped
+              </span>
+            </>
+          )}
+          {progress.filings_failed > 0 && (
+            <>
+              <span className="text-fg-subtle">·</span>
+              <span className="text-neg">{progress.filings_failed} failed</span>
+            </>
+          )}
+        </div>
       </div>
 
       {/* ---- Step indicator (horizontal stepper) ---- */}
@@ -205,28 +214,29 @@ export function ProgressTracker({
           const stepState = getStepState(index, progress.step_index);
           return (
             <div key={label} className="flex flex-1 items-center">
-              {/* Step circle */}
-              <div className="flex flex-col items-center gap-1">
+              <div className="flex flex-col items-center gap-1.5">
                 <div
-                  className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-medium ${STEP_CIRCLE_CLASSES[stepState]}`}
+                  className={`flex h-7 w-7 items-center justify-center rounded-full border font-mono text-[11px] font-semibold tabular-nums ${STEP_CIRCLE_CLASSES[stepState]}`}
                 >
                   {stepState === "completed" ? (
-                    <CheckCircle2 className="h-4 w-4" />
+                    <CheckCircle2 className="h-3.5 w-3.5" />
                   ) : (
                     index + 1
                   )}
                 </div>
                 <span
-                  className={`text-xs ${STEP_LABEL_CLASSES[stepState]}`}
+                  className={`font-mono text-[10px] font-semibold uppercase tracking-widest ${STEP_LABEL_CLASSES[stepState]}`}
                 >
                   {label}
                 </span>
               </div>
-
-              {/* Connecting line (not after the last step) */}
               {index < STEP_LABELS.length - 1 && (
                 <div
-                  className={`mx-1 h-0.5 flex-1 ${STEP_LINE_CLASSES[index < progress.step_index ? "completed" : "upcoming"]}`}
+                  className={`mx-1 h-px flex-1 ${
+                    STEP_LINE_CLASSES[
+                      index < progress.step_index ? "completed" : "upcoming"
+                    ]
+                  }`}
                 />
               )}
             </div>
@@ -236,23 +246,22 @@ export function ProgressTracker({
 
       {/* ---- Filing event list ---- */}
       {filingEvents.length > 0 && (
-        <div className="space-y-1">
-          <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300">
-            Filing Progress
-          </h3>
-          <div className="max-h-64 overflow-y-auto rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-gray-950">
-            <ul className="space-y-2">
+        <div className="space-y-2">
+          <div className="font-mono text-[10px] font-semibold uppercase tracking-widest text-fg-subtle">
+            Event Log
+          </div>
+          <div className="max-h-64 overflow-y-auto rounded-md border border-hairline bg-card p-3">
+            <ul className="space-y-1.5">
               {filingEvents.map((event, index) => (
                 <li
                   key={index}
-                  className={`flex items-start gap-2 text-sm ${EVENT_CLASSES[event.type]}`}
+                  className={`flex items-start gap-2 font-mono text-xs tabular-nums ${EVENT_CLASSES[event.type]}`}
                 >
                   <EventIcon type={event.type} />
                   <span>{formatEventText(event)}</span>
                 </li>
               ))}
             </ul>
-            {/* Scroll anchor — auto-scrolls to show new events. */}
             <div ref={scrollRef} />
           </div>
         </div>
@@ -260,11 +269,12 @@ export function ProgressTracker({
 
       {/* ---- Cancel button ---- */}
       {canCancel && (
-        <div className="flex justify-end">
+        <div className="flex justify-end border-t border-hairline pt-4">
           <Button
-            variant="destructive"
+            variant="ghost"
             size="sm"
             onClick={() => setShowCancelModal(true)}
+            className="border border-neg/40 text-neg hover:bg-neg/10 hover:text-neg"
           >
             Cancel Ingestion
           </Button>
@@ -283,7 +293,7 @@ export function ProgressTracker({
         confirmLabel="Cancel Ingestion"
         confirmVariant="destructive"
       >
-        <p className="text-sm text-gray-600 dark:text-gray-400">
+        <p className="text-sm text-fg-muted">
           The current filing will finish processing, but no new filings will
           start. Already-ingested filings will remain in the database.
         </p>
