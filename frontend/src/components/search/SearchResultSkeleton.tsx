@@ -17,74 +17,66 @@ import { Skeleton } from "@/components/ui";
 // Sub-components
 // ---------------------------------------------------------------------------
 
-/** Mirrors the new row-style ResultCard: left gutter + main column. */
 function ResultRowSkeleton() {
   return (
-    <div className="grid grid-cols-[56px_1fr_auto] gap-4 border-b border-hairline px-4 py-3.5">
-      {/* Left gutter: rank + sim + bar */}
-      <div className="flex flex-col items-start gap-1.5">
-        <Skeleton className="h-3 w-6" />
-        <Skeleton className="h-4 w-10" />
+    <div className="grid grid-cols-[64px_1fr_auto] gap-5 border-b border-hairline px-6 py-5">
+      <div className="flex flex-col items-start gap-2">
+        <Skeleton className="h-4 w-8" />
+        <Skeleton className="h-5 w-12" />
         <Skeleton className="h-1 w-full rounded-full" />
       </div>
 
-      {/* Main column: metadata + path + snippet */}
-      <div className="min-w-0 space-y-2">
+      <div className="min-w-0 space-y-2.5">
         <div className="flex gap-2">
-          <Skeleton className="h-3 w-12" />
-          <Skeleton className="h-3 w-10" />
-          <Skeleton className="h-3 w-20" />
-          <Skeleton className="h-3 w-32" />
+          <Skeleton className="h-4 w-14" />
+          <Skeleton className="h-4 w-12" />
+          <Skeleton className="h-4 w-24" />
+          <Skeleton className="h-4 w-40" />
         </div>
-        <Skeleton className="h-3 w-2/3" />
-        <Skeleton className="h-4 w-full" />
-        <Skeleton className="h-4 w-[92%]" />
+        <Skeleton className="h-4 w-2/3" />
+        <Skeleton className="h-5 w-full" />
+        <Skeleton className="h-5 w-[92%]" />
       </div>
 
-      {/* Right gutter: action slot */}
       <div>
-        <Skeleton className="h-7 w-7 rounded-md" />
+        <Skeleton className="h-9 w-9 rounded-lg" />
       </div>
     </div>
   );
 }
 
-// ---------------------------------------------------------------------------
-// Main export
-// ---------------------------------------------------------------------------
-
 const ROW_COUNT = 4;
 
 export function SearchResultSkeleton() {
   return (
-    <div className="space-y-4">
-      {/* Page title placeholder */}
-      <div className="flex items-center gap-3">
-        <Skeleton className="h-7 w-24" />
+    <div className="space-y-8">
+      {/* Page header placeholder */}
+      <div className="space-y-3">
+        <Skeleton className="h-9 w-32" />
+        <Skeleton className="h-5 w-80" />
       </div>
 
       {/* Search bar placeholder */}
-      <Skeleton className="h-14 w-full rounded-lg" />
+      <Skeleton className="h-16 w-full rounded-2xl" />
 
-      {/* Two-column layout: rail + main */}
-      <div className="grid gap-6 lg:grid-cols-[280px_1fr]">
+      {/* Two-column layout */}
+      <div className="grid gap-6 lg:grid-cols-[300px_1fr]">
         {/* Rail placeholder */}
-        <div className="space-y-3 rounded-lg border border-hairline bg-surface p-5">
-          <Skeleton className="h-4 w-20" />
-          <Skeleton className="h-3 w-full" />
-          <Skeleton className="h-3 w-5/6" />
+        <div className="space-y-4 rounded-2xl border border-hairline bg-card/70 p-6">
+          <Skeleton className="h-5 w-24" />
+          <Skeleton className="h-4 w-full" />
+          <Skeleton className="h-4 w-5/6" />
           <div className="pt-2">
-            <Skeleton className="h-4 w-20" />
+            <Skeleton className="h-5 w-24" />
           </div>
-          <Skeleton className="h-8 w-full rounded-md" />
+          <Skeleton className="h-10 w-full rounded-lg" />
         </div>
 
         {/* Results column placeholder */}
-        <div className="rounded-lg border border-hairline bg-surface">
-          {/* Meta header */}
-          <div className="flex items-center justify-between border-b border-hairline px-4 py-2.5">
-            <Skeleton className="h-3 w-48" />
-            <Skeleton className="h-3 w-32" />
+        <div className="rounded-2xl border border-hairline bg-card/70">
+          <div className="flex items-center justify-between border-b border-hairline px-6 py-4">
+            <Skeleton className="h-5 w-52" />
+            <Skeleton className="h-5 w-36" />
           </div>
           {Array.from({ length: ROW_COUNT }, (_, i) => (
             <ResultRowSkeleton key={i} />

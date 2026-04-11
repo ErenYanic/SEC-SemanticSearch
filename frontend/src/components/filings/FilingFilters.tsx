@@ -40,8 +40,8 @@ interface FilingFiltersProps {
 // ---------------------------------------------------------------------------
 
 const SELECT_CLASSES =
-  "rounded-md border border-hairline bg-card px-3 py-1.5 font-mono text-xs tabular-nums " +
-  "text-fg outline-none transition-colors hover:border-fg-subtle/40 " +
+  "rounded-lg border border-hairline bg-card px-3.5 py-2 text-sm font-medium tabular-nums " +
+  "text-fg outline-none transition-colors hover:border-accent/40 " +
   "focus:border-accent focus:ring-2 focus:ring-accent/25";
 
 // ---------------------------------------------------------------------------
@@ -59,7 +59,7 @@ export function FilingFilters({
   const hasActive = ticker !== "" || formType !== "";
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
+    <div className="flex flex-wrap items-center gap-3">
       <Filter className="h-4 w-4 shrink-0 text-fg-subtle" aria-hidden="true" />
 
       {/* Ticker dropdown */}
@@ -100,10 +100,10 @@ export function FilingFilters({
             onTickerChange("");
             onFormTypeChange("");
           }}
-          className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-medium text-fg-muted transition-colors hover:text-fg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+          className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium text-fg-muted transition-colors hover:text-fg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
           aria-label="Clear all filters"
         >
-          <X className="h-3 w-3" />
+          <X className="h-3.5 w-3.5" />
           Clear
         </button>
       )}

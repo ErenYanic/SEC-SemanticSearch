@@ -22,21 +22,36 @@ const HEADER_WIDTHS = ["w-12", "w-10", "w-28", "w-16", "w-14", "w-16"];
 
 export function FilingTableSkeleton() {
   return (
-    <div className="space-y-3">
+    <div className="space-y-8">
+      {/* ---- Page header placeholder ---- */}
+      <div className="space-y-3">
+        <Skeleton className="h-9 w-32" />
+        <Skeleton className="h-5 w-72" />
+      </div>
+
+      {/* ---- Toolbar placeholder ---- */}
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <Skeleton className="h-10 w-40 rounded-lg" />
+          <Skeleton className="h-10 w-44 rounded-lg" />
+        </div>
+        <Skeleton className="h-10 w-48 rounded-lg" />
+      </div>
+
       {/* ---- Table container ---- */}
-      <div className="overflow-x-auto rounded-lg border border-hairline bg-card">
+      <div className="overflow-x-auto rounded-2xl border border-hairline bg-card/80 shadow-sm backdrop-blur-sm">
         <table className="w-full border-collapse text-left">
           <thead>
-            <tr className="border-b border-hairline bg-surface/60">
-              <th className="w-10 px-4 py-2.5">
-                <Skeleton className="h-3.5 w-3.5 rounded" />
+            <tr className="border-b border-hairline bg-surface/40">
+              <th className="w-10 px-5 py-3.5">
+                <Skeleton className="h-4 w-4 rounded" />
               </th>
               {HEADER_WIDTHS.map((w, i) => (
-                <th key={i} className="px-4 py-2.5">
-                  <Skeleton className={`h-3 ${w}`} />
+                <th key={i} className="px-5 py-3.5">
+                  <Skeleton className={`h-3.5 ${w}`} />
                 </th>
               ))}
-              <th className="w-14 px-4 py-2.5" />
+              <th className="w-14 px-5 py-3.5" />
             </tr>
           </thead>
 
@@ -47,36 +62,36 @@ export function FilingTableSkeleton() {
                 className="border-b border-hairline/70 last:border-b-0"
               >
                 {/* Checkbox */}
-                <td className="px-4 py-2.5">
-                  <Skeleton className="h-3.5 w-3.5 rounded" />
+                <td className="px-5 py-3.5">
+                  <Skeleton className="h-4 w-4 rounded" />
                 </td>
                 {/* Ticker */}
-                <td className="px-4 py-2.5">
-                  <Skeleton className="h-4 w-12" />
+                <td className="px-5 py-3.5">
+                  <Skeleton className="h-5 w-14" />
                 </td>
                 {/* Form type */}
-                <td className="px-4 py-2.5">
-                  <Skeleton className="h-4 w-10 rounded" />
+                <td className="px-5 py-3.5">
+                  <Skeleton className="h-5 w-12 rounded-md" />
                 </td>
                 {/* Accession number */}
-                <td className="px-4 py-2.5">
-                  <Skeleton className="h-3 w-32" />
+                <td className="px-5 py-3.5">
+                  <Skeleton className="h-4 w-36" />
                 </td>
                 {/* Filing date */}
-                <td className="px-4 py-2.5">
-                  <Skeleton className="h-3 w-20" />
+                <td className="px-5 py-3.5">
+                  <Skeleton className="h-4 w-24" />
                 </td>
                 {/* Chunks */}
-                <td className="px-4 py-2.5 text-right">
-                  <Skeleton className="ml-auto h-3 w-10" />
+                <td className="px-5 py-3.5 text-right">
+                  <Skeleton className="ml-auto h-4 w-12" />
                 </td>
                 {/* Ingested at */}
-                <td className="px-4 py-2.5">
-                  <Skeleton className="h-3 w-20" />
+                <td className="px-5 py-3.5">
+                  <Skeleton className="h-4 w-24" />
                 </td>
                 {/* Action button */}
-                <td className="px-4 py-2.5">
-                  <Skeleton className="h-6 w-6 rounded-md" />
+                <td className="px-5 py-3.5">
+                  <Skeleton className="h-8 w-8 rounded-lg" />
                 </td>
               </tr>
             ))}
@@ -85,13 +100,13 @@ export function FilingTableSkeleton() {
       </div>
 
       {/* ---- Pagination footer ---- */}
-      <div className="flex items-center justify-between gap-3 px-1">
-        <Skeleton className="h-3 w-40" />
-        <Skeleton className="h-3 w-20" />
+      <div className="flex items-center justify-between gap-4 px-2">
+        <Skeleton className="h-4 w-44" />
+        <Skeleton className="h-4 w-24" />
         <div className="flex items-center gap-2">
-          <Skeleton className="h-7 w-7 rounded-md" />
-          <Skeleton className="h-3 w-10" />
-          <Skeleton className="h-7 w-7 rounded-md" />
+          <Skeleton className="h-8 w-8 rounded-lg" />
+          <Skeleton className="h-4 w-12" />
+          <Skeleton className="h-8 w-8 rounded-lg" />
         </div>
       </div>
     </div>

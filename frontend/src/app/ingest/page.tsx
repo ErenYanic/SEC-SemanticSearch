@@ -39,12 +39,12 @@ import type { IngestRequest } from "@/lib/types";
 // ---------------------------------------------------------------------------
 
 const STATUS_LABEL: Record<string, string> = {
-  idle: "READY",
-  pending: "QUEUED",
-  running: "STREAMING",
-  completed: "COMPLETE",
-  failed: "ERROR",
-  cancelled: "CANCELLED",
+  idle: "Ready",
+  pending: "Queued",
+  running: "Streaming",
+  completed: "Complete",
+  failed: "Error",
+  cancelled: "Cancelled",
 };
 
 const STATUS_TONE: Record<string, string> = {
@@ -82,11 +82,32 @@ export default function IngestPage() {
   }
 
   const header = (
-    <div className="flex flex-wrap items-baseline justify-between gap-3">
-      <h1 className="text-2xl font-semibold tracking-tight text-fg">Ingest</h1>
-      <div className="flex items-baseline gap-2 font-mono text-[11px] uppercase tabular-nums text-fg-muted">
-        <span className="text-fg-subtle">status</span>
-        <span className={`font-semibold ${STATUS_TONE[ingest.status]}`}>
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <h1 className="text-3xl font-semibold tracking-tight text-fg sm:text-4xl">
+          Ingest
+        </h1>
+        <span
+          className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-sm font-medium ${STATUS_TONE[ingest.status]} ${
+            ingest.status === "running" || ingest.status === "pending"
+              ? "border-accent/40 bg-accent/10"
+              : ingest.status === "completed"
+                ? "border-pos/40 bg-pos/10"
+                : ingest.status === "failed"
+                  ? "border-neg/40 bg-neg/10"
+                  : ingest.status === "cancelled"
+                    ? "border-warn/40 bg-warn/10"
+                    : "border-hairline bg-card/70"
+          }`}
+        >
+          <span
+            className={`h-1.5 w-1.5 rounded-full bg-current ${
+              ingest.status === "running" || ingest.status === "pending"
+                ? "animate-pulse"
+                : ""
+            }`}
+            aria-hidden="true"
+          />
           {STATUS_LABEL[ingest.status]}
         </span>
       </div>
@@ -96,9 +117,9 @@ export default function IngestPage() {
   switch (ingest.status) {
     case "idle":
       return (
-        <div className="space-y-5 [animation:fade-in_200ms_ease-out]">
+        <div className="space-y-8 [animation:fade-in_300ms_ease-out]">
           {header}
-          <p className="max-w-2xl text-sm text-fg-muted">
+          <p className="max-w-2xl text-base text-fg-muted">
             Fetch SEC filings, process them into chunks, and embed them for
             semantic search.
           </p>
@@ -109,7 +130,7 @@ export default function IngestPage() {
     case "pending":
     case "running":
       return (
-        <div className="space-y-5 [animation:fade-in_200ms_ease-out]">
+        <div className="space-y-8 [animation:fade-in_300ms_ease-out]">
           {header}
           <ProgressTracker
             progress={ingest.progress}
@@ -122,7 +143,7 @@ export default function IngestPage() {
 
     case "completed":
       return (
-        <div className="space-y-5 [animation:fade-in_200ms_ease-out]">
+        <div className="space-y-8 [animation:fade-in_300ms_ease-out]">
           {header}
           {ingest.summary && (
             <IngestSummary
@@ -139,16 +160,18 @@ export default function IngestPage() {
 
     case "failed":
       return (
-        <div className="space-y-5 [animation:fade-in_200ms_ease-out]">
+        <div className="space-y-8 [animation:fade-in_300ms_ease-out]">
           {header}
-          <div className="rounded-lg border border-neg/40 bg-neg/5 p-5">
-            <div className="flex items-center gap-2.5">
-              <AlertCircle className="h-4 w-4 text-neg" />
-              <h2 className="font-mono text-[11px] font-semibold uppercase tracking-widest text-neg">
-                Ingestion Failed
+          <div className="rounded-2xl border border-neg/40 bg-neg/5 p-6 shadow-sm backdrop-blur-sm">
+            <div className="flex items-center gap-3">
+              <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-neg/10 text-neg">
+                <AlertCircle className="h-5 w-5" />
+              </span>
+              <h2 className="text-lg font-semibold text-fg">
+                Ingestion failed
               </h2>
             </div>
-            <p className="mt-2 text-sm text-fg-muted">
+            <p className="mt-3 text-sm text-fg-muted">
               {ingest.error || "An unexpected error occurred."}
             </p>
             {ingest.filingEvents.length > 0 && ingest.summary && (
@@ -164,7 +187,7 @@ export default function IngestPage() {
               </div>
             )}
             {ingest.filingEvents.length === 0 && (
-              <Button className="mt-4" onClick={ingest.reset}>
+              <Button className="mt-5" onClick={ingest.reset}>
                 Try Again
               </Button>
             )}
@@ -174,16 +197,18 @@ export default function IngestPage() {
 
     case "cancelled":
       return (
-        <div className="space-y-5 [animation:fade-in_200ms_ease-out]">
+        <div className="space-y-8 [animation:fade-in_300ms_ease-out]">
           {header}
-          <div className="rounded-lg border border-warn/40 bg-warn/5 p-5">
-            <div className="flex items-center gap-2.5">
-              <XCircle className="h-4 w-4 text-warn" />
-              <h2 className="font-mono text-[11px] font-semibold uppercase tracking-widest text-warn">
-                Ingestion Cancelled
+          <div className="rounded-2xl border border-warn/40 bg-warn/5 p-6 shadow-sm backdrop-blur-sm">
+            <div className="flex items-center gap-3">
+              <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-warn/10 text-warn">
+                <XCircle className="h-5 w-5" />
+              </span>
+              <h2 className="text-lg font-semibold text-fg">
+                Ingestion cancelled
               </h2>
             </div>
-            <p className="mt-2 text-sm text-fg-muted">
+            <p className="mt-3 text-sm text-fg-muted">
               The ingestion was cancelled. Any filings that were fully
               processed have been kept in the database.
             </p>

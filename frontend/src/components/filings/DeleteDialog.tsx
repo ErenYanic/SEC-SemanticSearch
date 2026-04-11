@@ -102,15 +102,15 @@ export function DeleteDialog({
         {target.kind === "single" && (
           <p>
             Delete{" "}
-            <span className="font-mono font-semibold tabular-nums text-fg">
+            <span className="font-semibold tabular-nums text-fg">
               {target.filing.ticker} {target.filing.form_type}
             </span>{" "}
             (filed{" "}
-            <span className="font-mono tabular-nums">
+            <span className="tabular-nums">
               {target.filing.filing_date}
             </span>
             )? This will remove{" "}
-            <span className="font-mono tabular-nums text-fg">
+            <span className="font-semibold tabular-nums text-fg">
               {target.filing.chunk_count.toLocaleString()}
             </span>{" "}
             chunk{target.filing.chunk_count === 1 ? "" : "s"} from the database.
@@ -122,16 +122,16 @@ export function DeleteDialog({
             <p>
               Delete{" "}
               <span className="font-semibold text-fg">
-                <span className="font-mono tabular-nums">{target.count}</span>{" "}
-                selected filing{target.count === 1 ? "" : "s"}
+                <span className="tabular-nums">{target.count}</span> selected
+                filing{target.count === 1 ? "" : "s"}
               </span>
               ? This will remove approximately{" "}
-              <span className="font-mono tabular-nums text-fg">
+              <span className="font-semibold tabular-nums text-fg">
                 {target.totalChunks.toLocaleString()}
               </span>{" "}
               chunks.
             </p>
-            <p className="mt-2 font-mono text-[11px] uppercase tracking-wider text-neg">
+            <p className="mt-3 text-sm font-medium text-neg">
               This action cannot be undone.
             </p>
           </>
@@ -142,13 +142,12 @@ export function DeleteDialog({
             <p>
               Delete{" "}
               <span className="font-semibold text-fg">
-                all{" "}
-                <span className="font-mono tabular-nums">{target.count}</span>{" "}
-                filing{target.count === 1 ? "" : "s"}
+                all <span className="tabular-nums">{target.count}</span> filing
+                {target.count === 1 ? "" : "s"}
               </span>
               ? This will clear the entire database.
             </p>
-            <p className="mt-2 font-mono text-[11px] uppercase tracking-wider text-neg">
+            <p className="mt-3 text-sm font-medium text-neg">
               This action cannot be undone.
             </p>
           </>

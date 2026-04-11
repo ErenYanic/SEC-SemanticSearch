@@ -36,10 +36,12 @@ describe("Button", () => {
 
   it("applies size classes", () => {
     const { rerender } = render(<Button size="sm">Small</Button>);
-    expect(screen.getByRole("button").className).toContain("text-xs");
+    expect(screen.getByRole("button").className).toContain("text-sm");
+    expect(screen.getByRole("button").className).toContain("px-3");
 
     rerender(<Button size="lg">Large</Button>);
     expect(screen.getByRole("button").className).toContain("text-base");
+    expect(screen.getByRole("button").className).toContain("px-6");
   });
 
   it("is disabled when loading", () => {

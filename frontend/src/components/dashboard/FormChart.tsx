@@ -68,7 +68,7 @@ export function FormChart({ formBreakdown }: FormChartProps) {
   if (data.length === 0) return null;
 
   return (
-    <div className="rounded-2xl border border-hairline bg-card/80 shadow-sm backdrop-blur-sm">
+    <div className="flex h-full flex-col rounded-2xl border border-hairline bg-card/80 shadow-sm backdrop-blur-sm">
       {/* ---- Header ---- */}
       <div className="flex items-baseline justify-between border-b border-hairline px-6 py-4">
         <h2 className="text-base font-semibold text-fg">Filings by form type</h2>
@@ -76,7 +76,7 @@ export function FormChart({ formBreakdown }: FormChartProps) {
       </div>
 
       {/* ---- Chart body ---- */}
-      <div className="h-72 p-6">
+      <div className="min-h-[18rem] flex-1 p-6">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart
             data={data}

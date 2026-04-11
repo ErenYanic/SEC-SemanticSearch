@@ -154,40 +154,44 @@ export function ProgressTracker({
       : "Waiting to start\u2026";
 
   return (
-    <div className="space-y-6 rounded-lg border border-hairline bg-surface p-6">
+    <div className="space-y-7 rounded-2xl border border-hairline bg-card/80 p-7 shadow-sm backdrop-blur-sm">
       {/* ---- Status header ---- */}
       <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2.5">
-          <Loader2 className="h-4 w-4 animate-spin text-accent" />
-          <span className="font-mono text-sm tabular-nums text-fg">
+        <div className="flex items-center gap-3">
+          <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-accent/10 text-accent">
+            <Loader2 className="h-4 w-4 animate-spin" />
+          </span>
+          <span className="text-base font-medium tabular-nums text-fg">
             {statusText}
           </span>
         </div>
         {hasTotal && (
-          <span className="font-mono text-[11px] tabular-nums text-fg-muted">
-            <span className="text-fg">{progressPercent}%</span>
+          <span className="text-sm tabular-nums text-fg-muted">
+            <span className="font-semibold text-fg">{progressPercent}%</span>
           </span>
         )}
       </div>
 
       {/* ---- Overall progress bar ---- */}
-      <div className="space-y-2">
-        <div className="h-1 w-full overflow-hidden rounded-full bg-card">
+      <div className="space-y-2.5">
+        <div className="h-1.5 w-full overflow-hidden rounded-full bg-surface">
           {hasTotal ? (
             <div
-              className="h-full rounded-full bg-accent transition-all duration-500"
+              className="h-full rounded-full bg-gradient-to-r from-accent/70 to-accent transition-all duration-500"
               style={{ width: `${progressPercent}%` }}
             />
           ) : (
             <div className="h-full w-1/3 animate-pulse rounded-full bg-accent/60" />
           )}
         </div>
-        <div className="flex flex-wrap gap-3 font-mono text-[11px] tabular-nums text-fg-muted">
+        <div className="flex flex-wrap items-center gap-2 text-sm tabular-nums text-fg-muted">
           {hasTotal && (
             <span>
-              <span className="text-fg">{processed}</span>
-              <span className="text-fg-subtle"> / </span>
-              <span className="text-fg">{progress.filings_total}</span>
+              <span className="font-semibold text-fg">{processed}</span>
+              <span className="text-fg-subtle"> of </span>
+              <span className="font-semibold text-fg">
+                {progress.filings_total}
+              </span>
               <span className="text-fg-subtle"> filings</span>
             </span>
           )}
@@ -214,25 +218,25 @@ export function ProgressTracker({
           const stepState = getStepState(index, progress.step_index);
           return (
             <div key={label} className="flex flex-1 items-center">
-              <div className="flex flex-col items-center gap-1.5">
+              <div className="flex flex-col items-center gap-2">
                 <div
-                  className={`flex h-7 w-7 items-center justify-center rounded-full border font-mono text-[11px] font-semibold tabular-nums ${STEP_CIRCLE_CLASSES[stepState]}`}
+                  className={`flex h-9 w-9 items-center justify-center rounded-full border text-sm font-semibold tabular-nums ${STEP_CIRCLE_CLASSES[stepState]}`}
                 >
                   {stepState === "completed" ? (
-                    <CheckCircle2 className="h-3.5 w-3.5" />
+                    <CheckCircle2 className="h-4 w-4" />
                   ) : (
                     index + 1
                   )}
                 </div>
                 <span
-                  className={`font-mono text-[10px] font-semibold uppercase tracking-widest ${STEP_LABEL_CLASSES[stepState]}`}
+                  className={`text-xs font-medium ${STEP_LABEL_CLASSES[stepState]}`}
                 >
                   {label}
                 </span>
               </div>
               {index < STEP_LABELS.length - 1 && (
                 <div
-                  className={`mx-1 h-px flex-1 ${
+                  className={`mx-2 h-0.5 flex-1 rounded-full ${
                     STEP_LINE_CLASSES[
                       index < progress.step_index ? "completed" : "upcoming"
                     ]
@@ -246,16 +250,14 @@ export function ProgressTracker({
 
       {/* ---- Filing event list ---- */}
       {filingEvents.length > 0 && (
-        <div className="space-y-2">
-          <div className="font-mono text-[10px] font-semibold uppercase tracking-widest text-fg-subtle">
-            Event Log
-          </div>
-          <div className="max-h-64 overflow-y-auto rounded-md border border-hairline bg-card p-3">
-            <ul className="space-y-1.5">
+        <div className="space-y-3">
+          <div className="text-sm font-semibold text-fg">Event log</div>
+          <div className="max-h-72 overflow-y-auto rounded-xl border border-hairline bg-surface/40 p-4">
+            <ul className="space-y-2">
               {filingEvents.map((event, index) => (
                 <li
                   key={index}
-                  className={`flex items-start gap-2 font-mono text-xs tabular-nums ${EVENT_CLASSES[event.type]}`}
+                  className={`flex items-start gap-2.5 text-sm tabular-nums ${EVENT_CLASSES[event.type]}`}
                 >
                   <EventIcon type={event.type} />
                   <span>{formatEventText(event)}</span>
@@ -269,10 +271,9 @@ export function ProgressTracker({
 
       {/* ---- Cancel button ---- */}
       {canCancel && (
-        <div className="flex justify-end border-t border-hairline pt-4">
+        <div className="flex justify-end border-t border-hairline pt-5">
           <Button
             variant="ghost"
-            size="sm"
             onClick={() => setShowCancelModal(true)}
             className="border border-neg/40 text-neg hover:bg-neg/10 hover:text-neg"
           >
