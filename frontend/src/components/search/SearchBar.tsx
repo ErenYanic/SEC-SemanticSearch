@@ -109,7 +109,7 @@ export function SearchBar({
         aria-label="Search SEC filings"
         disabled={isSearching}
         className="
-          h-16 w-full rounded-2xl border border-hairline bg-card/80 pl-14 pr-44
+          h-16 w-full rounded-2xl border border-hairline bg-card/80 pl-14 pr-52
           text-base text-fg outline-none backdrop-blur-sm shadow-sm
           placeholder:text-fg-subtle
           transition-all duration-150
@@ -120,7 +120,7 @@ export function SearchBar({
 
       {/* Trailing kbd hints (hidden while input is empty or mid-search) */}
       <div
-        className="pointer-events-none absolute right-28 top-1/2 hidden -translate-y-1/2 items-center gap-1.5 md:flex"
+        className="pointer-events-none absolute right-32 top-1/2 hidden -translate-y-1/2 items-center gap-1.5 md:flex"
         aria-hidden="true"
       >
         {query.trim() && !isSearching && (
