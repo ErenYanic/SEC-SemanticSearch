@@ -10,7 +10,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { FormEvent, useState } from "react";
+import { type SubmitEvent, useState } from "react";
 import {
   LayoutDashboard,
   Search,
@@ -76,7 +76,7 @@ export function Navbar({ isTaskActive = false }: NavbarProps) {
     }
   }
 
-  async function handleAdminLogin(event: FormEvent) {
+  async function handleAdminLogin(event: SubmitEvent) {
     event.preventDefault();
     await submitAdminLogin();
   }

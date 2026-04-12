@@ -20,7 +20,7 @@
 
 "use client";
 
-import { type FormEvent, type KeyboardEvent, useId, useState } from "react";
+import { type SubmitEvent, type KeyboardEvent, useId, useState } from "react";
 import { Upload, X, ChevronDown, ChevronUp, Calendar } from "lucide-react";
 import { Button, useToast } from "@/components/ui";
 import type { IngestRequest } from "@/lib/types";
@@ -169,7 +169,7 @@ export function IngestForm({ onSubmit, isSubmitting }: IngestFormProps) {
 
   const canSubmit = tickers.length > 0 && formTypes.size > 0 && !isSubmitting;
 
-  function handleSubmit(e: FormEvent) {
+  function handleSubmit(e: SubmitEvent) {
     e.preventDefault();
     if (!canSubmit) return;
 

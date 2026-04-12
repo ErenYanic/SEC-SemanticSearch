@@ -24,7 +24,7 @@
 
 "use client";
 
-import { type FormEvent, type KeyboardEvent } from "react";
+import { type SubmitEvent, type KeyboardEvent } from "react";
 import { ArrowRight, Search } from "lucide-react";
 import { Spinner } from "@/components/ui";
 
@@ -74,7 +74,7 @@ export function SearchBar({
   chunkCount,
   filingCount,
 }: SearchBarProps) {
-  function handleSubmit(e: FormEvent) {
+  function handleSubmit(e: SubmitEvent) {
     e.preventDefault();
     const trimmed = query.trim();
     if (trimmed) {

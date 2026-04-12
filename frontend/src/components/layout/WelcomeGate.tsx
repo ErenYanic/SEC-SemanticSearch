@@ -14,7 +14,7 @@
  * immediately.
  */
 
-import { type FormEvent, useState, type ReactNode } from "react";
+import { type SubmitEvent, useState, type ReactNode } from "react";
 import { useEdgarSession } from "@/hooks/useEdgarSession";
 import { useStatus } from "@/hooks/useStatus";
 import { Button, Spinner } from "@/components/ui";
@@ -73,7 +73,7 @@ function WelcomeForm({ onLogin }: WelcomeFormProps) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
 
-  function handleSubmit(e: FormEvent) {
+  function handleSubmit(e: SubmitEvent) {
     e.preventDefault();
     if (name.trim() && email.trim()) {
       onLogin(name, email);
