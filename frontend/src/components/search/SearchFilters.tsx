@@ -114,7 +114,7 @@ const INPUT_CLASS =
 
 // Group heading style (used in rail mode)
 const GROUP_HEADING =
-  "mb-3 text-xs font-semibold uppercase tracking-wider text-fg-subtle";
+  "mb-3 text-sm font-semibold text-fg-muted";
 
 // Field label style
 const FIELD_LABEL = "text-sm font-medium text-fg-muted";
