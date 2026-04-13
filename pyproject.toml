@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "sec-semantic-search"
 version = "0.1.0"
-description = "A semantic search system for SEC filings (10-K, 10-Q)"
+description = "A semantic search system for SEC filings (10-K, 10-Q, 8-K with amendments)"
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.12"
