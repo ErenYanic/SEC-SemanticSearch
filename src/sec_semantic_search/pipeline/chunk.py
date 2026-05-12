@@ -29,12 +29,19 @@ class TextChunker:
     The chunking algorithm:
         1. If segment fits within token limit, keep as-is
         2. Otherwise, split on sentence boundaries (. ! ?)
-        3. Accumulate sentences until adding another would exceed limit
-        4. Tolerance band allows slight overrun to avoid tiny final chunks
+        3. Accumulate sentences targeting ``token_limit ± tolerance`` — finalise
+           early once the running chunk has reached ``token_limit - tolerance``,
+           and never overflow past ``token_limit + tolerance``.
+        4. Seed each subsequent chunk with trailing whole sentences from the
+           previous one, up to the configured overlap budget. If even the last
+           sentence exceeds the budget, that single sentence is reused whole
+           (sentence-boundary invariant preserved — chunks never start
+           mid-sentence).
 
     Attributes:
         token_limit: Maximum tokens per chunk (from settings)
-        tolerance: Acceptable overrun tolerance (from settings)
+        tolerance: Acceptable ± deviation around ``token_limit`` (from settings)
+        overlap: Token budget reused at the start of each subsequent chunk
 
     Example:
         >>> chunker = TextChunker()
@@ -49,22 +56,34 @@ class TextChunker:
         self,
         token_limit: int | None = None,
         tolerance: int | None = None,
+        overlap: int | None = None,
     ) -> None:
         """
         Initialise the chunker with configurable limits.
 
         Args:
             token_limit: Max tokens per chunk. If None, uses settings.
-            tolerance: Acceptable overrun. If None, uses settings.
+            tolerance: Acceptable ± deviation around ``token_limit``. If None, uses settings.
+            overlap: Token budget reused at the start of each subsequent chunk.
+                If None, uses settings. Pass ``0`` to disable overlap.
         """
         settings = get_settings()
-        self.token_limit = token_limit or settings.chunking.token_limit
-        self.tolerance = tolerance or settings.chunking.tolerance
+        self.token_limit = token_limit if token_limit is not None else settings.chunking.token_limit
+        self.tolerance = tolerance if tolerance is not None else settings.chunking.tolerance
+        self.overlap = overlap if overlap is not None else settings.chunking.overlap
+
+        if self.overlap < 0:
+            raise ValueError("overlap must be ≥ 0")
+        if self.overlap >= self.token_limit:
+            raise ValueError(
+                f"overlap ({self.overlap}) must be smaller than token_limit ({self.token_limit})"
+            )
 
         logger.debug(
-            "TextChunker initialised: limit=%d, tolerance=%d",
+            "TextChunker initialised: limit=%d, tolerance=±%d, overlap=%d",
             self.token_limit,
             self.tolerance,
+            self.overlap,
         )
 
     def _count_tokens(self, text: str) -> int:
@@ -87,6 +106,12 @@ class TextChunker:
         """
         Split text into chunks respecting sentence boundaries.
 
+        Targets a chunk size of ``token_limit ± tolerance``: finalise as soon as
+        the running chunk has reached ``token_limit - tolerance`` (early-stop),
+        and never let it grow past ``token_limit + tolerance`` (hard cap). Each
+        subsequent chunk is seeded with trailing whole sentences from the
+        previous one, up to ``self.overlap`` tokens.
+
         Args:
             text: Text content to split.
 
@@ -99,34 +124,77 @@ class TextChunker:
         if total_tokens <= self.token_limit:
             return [(text, total_tokens)]
 
-        # Split on sentence boundaries
+        # Split on sentence boundaries — keep token counts alongside the text so
+        # we never recount the same sentence twice.
         sentences = self.SENTENCE_PATTERN.split(text)
+        sentence_tokens = [self._count_tokens(s) for s in sentences]
+
+        upper = self.token_limit + self.tolerance
+        lower = self.token_limit - self.tolerance
 
         chunks: list[tuple[str, int]] = []
         current_sentences: list[str] = []
+        current_counts: list[int] = []
         current_tokens = 0
+        # Tracks the size of the overlap prefix carried over from the previous
+        # chunk so the final flush can skip emitting an overlap-only tail.
+        overlap_prefix_len = 0
 
-        for sentence in sentences:
-            sentence_tokens = self._count_tokens(sentence)
-
-            # Check if adding this sentence would exceed limit + tolerance
-            # If so, finalise current chunk (unless it's empty)
-            if (
-                current_tokens + sentence_tokens > self.token_limit + self.tolerance
-                and current_sentences
-            ):
+        for sentence, s_tokens in zip(sentences, sentence_tokens, strict=True):
+            # Only finalise once the running chunk contains at least one
+            # sentence beyond the overlap carried over from the previous chunk
+            # — otherwise we'd emit a duplicate of the previous chunk's tail.
+            has_new_content = len(current_sentences) > overlap_prefix_len
+            # Hard cap: adding this sentence would overshoot ``limit + tolerance``.
+            # Early-stop: running chunk already inside the ± band; finalise at
+            # the previous sentence boundary rather than overshoot the target.
+            if has_new_content and (current_tokens + s_tokens > upper or current_tokens >= lower):
                 chunks.append((" ".join(current_sentences), current_tokens))
-                current_sentences = []
-                current_tokens = 0
+                (
+                    current_sentences,
+                    current_counts,
+                    current_tokens,
+                ) = self._build_overlap(current_sentences, current_counts)
+                overlap_prefix_len = len(current_sentences)
 
             current_sentences.append(sentence)
-            current_tokens += sentence_tokens
+            current_counts.append(s_tokens)
+            current_tokens += s_tokens
 
-        # Flush remaining sentences
-        if current_sentences:
+        # Flush remaining sentences. Skip overlap-only tails — they would
+        # duplicate the previous chunk entirely without contributing new text.
+        if current_sentences and len(current_sentences) > overlap_prefix_len:
             chunks.append((" ".join(current_sentences), current_tokens))
 
         return chunks
+
+    def _build_overlap(
+        self,
+        sentences: list[str],
+        counts: list[int],
+    ) -> tuple[list[str], list[int], int]:
+        """
+        Select trailing whole sentences from a just-finalised chunk to seed the
+        next one. Walks backwards accumulating sentences while the total stays
+        within ``self.overlap``. If even the single last sentence exceeds the
+        budget, it is still reused whole — sentence boundaries are never split.
+        """
+        if self.overlap == 0 or not sentences:
+            return [], [], 0
+
+        overlap_sentences: list[str] = []
+        overlap_counts: list[int] = []
+        overlap_tokens = 0
+        for sentence, s_tokens in zip(reversed(sentences), reversed(counts), strict=True):
+            if overlap_sentences and overlap_tokens + s_tokens > self.overlap:
+                break
+            overlap_sentences.insert(0, sentence)
+            overlap_counts.insert(0, s_tokens)
+            overlap_tokens += s_tokens
+            if overlap_tokens >= self.overlap:
+                break
+
+        return overlap_sentences, overlap_counts, overlap_tokens
 
     def chunk_segment(self, segment: Segment, start_index: int = 0) -> list[Chunk]:
         """

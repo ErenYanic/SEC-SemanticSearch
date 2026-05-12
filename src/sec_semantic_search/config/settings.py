@@ -49,8 +49,16 @@ class ChunkingSettings(BaseSettings):
 
     token_limit: int = 500
     tolerance: int = 50
+    overlap: int = 50  # Token budget reused at the start of each subsequent chunk
 
     model_config = SettingsConfigDict(env_prefix="CHUNKING_")
+
+    @field_validator("overlap")
+    @classmethod
+    def _validate_overlap(cls, value: int) -> int:
+        if value < 0:
+            raise ValueError("CHUNKING_OVERLAP must be ≥ 0.")
+        return value
 
 
 def resolve_encryption_key_from_values(key: str | None, key_file: str | None) -> str | None:

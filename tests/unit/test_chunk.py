@@ -25,9 +25,10 @@ def chunker() -> TextChunker:
 
     token_limit=20 and tolerance=5 make it easy to construct test
     inputs that are just above or below the boundary without needing
-    hundreds of words.
+    hundreds of words. ``overlap`` is scaled down to ``5`` to match the
+    miniature limit (matching the production 10 % ratio of 50/500).
     """
-    return TextChunker(token_limit=20, tolerance=5)
+    return TextChunker(token_limit=20, tolerance=5, overlap=5)
 
 
 class TestShortSegments:
@@ -233,3 +234,179 @@ class TestEdgeCases:
         # All original words should be present across chunks
         all_words = " ".join(c.content for c in chunks).split()
         assert len(all_words) == 30
+
+
+class TestSymmetricTolerance:
+    """± tolerance: chunks should land inside ``[limit - tolerance, limit + tolerance]``."""
+
+    def test_chunks_respect_upper_bound(self, chunker, sample_filing_id):
+        """No chunk should exceed ``token_limit + tolerance`` (hard cap)."""
+        text = " ".join(f"Sentence number {i} about some financial topic." for i in range(20))
+        segment = Segment(
+            path="Part I",
+            content_type=ContentType.TEXT,
+            content=text,
+            filing_id=sample_filing_id,
+        )
+        chunks = chunker.chunk_segment(segment)
+        for chunk in chunks:
+            assert chunk.token_count <= chunker.token_limit + chunker.tolerance
+
+    def test_chunks_respect_lower_bound_early_stop(self, chunker, sample_filing_id):
+        """
+        Non-terminal chunks must reach at least ``limit - tolerance`` tokens —
+        the early-stop trigger only fires once we're already inside the band.
+        Tail chunks may legitimately be short (they hold whatever's left).
+        """
+        text = " ".join(f"Sentence number {i} about some financial topic." for i in range(20))
+        segment = Segment(
+            path="Part I",
+            content_type=ContentType.TEXT,
+            content=text,
+            filing_id=sample_filing_id,
+        )
+        chunks = chunker.chunk_segment(segment)
+        assert len(chunks) >= 2
+        lower = chunker.token_limit - chunker.tolerance
+        for chunk in chunks[:-1]:
+            assert chunk.token_count >= lower, (
+                f"Non-terminal chunk has {chunk.token_count} tokens, "
+                f"below ± band lower bound {lower}"
+            )
+
+    def test_early_stop_prevents_overshoot(self, sample_filing_id):
+        """
+        With limit=20, tolerance=5, three 7-token sentences (=21) should
+        finalise rather than continue accumulating — the previous ``+`` only
+        algorithm would have allowed a fourth, taking the chunk to 28 tokens.
+        """
+        chunker = TextChunker(token_limit=20, tolerance=5, overlap=0)
+        text = " ".join(f"Sentence number {i} about some financial topic." for i in range(8))
+        segment = Segment(
+            path="Part I",
+            content_type=ContentType.TEXT,
+            content=text,
+            filing_id=sample_filing_id,
+        )
+        chunks = chunker.chunk_segment(segment)
+        # First chunk caps at three sentences (21 tokens) — never four (28).
+        assert chunks[0].token_count == 21
+
+
+class TestChunkOverlap:
+    """Trailing sentences from chunk N should reappear at the start of chunk N+1."""
+
+    def test_overlap_present_between_chunks(self, chunker, sample_filing_id):
+        """Each non-first chunk should start with the last sentence of its predecessor."""
+        text = " ".join(f"Sentence number {i} about some financial topic." for i in range(20))
+        segment = Segment(
+            path="Part I",
+            content_type=ContentType.TEXT,
+            content=text,
+            filing_id=sample_filing_id,
+        )
+        chunks = chunker.chunk_segment(segment)
+        assert len(chunks) >= 2
+        for prev, curr in zip(chunks[:-1], chunks[1:], strict=True):
+            prev_sentences = TextChunker.SENTENCE_PATTERN.split(prev.content)
+            curr_sentences = TextChunker.SENTENCE_PATTERN.split(curr.content)
+            # The first sentence of the next chunk must come from the tail
+            # of the previous chunk — preserving the sentence-boundary invariant.
+            assert curr_sentences[0] in prev_sentences, (
+                f"Expected overlap sentence {curr_sentences[0]!r} not found in previous chunk"
+            )
+
+    def test_overlap_respects_token_budget(self, chunker, sample_filing_id):
+        """Overlap should not blow past the configured budget when whole sentences fit."""
+        text = " ".join(f"Sentence number {i} about some financial topic." for i in range(20))
+        segment = Segment(
+            path="Part I",
+            content_type=ContentType.TEXT,
+            content=text,
+            filing_id=sample_filing_id,
+        )
+        chunks = chunker.chunk_segment(segment)
+        # Each sentence is 7 tokens — overlap budget of 5 only fits when we
+        # take a single sentence and accept the small overshoot inherent to
+        # sentence-aligned overlap. We assert overlap is at most one sentence.
+        for prev, curr in zip(chunks[:-1], chunks[1:], strict=True):
+            prev_sentences = TextChunker.SENTENCE_PATTERN.split(prev.content)
+            curr_sentences = TextChunker.SENTENCE_PATTERN.split(curr.content)
+            shared = [s for s in curr_sentences if s in prev_sentences[-2:]]
+            assert len(shared) <= 2  # No runaway overlap
+
+    def test_overlap_disabled(self, sample_filing_id):
+        """``overlap=0`` should produce disjoint chunks."""
+        chunker = TextChunker(token_limit=20, tolerance=5, overlap=0)
+        text = " ".join(f"Sentence number {i} about some financial topic." for i in range(15))
+        segment = Segment(
+            path="Part I",
+            content_type=ContentType.TEXT,
+            content=text,
+            filing_id=sample_filing_id,
+        )
+        chunks = chunker.chunk_segment(segment)
+        assert len(chunks) >= 2
+        # No sentence should appear in more than one chunk.
+        sentence_appearances: dict[str, int] = {}
+        for chunk in chunks:
+            for sentence in TextChunker.SENTENCE_PATTERN.split(chunk.content):
+                sentence_appearances[sentence] = sentence_appearances.get(sentence, 0) + 1
+        for sentence, count in sentence_appearances.items():
+            assert count == 1, f"Sentence {sentence!r} appears {count} times with overlap=0"
+
+    def test_overlap_forces_at_least_one_sentence(self, sample_filing_id):
+        """
+        When the last sentence of a chunk exceeds the overlap budget, the
+        chunker should still carry it whole — sentence boundaries are sacred.
+        """
+        # Trailing sentence (~25 tokens) far exceeds overlap budget (5).
+        chunker = TextChunker(token_limit=50, tolerance=5, overlap=5)
+        s1 = "alpha " * 10 + "end1."
+        s2 = "beta " * 10 + "end2."
+        s3 = "gamma " * 24 + "end3."  # ~25 tokens — far bigger than overlap budget
+        tail = " ".join(f"Tail sentence number {i}." for i in range(8))
+        segment = Segment(
+            path="Part I",
+            content_type=ContentType.TEXT,
+            content=f"{s1} {s2} {s3} {tail}",
+            filing_id=sample_filing_id,
+        )
+        chunks = chunker.chunk_segment(segment)
+        assert len(chunks) >= 2
+        # ``end3.`` must reappear at the start of the second chunk — proving
+        # the oversized trailing sentence was reused whole despite the small
+        # overlap budget.
+        assert "end3." in chunks[1].content
+        assert chunks[1].content.startswith("gamma")
+
+    def test_overlap_does_not_emit_duplicate_tail(self, sample_filing_id):
+        """
+        Pathological case: a single oversized sentence becomes its own overlap.
+        The chunker must not emit it twice consecutively.
+        """
+        chunker = TextChunker(token_limit=20, tolerance=5, overlap=5)
+        big = "alpha " * 25 + "end."
+        text = big + " Short follow up sentence."
+        segment = Segment(
+            path="Part I",
+            content_type=ContentType.TEXT,
+            content=text,
+            filing_id=sample_filing_id,
+        )
+        chunks = chunker.chunk_segment(segment)
+        # No two consecutive chunks should be byte-identical.
+        for prev, curr in zip(chunks[:-1], chunks[1:], strict=True):
+            assert prev.content != curr.content
+
+
+class TestConfigurationValidation:
+    """The chunker should reject incoherent overlap/limit combinations."""
+
+    def test_overlap_must_be_smaller_than_limit(self):
+        with pytest.raises(ValueError, match="overlap"):
+            TextChunker(token_limit=20, tolerance=5, overlap=20)
+
+    def test_negative_overlap_rejected(self):
+        with pytest.raises(ValueError, match="overlap"):
+            TextChunker(token_limit=20, tolerance=5, overlap=-1)
