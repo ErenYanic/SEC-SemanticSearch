@@ -234,6 +234,13 @@ class SearchResultSchema(BaseModel):
 
     Uses ``content_type`` as a plain string (not the ``ContentType`` enum)
     to keep the API contract stable and framework-agnostic.
+
+    ``content`` is the short embedded chunk (what the vector match was
+    scored against). ``parent_content`` is the broader segment that the
+    chunk was carved out of — clients should render ``parent_content``
+    when present and highlight ``content`` inside it. When
+    ``parent_content`` is ``None`` (legacy data with no segment row),
+    clients fall back to displaying ``content`` directly.
     """
 
     content: str
@@ -245,6 +252,14 @@ class SearchResultSchema(BaseModel):
     filing_date: str | None = Field(None, description="ISO date (YYYY-MM-DD)")
     accession_number: str | None = None
     chunk_id: str | None = None
+    segment_index: int | None = Field(
+        None,
+        description="Zero-based position of the parent segment within the filing",
+    )
+    parent_content: str | None = Field(
+        None,
+        description="Full text of the parent segment for display (None for legacy chunks)",
+    )
 
 
 class SearchRequest(BaseModel):

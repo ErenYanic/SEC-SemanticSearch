@@ -118,7 +118,13 @@ export interface AdminSessionResponse {
 // Search
 // ---------------------------------------------------------------------------
 
-/** A single search result. */
+/** A single search result.
+ *
+ * `content` is the small chunk that scored against the query vector.
+ * `parent_content` is the broader segment that chunk came from — use
+ * it as the display body and highlight `content` inside it. Falls back
+ * to `content` when `parent_content` is null (legacy data).
+ */
 export interface SearchResult {
   content: string;
   path: string;
@@ -129,6 +135,8 @@ export interface SearchResult {
   filing_date?: string | null;
   accession_number?: string | null;
   chunk_id?: string | null;
+  segment_index?: number | null;
+  parent_content?: string | null;
 }
 
 /** POST /api/search/ — request body */

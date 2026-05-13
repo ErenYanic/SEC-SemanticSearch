@@ -217,6 +217,7 @@ class TextChunker:
                 filing_id=segment.filing_id,
                 chunk_index=start_index + i,
                 token_count=tokens,
+                segment_index=segment.segment_index,
             )
             for i, (text, tokens) in enumerate(text_chunks)
         ]

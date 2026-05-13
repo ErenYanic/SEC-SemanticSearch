@@ -35,6 +35,7 @@ from sec_semantic_search.core import (
     DatabaseError,
     FilingIdentifier,
     FilingLimitExceededError,
+    Segment,
     get_logger,
 )
 
@@ -305,7 +306,7 @@ class MetadataRegistry:
         return self._encrypted
 
     def _create_table(self) -> None:
-        """Create the filings and task_history tables if they do not exist."""
+        """Create the filings, segments, and task_history tables if missing."""
         filings_sql = """
             CREATE TABLE IF NOT EXISTS filings (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -316,6 +317,24 @@ class MetadataRegistry:
                 chunk_count INTEGER NOT NULL,
                 ingested_at TEXT NOT NULL,
                 UNIQUE(ticker, form_type, filing_date)
+            )
+        """
+        # ``segments`` holds the full parent-context text keyed by
+        # (accession_number, segment_index). Search results are joined
+        # against this table at query time so the API can return the
+        # broad paragraph for display while keeping the embedded chunk
+        # in ChromaDB. Cleanup is driven by the dual-store delete path
+        # (no FOREIGN KEY cascade — SQLite requires PRAGMA foreign_keys
+        # to be set per connection and the registry already manages
+        # filing deletion explicitly).
+        segments_sql = """
+            CREATE TABLE IF NOT EXISTS segments (
+                accession_number TEXT NOT NULL,
+                segment_index INTEGER NOT NULL,
+                path TEXT NOT NULL,
+                content_type TEXT NOT NULL,
+                content TEXT NOT NULL,
+                PRIMARY KEY (accession_number, segment_index)
             )
         """
         task_history_sql = """
@@ -340,6 +359,7 @@ class MetadataRegistry:
         try:
             with self._lock, self._conn:
                 self._conn.execute(filings_sql)
+                self._conn.execute(segments_sql)
                 self._conn.execute(index_sql)
                 self._conn.execute(task_history_sql)
         except self._db_error as e:
@@ -434,13 +454,24 @@ class MetadataRegistry:
         self,
         filing_id: FilingIdentifier,
         chunk_count: int,
+        segments: list[Segment] | None = None,
     ) -> None:
         """
         Register a newly ingested filing in the metadata registry.
 
+        When ``segments`` is provided, the filing row and all segment rows
+        are inserted atomically inside the same transaction — either both
+        land or neither does. This preserves the dual-store invariant
+        (segments must always be resolvable for every registered filing)
+        without introducing a separate failure mode.
+
         Args:
             filing_id: Identifier of the ingested filing.
             chunk_count: Number of chunks stored in ChromaDB.
+            segments: Optional parent segments to persist for parent-context
+                resolution at search time. ``None`` is accepted so the
+                method stays usable in tests that do not exercise the
+                segment-storage path.
 
         Raises:
             DatabaseError: If the insert fails (e.g., duplicate).
@@ -465,12 +496,15 @@ class MetadataRegistry:
                         ingested_at,
                     ),
                 )
+                if segments:
+                    self._insert_segments(filing_id.accession_number, segments)
             logger.info(
-                "Registered filing: %s %s (%s) — %d chunks",
+                "Registered filing: %s %s (%s) — %d chunks, %d segments",
                 filing_id.ticker,
                 filing_id.form_type,
                 filing_id.date_str,
                 chunk_count,
+                len(segments) if segments else 0,
             )
         except self._db_integrity_error as e:
             raise DatabaseError(
@@ -487,6 +521,7 @@ class MetadataRegistry:
         self,
         filing_id: FilingIdentifier,
         chunk_count: int,
+        segments: list[Segment] | None = None,
     ) -> bool:
         """
         Atomically check for duplicate and register a filing if new.
@@ -495,9 +530,15 @@ class MetadataRegistry:
         insert, closing the race window where two threads could both pass
         ``is_duplicate()`` and then both attempt ``register_filing()``.
 
+        When ``segments`` is provided, the filing row and segment rows
+        are inserted in the same transaction so the parent-context store
+        is consistent with the filings table at all times.
+
         Args:
             filing_id: Identifier of the filing to register.
             chunk_count: Number of chunks stored in ChromaDB.
+            segments: Optional parent segments to persist alongside the
+                filing row. See ``register_filing`` for details.
 
         Returns:
             True if the filing was registered, False if it already existed.
@@ -537,6 +578,8 @@ class MetadataRegistry:
                         ingested_at,
                     ),
                 )
+                if segments:
+                    self._insert_segments(filing_id.accession_number, segments)
         except self._db_integrity_error:
             # Defensive: UNIQUE constraint caught a race despite the check.
             logger.debug(
@@ -551,17 +594,18 @@ class MetadataRegistry:
             ) from e
 
         logger.info(
-            "Registered filing: %s %s (%s) — %d chunks",
+            "Registered filing: %s %s (%s) — %d chunks, %d segments",
             filing_id.ticker,
             filing_id.form_type,
             filing_id.date_str,
             chunk_count,
+            len(segments) if segments else 0,
         )
         return True
 
     def remove_filing(self, accession_number: str) -> bool:
         """
-        Remove a filing from the registry by accession number.
+        Remove a filing (and its stored segments) from the registry.
 
         Args:
             accession_number: SEC accession number of the filing to remove.
@@ -573,10 +617,15 @@ class MetadataRegistry:
             DatabaseError: If the delete fails.
         """
         sql = "DELETE FROM filings WHERE accession_number = ?"
+        sql_segments = "DELETE FROM segments WHERE accession_number = ?"
         try:
             with self._lock, self._conn:
                 cursor = self._conn.execute(sql, (accession_number,))
                 removed = cursor.rowcount > 0
+                # Always purge segments — even on a stale row where the
+                # filing entry is gone, leaving orphans behind would
+                # confuse the next ingest with the same accession.
+                self._conn.execute(sql_segments, (accession_number,))
             if removed:
                 logger.info("Removed filing from registry: %s", accession_number)
             else:
@@ -616,10 +665,13 @@ class MetadataRegistry:
             batch = accession_numbers[i : i + chunk_size]
             placeholders = ", ".join("?" for _ in batch)
             sql = f"DELETE FROM filings WHERE accession_number IN ({placeholders})"
+            sql_segments = f"DELETE FROM segments WHERE accession_number IN ({placeholders})"
             try:
                 with self._lock, self._conn:
                     cursor = self._conn.execute(sql, batch)
                     removed += cursor.rowcount
+                    # Cascade to segments in the same transaction.
+                    self._conn.execute(sql_segments, batch)
             except self._db_error as e:
                 raise DatabaseError(
                     "Failed to remove filings batch",
@@ -645,10 +697,14 @@ class MetadataRegistry:
             DatabaseError: If the delete fails.
         """
         sql = "DELETE FROM filings"
+        sql_segments = "DELETE FROM segments"
         try:
             with self._lock, self._conn:
                 cursor = self._conn.execute(sql)
                 removed = cursor.rowcount
+                # Wipe parent-context store in the same transaction so the
+                # two stays consistent.
+                self._conn.execute(sql_segments)
             if removed:
                 logger.info("Cleared all filings from registry: %d removed", removed)
             return removed
@@ -1053,6 +1109,119 @@ class MetadataRegistry:
         except self._db_error as e:
             raise DatabaseError(
                 "Failed to prune task history",
+                details=str(e),
+            ) from e
+
+    # ------------------------------------------------------------------
+    # Segments (parent-context store)
+    # ------------------------------------------------------------------
+
+    def _insert_segments(
+        self,
+        accession_number: str,
+        segments: list[Segment],
+    ) -> None:
+        """Insert all segments for a filing.
+
+        Called from inside ``register_filing`` / ``register_filing_if_new``
+        while the threading lock and SQLite transaction are already held —
+        the caller is responsible for both. We use ``INSERT OR REPLACE`` so
+        a stale segment row left behind by an aborted ingest never blocks
+        a fresh registration on the same accession.
+        """
+        sql = """
+            INSERT OR REPLACE INTO segments
+                (accession_number, segment_index, path, content_type, content)
+            VALUES (?, ?, ?, ?, ?)
+        """
+        rows = [
+            (
+                accession_number,
+                seg.segment_index,
+                seg.path,
+                seg.content_type.value,
+                seg.content,
+            )
+            for seg in segments
+        ]
+        self._conn.executemany(sql, rows)
+
+    def get_parent_segments(
+        self,
+        accession_segment_pairs: list[tuple[str, int]],
+    ) -> dict[tuple[str, int], str]:
+        """Bulk-fetch parent segment text for a set of chunk locations.
+
+        Used by the search engine to attach the broader paragraph to each
+        ChromaDB result before returning it to the caller. The single SQL
+        round-trip replaces what would otherwise be O(N) point lookups.
+
+        Args:
+            accession_segment_pairs: Tuples of (accession_number,
+                segment_index) identifying the segments to fetch.
+
+        Returns:
+            Mapping from each requested ``(accession, segment_index)``
+            pair to its segment content. Missing keys indicate a chunk
+            whose parent could not be resolved (e.g. legacy data
+            ingested before the segments table was populated) — callers
+            should fall back to the chunk text in that case.
+
+        Raises:
+            DatabaseError: If the query fails.
+        """
+        if not accession_segment_pairs:
+            return {}
+
+        # Deduplicate so we never bind the same pair twice — saves work
+        # when multiple top-k results share a parent segment.
+        unique_pairs = list(set(accession_segment_pairs))
+
+        result: dict[tuple[str, int], str] = {}
+        chunk_size = 499  # 499 pairs * 2 params = 998, under SQLite's 999 limit
+        for i in range(0, len(unique_pairs), chunk_size):
+            batch = unique_pairs[i : i + chunk_size]
+            placeholders = ", ".join("(?, ?)" for _ in batch)
+            sql = (
+                "SELECT accession_number, segment_index, content "
+                f"FROM segments WHERE (accession_number, segment_index) IN ({placeholders})"
+            )
+            params: list = []
+            for accession, seg_idx in batch:
+                params.append(accession)
+                params.append(seg_idx)
+            try:
+                with self._lock:
+                    rows = self._conn.execute(sql, params).fetchall()
+            except self._db_error as e:
+                raise DatabaseError(
+                    "Failed to fetch parent segments",
+                    details=str(e),
+                ) from e
+            for row in rows:
+                result[(row["accession_number"], row["segment_index"])] = row["content"]
+
+        return result
+
+    def count_segments(self, accession_number: str | None = None) -> int:
+        """Count rows in the segments table (optionally filtered).
+
+        Mainly for tests and diagnostics — the production search path uses
+        ``get_parent_segments`` for batched lookups instead.
+        """
+        if accession_number is None:
+            sql = "SELECT COUNT(*) FROM segments"
+            params: tuple = ()
+        else:
+            sql = "SELECT COUNT(*) FROM segments WHERE accession_number = ?"
+            params = (accession_number,)
+        try:
+            with self._lock:
+                row = self._conn.execute(sql, params).fetchone()
+            return row[0]
+        except self._db_error as e:
+            raise DatabaseError(
+                "Failed to count segments",
                 details=str(e),
             ) from e
 

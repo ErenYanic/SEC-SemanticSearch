@@ -61,6 +61,39 @@ class TestSearchEndpoint:
         assert data["results"][0]["ticker"] == "AAPL"
         assert data["results"][0]["content_type"] == "text"
 
+    def test_parent_context_fields_in_response(self):
+        """parent_content and segment_index round-trip through the schema.
+
+        The route copies these from ``SearchResult`` straight onto the
+        wire so the frontend can render the broader paragraph and
+        highlight the matched chunk. Verified end-to-end against a
+        mocked engine so the test stays fast and deterministic.
+        """
+        results = [
+            _make_result(
+                content="cash and equivalents decreased",
+                parent_content="Operating cash flow improved despite the fact that "
+                "cash and equivalents decreased by twelve percent year over year.",
+                segment_index=4,
+            )
+        ]
+        client, _ = _make_client(search_results=results)
+        resp = client.post("/api/search/", json={"query": "cash"})
+        assert resp.status_code == 200
+        payload = resp.json()["results"][0]
+        assert payload["segment_index"] == 4
+        assert payload["parent_content"].startswith("Operating cash flow")
+        assert payload["content"] in payload["parent_content"]
+
+    def test_parent_context_fields_default_to_none(self):
+        """Legacy results without parent context must still serialise."""
+        results = [_make_result()]
+        client, _ = _make_client(search_results=results)
+        resp = client.post("/api/search/", json={"query": "revenue"})
+        payload = resp.json()["results"][0]
+        assert payload["segment_index"] is None
+        assert payload["parent_content"] is None
+
     def test_valid_query_no_results(self):
         client, _ = _make_client(search_results=[])
         resp = client.post("/api/search/", json={"query": "obscure query"})

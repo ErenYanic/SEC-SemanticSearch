@@ -295,7 +295,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     registry = MetadataRegistry()
     chroma = ChromaDBClient()
     embedder = EmbeddingGenerator()
-    search_engine = SearchEngine(embedder=embedder, chroma_client=chroma)
+    search_engine = SearchEngine(embedder=embedder, chroma_client=chroma, registry=registry)
     fetcher = FilingFetcher()
     orchestrator = PipelineOrchestrator(fetcher=fetcher, embedder=embedder)
     task_manager = TaskManager(

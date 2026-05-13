@@ -62,6 +62,7 @@ def populated_chroma(tmp_chroma_path, sample_chunks, sample_filing_id):
         chunks=sample_chunks,
         embeddings=embeddings,
         ingest_result=None,
+        segments=[],
     )
     client.store_filing(pf)
     return client

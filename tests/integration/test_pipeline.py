@@ -171,6 +171,7 @@ def _make_processed_filing(chunks, filing_id):
         chunks=chunks,
         embeddings=embeddings,
         ingest_result=None,  # Not needed for storage
+        segments=[],  # Storage tests don't exercise the parent-context path
     )
 
 

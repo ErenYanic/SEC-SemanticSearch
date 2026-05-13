@@ -742,6 +742,7 @@ class TaskManager:
                 registered = self._registry.register_filing_if_new(
                     result.filing_id,
                     result.ingest_result.chunk_count,
+                    segments=result.segments,
                 )
                 if not registered:
                     # Another thread registered this filing between the

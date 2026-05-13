@@ -95,6 +95,8 @@ async def search(
             filing_date=r.filing_date,
             accession_number=r.accession_number,
             chunk_id=r.chunk_id,
+            segment_index=r.segment_index,
+            parent_content=r.parent_content,
         )
         for r in results
     ]

@@ -172,6 +172,7 @@ class TestChunk:
             "filing_date",
             "filing_date_int",
             "accession_number",
+            "segment_index",
         }
         assert set(meta.keys()) == expected_keys
 

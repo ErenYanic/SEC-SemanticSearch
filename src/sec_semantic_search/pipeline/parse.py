@@ -120,6 +120,14 @@ class FilingParser:
                 details="The document structure may be unsupported.",
             )
 
+        # Assign sequential segment indices for parent-context resolution.
+        # Done here (not in __post_init__) so the index reflects the order
+        # in which segments were extracted from the filing — that order is
+        # what later joins between Chroma chunks and the segments table key
+        # off of.
+        for idx, segment in enumerate(segments):
+            segment.segment_index = idx
+
         logger.info(
             "Extracted %d segments from %s %s",
             len(segments),

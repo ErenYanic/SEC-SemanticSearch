@@ -87,7 +87,13 @@ def search(
     """
     with console.status("Searching..."):
         try:
-            engine = SearchEngine()
+            # Build a registry instance so the engine can resolve each
+            # chunk back to its parent segment for display. The CLI does
+            # not need to share the registry with any other singleton,
+            # so we create a short-lived one here.
+            from sec_semantic_search.database import MetadataRegistry
+
+            engine = SearchEngine(registry=MetadataRegistry())
             # Normalise ticker(s) to uppercase; pass list or None.
             ticker_filter: list[str] | None = [t.upper() for t in ticker] if ticker else None
             form_filter: list[str] | None = [f.upper() for f in form] if form else None
@@ -133,10 +139,15 @@ def search(
         if result.filing_date:
             source += f"\n{result.filing_date}"
 
-        # Truncate long content for display.
-        content = result.content
-        if len(content) > _CONTENT_PREVIEW_LIMIT:
-            content = content[:_CONTENT_PREVIEW_LIMIT] + "..."
+        # Prefer the parent segment text when available so the analyst
+        # sees the broader paragraph; highlight the embedded chunk
+        # inside it. Falls back to the chunk text for legacy data.
+        display_source = result.parent_content or result.content
+        if len(display_source) > _CONTENT_PREVIEW_LIMIT:
+            display_source = display_source[:_CONTENT_PREVIEW_LIMIT] + "..."
+        content_text = Text(display_source)
+        if result.parent_content and result.content in result.parent_content:
+            content_text.highlight_words([result.content], style="black on yellow")
 
         # Truncate long section paths for display.
         section = result.path
@@ -148,7 +159,7 @@ def search(
             _similarity_text(result.similarity),
             source,
             section,
-            content,
+            content_text,
         )
 
     console.print(table)

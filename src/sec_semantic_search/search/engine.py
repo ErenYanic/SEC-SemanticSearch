@@ -14,7 +14,7 @@ Usage:
 
 from sec_semantic_search.config import get_settings
 from sec_semantic_search.core import SearchError, SearchResult, get_logger
-from sec_semantic_search.database import ChromaDBClient
+from sec_semantic_search.database import ChromaDBClient, MetadataRegistry
 from sec_semantic_search.pipeline import EmbeddingGenerator
 
 logger = get_logger(__name__)
@@ -45,6 +45,7 @@ class SearchEngine:
         self,
         embedder: EmbeddingGenerator | None = None,
         chroma_client: ChromaDBClient | None = None,
+        registry: MetadataRegistry | None = None,
     ) -> None:
         """
         Initialise the search engine.
@@ -54,9 +55,16 @@ class SearchEngine:
                       instance is created (model loads lazily on first query).
             chroma_client: Pre-built ChromaDB client. If None, a new
                            instance is created using settings.
+            registry: Pre-built metadata registry. Used to resolve each
+                ChromaDB match back to its full parent segment for
+                display. ``None`` disables parent-context lookup —
+                ``SearchResult.parent_content`` will stay ``None`` and
+                callers fall back to the chunk text. The API wires a
+                singleton registry; CLI search builds one on demand.
         """
         self._embedder = embedder or EmbeddingGenerator()
         self._chroma_client = chroma_client or ChromaDBClient()
+        self._registry = registry
 
         settings = get_settings()
         self._default_top_k = settings.search.top_k
@@ -162,5 +170,43 @@ class SearchEngine:
                     effective_min_sim,
                 )
 
+        # Attach parent-segment text so the UI can show the broader
+        # paragraph while still highlighting the short chunk that
+        # produced the vector match. One batched lookup, not N.
+        self._attach_parent_content(results)
+
         logger.info("Search returned %d results", len(results))
         return results
+
+    def _attach_parent_content(self, results: list[SearchResult]) -> None:
+        """Populate ``SearchResult.parent_content`` in place.
+
+        Resolves each result back to its parent ``Segment`` via the
+        metadata registry using one batched SQL query. Missing parents
+        (legacy chunks without ``segment_index``, or rows lost to a
+        previous partial rollback) silently fall through — the API still
+        returns the chunk text via ``content``.
+        """
+        if self._registry is None or not results:
+            return
+
+        pairs: list[tuple[str, int]] = []
+        for r in results:
+            if r.accession_number and r.segment_index is not None:
+                pairs.append((r.accession_number, r.segment_index))
+
+        if not pairs:
+            return
+
+        try:
+            parent_map = self._registry.get_parent_segments(pairs)
+        except Exception as exc:  # noqa: BLE001 — degrade gracefully on lookup failure
+            logger.warning(
+                "Parent-context lookup failed; returning chunk text only: %s",
+                exc,
+            )
+            return
+
+        for r in results:
+            if r.accession_number and r.segment_index is not None:
+                r.parent_content = parent_map.get((r.accession_number, r.segment_index))

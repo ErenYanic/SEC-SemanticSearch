@@ -295,6 +295,7 @@ def _ingest_one_form(
             registry.register_filing(
                 result.filing_id,
                 result.ingest_result.chunk_count,
+                segments=result.segments,
             )
         except DatabaseError as e:
             if multi:
@@ -481,6 +482,7 @@ def _ingest_across_forms(
                 registry.register_filing(
                     result.filing_id,
                     result.ingest_result.chunk_count,
+                    segments=result.segments,
                 )
             except DatabaseError as e:
                 progress.console.print(f"  [red]Storage failed{filing_num}:[/red] {e.message}")
@@ -953,6 +955,7 @@ def batch(
                     registry.register_filing(
                         result.filing_id,
                         result.ingest_result.chunk_count,
+                        segments=result.segments,
                     )
                 except DatabaseError as e:
                     progress.console.print(

@@ -87,6 +87,10 @@ class Segment:
         content_type: Type of content (text, textsmall, table)
         content: The actual text content
         filing_id: Reference to the source filing
+        segment_index: Zero-based position of this segment within the filing.
+            Assigned by the parser and inherited by every chunk derived from
+            this segment so the search layer can resolve the chunk back to
+            its parent context for display.
 
     Example:
         >>> segment = Segment(
@@ -101,6 +105,7 @@ class Segment:
     content_type: ContentType
     content: str
     filing_id: FilingIdentifier
+    segment_index: int = field(default=0)
 
 
 @dataclass
@@ -129,6 +134,7 @@ class Chunk:
     filing_id: FilingIdentifier
     chunk_index: int = field(default=0)
     token_count: int = field(default=0)
+    segment_index: int = field(default=0)
 
     @property
     def chunk_id(self) -> str:
@@ -162,6 +168,7 @@ class Chunk:
             "filing_date": self.filing_id.date_str,
             "filing_date_int": int(self.filing_id.date_str.replace("-", "")),
             "accession_number": self.filing_id.accession_number,
+            "segment_index": self.segment_index,
         }
 
 
@@ -175,7 +182,7 @@ class SearchResult:
     and relevance score.
 
     Attributes:
-        content: The matched chunk text
+        content: The matched chunk text (the small, embedded slice)
         path: Hierarchical path in the source document
         content_type: Type of content (text, textsmall, table)
         ticker: Stock ticker of the source filing
@@ -184,6 +191,13 @@ class SearchResult:
         filing_date: Date of the source filing (optional)
         accession_number: SEC accession number (optional)
         chunk_id: ChromaDB document ID (optional)
+        segment_index: Index of the parent segment within the filing
+            (optional — present when the chunk metadata carries it).
+        parent_content: Full text of the parent segment, attached by the
+            search engine after the vector match. Decouples the small
+            embedded chunk from the broader context shown to the user.
+            ``None`` when the parent could not be resolved (e.g. a chunk
+            ingested before the segments table was populated).
     """
 
     content: str
@@ -195,6 +209,8 @@ class SearchResult:
     filing_date: str | None = None
     accession_number: str | None = None
     chunk_id: str | None = None
+    segment_index: int | None = None
+    parent_content: str | None = None
 
     @classmethod
     def from_chromadb_result(
@@ -219,6 +235,12 @@ class SearchResult:
         Returns:
             SearchResult instance with similarity score
         """
+        raw_index = metadata.get("segment_index")
+        # ChromaDB returns metadata values as the type they were stored as,
+        # but be defensive: legacy rows ingested before the parent-context
+        # change may omit segment_index entirely.
+        segment_index = int(raw_index) if isinstance(raw_index, (int, float)) else None
+
         return cls(
             content=document,
             path=metadata.get("path", "(unknown)"),
@@ -229,6 +251,7 @@ class SearchResult:
             filing_date=metadata.get("filing_date"),
             accession_number=metadata.get("accession_number"),
             chunk_id=chunk_id,
+            segment_index=segment_index,
         )
 
 

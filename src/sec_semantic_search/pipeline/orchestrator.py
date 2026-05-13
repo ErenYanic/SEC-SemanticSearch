@@ -33,6 +33,7 @@ from sec_semantic_search.core import (
     Chunk,
     FilingIdentifier,
     IngestResult,
+    Segment,
     get_logger,
 )
 from sec_semantic_search.pipeline.chunk import TextChunker
@@ -53,20 +54,23 @@ class ProcessedFiling:
     Result of processing a single filing through the pipeline.
 
     This contains all the data needed for storage in the database.
-    Segment count is captured in ``ingest_result``; the raw segments
-    are not retained because no consumer reads them after chunking.
 
     Attributes:
         filing_id: Identifier for the filing
         chunks: Chunked text ready for storage
         embeddings: Vector embeddings for each chunk
         ingest_result: Statistics about the ingestion
+        segments: Parsed segments retained so the storage layer can persist
+            the parent context alongside the chunk vectors. The database
+            layer joins these back onto search results so the UI can display
+            the broader paragraph that produced each chunk.
     """
 
     filing_id: FilingIdentifier
     chunks: list[Chunk]
     embeddings: np.ndarray
     ingest_result: IngestResult
+    segments: list[Segment]
 
 
 class PipelineOrchestrator:
@@ -199,6 +203,7 @@ class PipelineOrchestrator:
             chunks=chunks,
             embeddings=embeddings,
             ingest_result=ingest_result,
+            segments=segments,
         )
 
     def ingest_latest(

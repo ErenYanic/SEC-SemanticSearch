@@ -47,6 +47,31 @@ import type { SearchResult } from "@/lib/types";
 /** Maximum characters to show before truncating. */
 const PREVIEW_LENGTH = 300;
 
+/**
+ * Split a parent paragraph around the first occurrence of the chunk text
+ * so the chunk can be wrapped in a <mark> for visual highlight.
+ *
+ * Returns a 3-tuple of {before, match, after} on success, or null when
+ * the chunk does not appear inside the parent. We do not perform fuzzy
+ * matching — the chunker preserves chunk text verbatim from the parent
+ * segment, so an exact substring match should always succeed for data
+ * ingested after the parent-context change. Legacy chunks (no parent)
+ * are handled by the caller before this helper runs.
+ */
+function splitForHighlight(
+  parent: string,
+  chunk: string,
+): { before: string; match: string; after: string } | null {
+  if (!chunk) return null;
+  const idx = parent.indexOf(chunk);
+  if (idx < 0) return null;
+  return {
+    before: parent.slice(0, idx),
+    match: parent.slice(idx, idx + chunk.length),
+    after: parent.slice(idx + chunk.length),
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -101,11 +126,24 @@ export function ResultCard({
   const { addToast } = useToast();
   const [justCopied, setJustCopied] = useState(false);
 
-  const needsTruncation = result.content.length > PREVIEW_LENGTH;
+  // Prefer the parent segment text so the analyst sees the broader
+  // paragraph; highlight the embedded chunk inside it. Falls back to
+  // the chunk text directly when parent_content is absent (legacy
+  // chunks ingested before the parent-context change).
+  const fullContent = result.parent_content ?? result.content;
+  const needsTruncation = fullContent.length > PREVIEW_LENGTH;
   const displayContent =
     isExpanded || !needsTruncation
-      ? result.content
-      : result.content.slice(0, PREVIEW_LENGTH) + "…";
+      ? fullContent
+      : fullContent.slice(0, PREVIEW_LENGTH) + "…";
+
+  // Only highlight when we are showing the parent segment AND the chunk
+  // text appears verbatim inside the displayed slice (otherwise the
+  // chunk would either be missing or span the truncation boundary).
+  const highlightParts =
+    result.parent_content && result.parent_content !== result.content
+      ? splitForHighlight(displayContent, result.content)
+      : null;
 
   const percentage = Math.round(result.similarity * 100);
   const colors = similarityColors(result.similarity);
@@ -200,13 +238,29 @@ export function ResultCard({
           </p>
         )}
 
-        {/* Snippet */}
+        {/* Snippet — when the parent paragraph is available and contains the
+            matched chunk verbatim, wrap the chunk in <mark> so analysts can
+            see exactly which sentence(s) drove the vector match inside the
+            broader context. */}
         <p
           className={`mt-2 whitespace-pre-wrap text-[15px] leading-relaxed text-fg ${
             isExpanded ? "" : "line-clamp-3"
           }`}
         >
-          {displayContent}
+          {highlightParts ? (
+            <>
+              {highlightParts.before}
+              <mark
+                data-testid="chunk-highlight"
+                className="rounded-sm bg-warn/30 px-0.5 text-fg"
+              >
+                {highlightParts.match}
+              </mark>
+              {highlightParts.after}
+            </>
+          ) : (
+            displayContent
+          )}
         </p>
 
         {/* Expand hint */}
