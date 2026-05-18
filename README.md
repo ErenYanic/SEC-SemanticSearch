@@ -524,9 +524,9 @@ SEC-SemanticSearch/
 
 ## Licensing & Usage
 
-**SEC-GenerativeSearch** is licensed under the **Business Source License 1.1 (BSL 1.1)**.
+**SEC-SemanticSearch** is licensed under the **Business Source License 1.1 (BSL 1.1)**.
 
-Our goal with this license is to keep the codebase open for developers, students, and researchers to explore our RAG architecture and chunking logic, while protecting the project against unauthorized commercial exploitation and competing SaaS offerings.
+Our goal with this license is to keep the codebase open for developers, students, and researchers to explore our semantic search architecture and chunking logic, while protecting the project against unauthorized commercial exploitation and competing SaaS offerings.
 
 ### What you CAN do (Free & Open)
 
