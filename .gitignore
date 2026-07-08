@@ -25,6 +25,8 @@ edgar-identity.txt
 *.json
 *.parquet
 *.feather
+*.xlsx
+*.xls
 data/
 
 # Operating system files
